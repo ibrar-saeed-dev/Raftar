@@ -12,7 +12,11 @@ import {
   Dimensions,
   StatusBar,
   SafeAreaView,
-  Platform
+  Platform,
+  ActivityIndicator,
+  Modal,
+  Pressable,
+  Easing
 } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigation } from '@react-navigation/native';
@@ -37,6 +41,7 @@ const ProfileScreen = () => {
   
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [sidebarVisible, setSidebarVisible] = useState(false);
   const [profileData, setProfileData] = useState({
     name: user?.name || '',
     phoneNumber: user?.phoneNumber || '',
@@ -45,7 +50,7 @@ const ProfileScreen = () => {
     bio: user?.bio || 'Ride smarter, travel better 🚀'
   });
   const [notifications, setNotifications] = useState(true);
-  const [darkMode, setDarkMode] = useState(true);
+  const [darkMode, setDarkMode] = useState(false);
   const [language, setLanguage] = useState('English');
   const [isImageLoading, setIsImageLoading] = useState(false);
 
@@ -53,6 +58,11 @@ const ProfileScreen = () => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
   const scaleAnim = useRef(new Animated.Value(0.9)).current;
+  
+  // Sidebar animation refs
+  const sidebarTranslateX = useRef(new Animated.Value(width)).current;
+  const sidebarOverlayOpacity = useRef(new Animated.Value(0)).current;
+  const sidebarScale = useRef(new Animated.Value(0.95)).current;
 
   useEffect(() => {
     if (user) {
@@ -86,6 +96,45 @@ const ProfileScreen = () => {
         useNativeDriver: true,
       })
     ]).start();
+  };
+
+  const openSidebar = () => {
+    setSidebarVisible(true);
+    Animated.parallel([
+      Animated.timing(sidebarTranslateX, {
+        toValue: 0,
+        duration: 350,
+        easing: Easing.bezier(0.4, 0, 0.2, 1),
+        useNativeDriver: true,
+      }),
+      Animated.timing(sidebarOverlayOpacity, {
+        toValue: 0.5,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+      Animated.spring(sidebarScale, {
+        toValue: 1,
+        friction: 8,
+        tension: 40,
+        useNativeDriver: true,
+      })
+    ]).start();
+  };
+
+  const closeSidebar = () => {
+    Animated.parallel([
+      Animated.timing(sidebarTranslateX, {
+        toValue: width,
+        duration: 300,
+        easing: Easing.bezier(0.4, 0, 0.2, 1),
+        useNativeDriver: true,
+      }),
+      Animated.timing(sidebarOverlayOpacity, {
+        toValue: 0,
+        duration: 250,
+        useNativeDriver: true,
+      })
+    ]).start(() => setSidebarVisible(false));
   };
 
   const pickImage = async () => {
@@ -139,84 +188,142 @@ const ProfileScreen = () => {
   };
 
   const handleLogout = () => {
-    Alert.alert(
-      'Logout',
-      'Are you sure you want to logout?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Logout',
-          style: 'destructive',
-          onPress: async () => {
-            await dispatch(logout());
-            navigation.reset({
-              index: 0,
-              routes: [{ name: 'Auth' }],
-            });
+    closeSidebar();
+    setTimeout(() => {
+      Alert.alert(
+        'Logout',
+        'Are you sure you want to logout?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Logout',
+            style: 'destructive',
+            onPress: async () => {
+              await dispatch(logout());
+              navigation.reset({
+                index: 0,
+                routes: [{ name: 'Auth' }],
+              });
+            }
           }
-        }
-      ]
-    );
+        ]
+      );
+    }, 300);
   };
 
-  const menuItems = [
+  const sidebarMenuItems = [
     {
-      icon: 'history',
-      iconType: 'material',
+      icon: 'person-outline',
+      iconType: 'ionicon',
+      label: 'My Profile',
+      onPress: () => {
+        closeSidebar();
+      }
+    },
+    {
+      icon: 'time-outline',
+      iconType: 'ionicon',
       label: 'Ride History',
       count: 12,
-      color: '#FF6B6B',
-      onPress: () => navigation.navigate('RideHistory')
+      onPress: () => {
+        closeSidebar();
+        navigation.navigate('RideHistory');
+      }
     },
     {
-      icon: 'attach-money',
-      iconType: 'material',
+      icon: 'wallet-outline',
+      iconType: 'ionicon',
+      label: 'Wallet',
+      onPress: () => {
+        closeSidebar();
+        navigation.navigate('Wallet');
+      }
+    },
+    {
+      icon: 'cash-outline',
+      iconType: 'ionicon',
       label: 'My Spending',
-      color: '#FF6B6B',
-      onPress: () => navigation.navigate('Spending')
+      onPress: () => {
+        closeSidebar();
+        navigation.navigate('Spending');
+      }
     },
     {
-      icon: 'credit-card',
-      iconType: 'material',
+      icon: 'card-outline',
+      iconType: 'ionicon',
       label: 'Payment Methods',
       count: 2,
-      color: '#4ECDC4',
-      onPress: () => navigation.navigate('PaymentMethods')
+      onPress: () => {
+        closeSidebar();
+        navigation.navigate('PaymentMethods');
+      }
     },
     {
-      icon: 'headset',
-      iconType: 'material-community',
+      icon: 'notifications-outline',
+      iconType: 'ionicon',
+      label: 'Push Notifications',
+      isSwitch: true,
+      switchValue: notifications,
+      onSwitchChange: setNotifications,
+    },
+    {
+      icon: 'moon-outline',
+      iconType: 'ionicon',
+      label: 'Dark Mode',
+      isSwitch: true,
+      switchValue: darkMode,
+      onSwitchChange: setDarkMode,
+    },
+    {
+      icon: 'globe-outline',
+      iconType: 'ionicon',
+      label: 'Language',
+      value: language,
+      onPress: () => {
+        closeSidebar();
+        Alert.alert(
+          'Select Language',
+          'Choose your preferred language',
+          [
+            { text: 'English', onPress: () => setLanguage('English') },
+            { text: 'Urdu', onPress: () => setLanguage('Urdu') },
+            { text: 'Arabic', onPress: () => setLanguage('Arabic') },
+            { text: 'Cancel', style: 'cancel' }
+          ]
+        );
+      }
+    },
+    {
+      icon: 'help-circle-outline',
+      iconType: 'ionicon',
       label: 'Help & Support',
-      color: '#FFD93D',
-      onPress: () => navigation.navigate('Support')
+      onPress: () => {
+        closeSidebar();
+        navigation.navigate('HelpCenter');
+      }
     },
     {
-      icon: 'information-circle',
+      icon: 'information-circle-outline',
       iconType: 'ionicon',
       label: 'About Raftar',
-      color: '#A8E6CF',
-      onPress: () => navigation.navigate('About')
+      onPress: () => {
+        closeSidebar();
+        navigation.navigate('About');
+      }
     },
     {
-      icon: 'shield-check',
-      iconType: 'material-community',
-      label: 'Privacy Policy',
-      color: '#B39DDB',
-      onPress: () => navigation.navigate('Privacy')
-    },
-    {
-      icon: 'document-text',
+      icon: 'log-out-outline',
       iconType: 'ionicon',
-      label: 'Terms & Conditions',
-      color: '#FF8A80',
-      onPress: () => navigation.navigate('Terms')
-    }
+      label: 'Logout',
+      onPress: handleLogout,
+      isDanger: true
+    },
   ];
 
   const stats = [
-    { label: 'Rides', value: user?.stats?.totalRides?.toString() || '0', icon: 'car', color: '#FF6B6B', iconType: 'ionicon' },
-    { label: 'Rating', value: user?.stats?.rating?.toString() || '0', icon: 'star', color: '#FFD93D' },
-    { label: 'Points', value: '2.3k', icon: 'emoji-events', color: '#FFD700' }
+    { label: 'Total Rides', value: user?.stats?.totalRides?.toString() || '0', icon: 'car', color: '#F9C349', iconType: 'ionicon' },
+    { label: 'Rating', value: user?.stats?.rating?.toString() || '0', icon: 'star', color: '#F9C349' },
+    { label: 'Points', value: '2.3k', icon: 'trophy', color: '#F9C349', iconType: 'ionicon' }
   ];
 
   const getIcon = (icon, iconType, size, color) => {
@@ -236,7 +343,7 @@ const ProfileScreen = () => {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor="#121212" />
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
       
       <Animated.View 
         style={[
@@ -254,41 +361,61 @@ const ProfileScreen = () => {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scrollContent}
         >
-          {/* Header */}
+          {/* Modern Header */}
           <View style={styles.header}>
             <TouchableOpacity 
               style={styles.backButton}
               onPress={() => navigation.goBack()}
             >
-              <Icon name="arrow-back" size={24} color="#FFF" />
+              <Icon name="arrow-back" size={24} color="#000" />
             </TouchableOpacity>
-            <Text style={styles.headerTitle}>Profile</Text>
+            <Text style={styles.headerTitle}>My Profile</Text>
             <TouchableOpacity 
               style={styles.moreButton}
-              onPress={() => Alert.alert('More options coming soon')}
+              onPress={openSidebar}
             >
-              <Icon name="more-vert" size={24} color="#FFF" />
+              <Icon name="more-vert" size={24} color="#000" />
             </TouchableOpacity>
           </View>
 
-          {/* Profile Card */}
+          {/* Modern Cover Photo */}
+          <View style={styles.coverContainer}>
+            <LinearGradient
+              colors={['#F9C349', '#F8B82A', '#F5A623']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.coverGradient}
+            >
+              <View style={styles.coverOverlay}>
+                <Animatable.View 
+                  animation="bounceIn" 
+                  duration={1000}
+                  style={styles.coverBadgeContainer}
+                >
+                  <View style={styles.coverBadge}>
+                    <Icon name="star" size={14} color="#F9C349" />
+                    <Text style={styles.coverBadgeText}>Premium Rider</Text>
+                  </View>
+                </Animatable.View>
+              </View>
+            </LinearGradient>
+          </View>
+
+          {/* Modern Profile Card - Overlapping */}
           <Animatable.View 
             animation="fadeInUp" 
             duration={800}
-            style={styles.profileCard}
+            style={styles.profileCardWrapper}
           >
-            <LinearGradient
-              colors={['#1E1E1E', '#2A2A2A']}
-              style={styles.profileGradient}
-            >
+            <View style={styles.profileCard}>
               <View style={styles.profileHeader}>
-                {/* Left side - Image */}
-                <View style={styles.profileImageSection}>
-                  <TouchableOpacity 
-                    style={styles.profileImageContainer} 
-                    onPress={pickImage}
-                    activeOpacity={0.8}
-                  >
+                {/* Profile Image with Ring */}
+                <TouchableOpacity 
+                  style={styles.profileImageWrapper}
+                  onPress={pickImage}
+                  activeOpacity={0.8}
+                >
+                  <View style={styles.profileImageRing}>
                     <Image
                       source={{ 
                         uri: user?.profilePhoto || 
@@ -298,44 +425,54 @@ const ProfileScreen = () => {
                     />
                     {isImageLoading && (
                       <View style={styles.imageLoadingOverlay}>
-                        <ActivityIndicator size="large" color="#FFD700" />
+                        <ActivityIndicator size="large" color="#F9C349" />
                       </View>
                     )}
-                    <View style={styles.cameraIcon}>
-                      <Icon name="camera-alt" size={14} color="#121212" />
-                    </View>
-                  </TouchableOpacity>
-                  <View style={styles.verificationBadge}>
-                    <Icon name="verified" size={16} color="#4ECDC4" />
-                    <Text style={styles.verificationText}>Verified</Text>
                   </View>
-                </View>
+                  <View style={styles.cameraIcon}>
+                    <Icon name="camera-alt" size={14} color="#000" />
+                  </View>
+                </TouchableOpacity>
 
-                {/* Right side - Info */}
-                <View style={styles.profileInfoSection}>
-                  <Text style={styles.userName} numberOfLines={1}>
-                    {user?.name || 'Guest User'}
-                  </Text>
-                  <Text style={styles.userPhone}>{user?.phoneNumber || 'N/A'}</Text>
-                  <Text style={styles.userBio} numberOfLines={2}>
-                    {profileData.bio}
-                  </Text>
-                  <View style={styles.userMeta}>
-                    <View style={styles.metaItem}>
-                      <Icon name="email" size={14} color="#888" />
-                      <Text style={styles.metaText}>{user?.email || 'No email'}</Text>
+                {/* User Info */}
+                <View style={styles.userInfoContainer}>
+                  <View style={styles.userNameRow}>
+                    <Text style={styles.userName} numberOfLines={1}>
+                      {user?.name || 'Guest User'}
+                    </Text>
+                    <View style={styles.verificationBadge}>
+                      <Icon name="verified" size={16} color="#4ECDC4" />
                     </View>
-                    <View style={styles.metaItem}>
-                      <Icon name="credit-card" size={14} color="#888" />
-                      <Text style={styles.metaText}>{user?.cnic || 'No CNIC'}</Text>
-                    </View>
+                  </View>
+                  <View style={styles.userPhoneContainer}>
+                    <IconIonic name="call-outline" size={14} color="#888" />
+                    <Text style={styles.userPhone}>{user?.phoneNumber || 'N/A'}</Text>
+                  </View>
+                  <View style={styles.userBioContainer}>
+                    <IconIonic name="chatbubble-outline" size={14} color="#888" />
+                    <Text style={styles.userBio} numberOfLines={2}>
+                      {profileData.bio}
+                    </Text>
                   </View>
                 </View>
               </View>
-            </LinearGradient>
+
+              {/* User Meta Info */}
+              <View style={styles.metaInfoContainer}>
+                <View style={styles.metaItem}>
+                  <Icon name="email" size={16} color="#F9C349" />
+                  <Text style={styles.metaText}>{user?.email || 'No email'}</Text>
+                </View>
+                <View style={styles.metaDivider} />
+                <View style={styles.metaItem}>
+                  <Icon name="credit-card" size={16} color="#F9C349" />
+                  <Text style={styles.metaText}>{user?.cnic || 'No CNIC'}</Text>
+                </View>
+              </View>
+            </View>
           </Animatable.View>
 
-          {/* Stats Section */}
+          {/* Modern Stats Section */}
           <Animatable.View 
             animation="fadeInUp" 
             duration={800} 
@@ -344,16 +481,21 @@ const ProfileScreen = () => {
           >
             {stats.map((stat, index) => (
               <View key={index} style={styles.statItem}>
-                <View style={[styles.statIcon, { backgroundColor: stat.color + '20' }]}>
-                  {getIcon(stat.icon, stat.iconType || 'material', 20, stat.color)}
-                </View>
+                <LinearGradient
+                  colors={['#FFF8E8', '#FFFEF5']}
+                  style={styles.statIconWrapper}
+                >
+                  <View style={styles.statIcon}>
+                    {getIcon(stat.icon, stat.iconType || 'material', 24, '#F9C349')}
+                  </View>
+                </LinearGradient>
                 <Text style={styles.statValue}>{stat.value}</Text>
                 <Text style={styles.statLabel}>{stat.label}</Text>
               </View>
             ))}
           </Animatable.View>
 
-          {/* Edit Profile Section */}
+          {/* Modern Edit Profile Section */}
           <Animatable.View 
             animation="fadeInUp" 
             duration={800} 
@@ -361,23 +503,28 @@ const ProfileScreen = () => {
             style={styles.section}
           >
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Profile Information</Text>
+              <View style={styles.sectionTitleContainer}>
+                <Icon name="person" size={22} color="#F9C349" />
+                <Text style={styles.sectionTitle}>Personal Information</Text>
+              </View>
               <TouchableOpacity 
                 onPress={() => setIsEditing(!isEditing)}
                 style={styles.editButtonContainer}
               >
                 <LinearGradient
-                  colors={isEditing ? ['#FF6B6B', '#FF8E53'] : ['#FFD700', '#FFC107']}
-                  style={styles.editButtonGradient}
+                  colors={isEditing ? ['#FF3B30', '#FF3B30'] : ['#F9C349', '#F8B82A']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={[styles.editButtonGradient, isEditing && styles.editButtonActive]}
                 >
-                  <Text style={styles.editButton}>
-                    {isEditing ? 'Cancel' : 'Edit'}
-                  </Text>
                   <Icon 
                     name={isEditing ? 'close' : 'edit'} 
                     size={16} 
-                    color="#121212" 
+                    color={isEditing ? '#FFF' : '#000'} 
                   />
+                  <Text style={[styles.editButton, isEditing && styles.editButtonActiveText]}>
+                    {isEditing ? 'Cancel' : 'Edit'}
+                  </Text>
                 </LinearGradient>
               </TouchableOpacity>
             </View>
@@ -415,155 +562,227 @@ const ProfileScreen = () => {
                   multiline
                   numberOfLines={3}
                 />
-                <Button
-                  title="Save Changes"
-                  onPress={handleSave}
-                  loading={loading}
-                  size="large"
+                <TouchableOpacity
                   style={styles.saveButton}
-                />
+                  onPress={handleSave}
+                  disabled={loading}
+                >
+                  <LinearGradient
+                    colors={['#F9C349', '#F8B82A']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.saveButtonGradient}
+                  >
+                    {loading ? (
+                      <ActivityIndicator size="small" color="#000" />
+                    ) : (
+                      <>
+                        <Icon name="save" size={20} color="#000" />
+                        <Text style={styles.saveButtonText}>Save Changes</Text>
+                      </>
+                    )}
+                  </LinearGradient>
+                </TouchableOpacity>
               </View>
             ) : (
               <View style={styles.infoCard}>
                 <View style={styles.infoRow}>
-                  <Text style={styles.infoLabel}>Name</Text>
+                  <View style={styles.infoLabelContainer}>
+                    <Icon name="person-outline" size={18} color="#888" />
+                    <Text style={styles.infoLabel}>Full Name</Text>
+                  </View>
                   <Text style={styles.infoValue}>{user?.name}</Text>
                 </View>
                 <View style={styles.infoRow}>
-                  <Text style={styles.infoLabel}>Phone</Text>
+                  <View style={styles.infoLabelContainer}>
+                    <Icon name="phone" size={18} color="#888" />
+                    <Text style={styles.infoLabel}>Phone</Text>
+                  </View>
                   <Text style={styles.infoValue}>{user?.phoneNumber}</Text>
                 </View>
                 <View style={styles.infoRow}>
-                  <Text style={styles.infoLabel}>Email</Text>
+                  <View style={styles.infoLabelContainer}>
+                    <Icon name="email" size={18} color="#888" />
+                    <Text style={styles.infoLabel}>Email</Text>
+                  </View>
                   <Text style={styles.infoValue}>{user?.email || 'Not set'}</Text>
                 </View>
                 <View style={[styles.infoRow, styles.lastInfoRow]}>
-                  <Text style={styles.infoLabel}>CNIC</Text>
+                  <View style={styles.infoLabelContainer}>
+                    <Icon name="credit-card" size={18} color="#888" />
+                    <Text style={styles.infoLabel}>CNIC</Text>
+                  </View>
                   <Text style={styles.infoValue}>{user?.cnic || 'Not set'}</Text>
                 </View>
               </View>
             )}
           </Animatable.View>
 
-          {/* Preferences */}
-          <Animatable.View 
-            animation="fadeInUp" 
-            duration={800} 
-            delay={400}
-            style={styles.section}
+          
+        </ScrollView>
+      </Animated.View>
+
+      {/* Modern Sidebar */}
+      <Modal
+        transparent={true}
+        visible={sidebarVisible}
+        onRequestClose={closeSidebar}
+        statusBarTranslucent={true}
+      >
+        <Animated.View 
+          style={[
+            styles.sidebarOverlay,
+            { opacity: sidebarOverlayOpacity }
+          ]}
+        >
+          <Pressable 
+            style={styles.sidebarPressable}
+            onPress={closeSidebar}
+          />
+        </Animated.View>
+        
+        <Animated.View 
+          style={[
+            styles.sidebarContainer,
+            {
+              transform: [
+                { translateX: sidebarTranslateX },
+                { scale: sidebarScale }
+              ]
+            }
+          ]}
+        >
+          {/* Sidebar Header */}
+          <LinearGradient
+            colors={['#F9C349', '#F8B82A']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.sidebarHeader}
           >
-            <Text style={styles.sectionTitle}>Preferences</Text>
-            
-            <View style={styles.preferenceItem}>
-              <View style={styles.preferenceInfo}>
-                <View style={styles.preferenceIcon}>
-                  <Icon name="notifications" size={22} color="#FFD700" />
-                </View>
-                <View>
-                  <Text style={styles.preferenceLabel}>Push Notifications</Text>
-                  <Text style={styles.preferenceSub}>Receive ride updates and offers</Text>
-                </View>
-              </View>
-              <Switch
-                value={notifications}
-                onValueChange={setNotifications}
-                trackColor={{ false: '#333', true: '#FFD700' }}
-                thumbColor={notifications ? '#FFF' : '#666'}
-                ios_backgroundColor="#333"
-              />
-            </View>
-
-            <View style={styles.preferenceItem}>
-              <View style={styles.preferenceInfo}>
-                <View style={styles.preferenceIcon}>
-                  <Icon name="dark-mode" size={22} color="#FFD700" />
-                </View>
-                <View>
-                  <Text style={styles.preferenceLabel}>Dark Mode</Text>
-                  <Text style={styles.preferenceSub}>Dark theme for better viewing</Text>
-                </View>
-              </View>
-              <Switch
-                value={darkMode}
-                onValueChange={setDarkMode}
-                trackColor={{ false: '#333', true: '#FFD700' }}
-                thumbColor={darkMode ? '#FFF' : '#666'}
-                ios_backgroundColor="#333"
-              />
-            </View>
-
-            <TouchableOpacity style={styles.preferenceItem}>
-              <View style={styles.preferenceInfo}>
-                <View style={styles.preferenceIcon}>
-                  <Icon name="language" size={22} color="#FFD700" />
-                </View>
-                <View>
-                  <Text style={styles.preferenceLabel}>Language</Text>
-                  <Text style={styles.preferenceSub}>{language}</Text>
-                </View>
-              </View>
-              <Icon name="chevron-right" size={24} color="#666" />
+            <TouchableOpacity 
+              style={styles.sidebarCloseButton}
+              onPress={closeSidebar}
+            >
+              <Icon name="close" size={24} color="#000" />
             </TouchableOpacity>
-          </Animatable.View>
-
-          {/* Menu */}
-          <Animatable.View 
-            animation="fadeInUp" 
-            duration={800} 
-            delay={500}
-            style={styles.section}
-          >
-            <Text style={styles.sectionTitle}>Settings</Text>
             
-            {menuItems.map((item, index) => (
+            <View style={styles.sidebarUserInfo}>
+              <TouchableOpacity 
+                style={styles.sidebarAvatarContainer}
+                onPress={pickImage}
+              >
+                <Image
+                  source={{ 
+                    uri: user?.profilePhoto || 
+                         'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&h=200&fit=crop&crop=face'
+                  }}
+                  style={styles.sidebarAvatar}
+                />
+                <View style={styles.sidebarCameraIcon}>
+                  <Icon name="camera-alt" size={12} color="#000" />
+                </View>
+              </TouchableOpacity>
+              
+              <Text style={styles.sidebarUserName} numberOfLines={1}>
+                {user?.name || 'Guest User'}
+              </Text>
+              <Text style={styles.sidebarUserEmail} numberOfLines={1}>
+                {user?.email || 'No email'}
+              </Text>
+            </View>
+
+            <View style={styles.sidebarStats}>
+              <View style={styles.sidebarStat}>
+                <Text style={styles.sidebarStatValue}>12</Text>
+                <Text style={styles.sidebarStatLabel}>Rides</Text>
+              </View>
+              <View style={styles.sidebarStatDivider} />
+              <View style={styles.sidebarStat}>
+                <Text style={styles.sidebarStatValue}>4.8</Text>
+                <Text style={styles.sidebarStatLabel}>Rating</Text>
+              </View>
+              <View style={styles.sidebarStatDivider} />
+              <View style={styles.sidebarStat}>
+                <Text style={styles.sidebarStatValue}>2.3k</Text>
+                <Text style={styles.sidebarStatLabel}>Points</Text>
+              </View>
+            </View>
+          </LinearGradient>
+
+          {/* Sidebar Menu */}
+          <ScrollView 
+            style={styles.sidebarMenu}
+            showsVerticalScrollIndicator={false}
+          >
+            {sidebarMenuItems.map((item, index) => (
               <TouchableOpacity
                 key={index}
-                style={styles.menuItem}
+                style={[
+                  styles.sidebarMenuItem,
+                  item.isDanger && styles.sidebarMenuItemDanger
+                ]}
                 onPress={item.onPress}
                 activeOpacity={0.7}
+                disabled={item.isSwitch}
               >
-                <View style={styles.menuItemLeft}>
-                  <View style={[styles.menuIcon, { backgroundColor: item.color + '15' }]}>
-                    {getIcon(item.icon, item.iconType, 22, item.color)}
+                <View style={styles.sidebarMenuItemLeft}>
+                  <View style={[
+                    styles.sidebarMenuItemIcon,
+                    item.isDanger && styles.sidebarMenuItemIconDanger
+                  ]}>
+                    {getIcon(item.icon, item.iconType, 22, item.isDanger ? '#FF3B30' : '#F9C349')}
                   </View>
-                  <Text style={styles.menuItemText}>{item.label}</Text>
+                  <View style={styles.sidebarMenuItemTextContainer}>
+                    <Text style={[
+                      styles.sidebarMenuItemText,
+                      item.isDanger && styles.sidebarMenuItemTextDanger
+                    ]}>
+                      {item.label}
+                    </Text>
+                    {item.value && (
+                      <Text style={styles.sidebarMenuItemValue}>{item.value}</Text>
+                    )}
+                  </View>
                 </View>
-                <View style={styles.menuItemRight}>
+                <View style={styles.sidebarMenuItemRight}>
                   {item.count && (
-                    <View style={styles.menuBadge}>
-                      <Text style={styles.menuBadgeText}>{item.count}</Text>
+                    <View style={styles.sidebarMenuBadge}>
+                      <Text style={styles.sidebarMenuBadgeText}>{item.count}</Text>
                     </View>
                   )}
-                  <Icon name="chevron-right" size={20} color="#444" />
+                  {item.isSwitch ? (
+                    <Switch
+                      value={item.switchValue}
+                      onValueChange={item.onSwitchChange}
+                      trackColor={{ false: '#E0E0E0', true: '#F9C349' }}
+                      thumbColor={item.switchValue ? '#FFF' : '#999'}
+                      ios_backgroundColor="#E0E0E0"
+                    />
+                  ) : (
+                    <Icon name="chevron-right" size={20} color="#CCC" />
+                  )}
                 </View>
               </TouchableOpacity>
             ))}
-          </Animatable.View>
+          </ScrollView>
 
-          {/* Logout Button */}
-          <Animatable.View 
-            animation="fadeInUp" 
-            duration={800} 
-            delay={600}
-            style={styles.logoutContainer}
-          >
-            <TouchableOpacity
-              style={styles.logoutButton}
-              onPress={handleLogout}
-              activeOpacity={0.8}
-            >
-              <LinearGradient
-                colors={['#FF6B6B', '#FF8E53']}
-                style={styles.logoutGradient}
-              >
-                <Icon name="logout" size={22} color="#FFF" />
-                <Text style={styles.logoutText}>Logout</Text>
-              </LinearGradient>
-            </TouchableOpacity>
-            <Text style={styles.versionText}>Version 2.0.0 • Made with ❤️</Text>
-          </Animatable.View>
-        </ScrollView>
-      </Animated.View>
+          {/* Sidebar Footer */}
+          <View style={styles.sidebarFooter}>
+            <Text style={styles.sidebarVersion}>Version 2.0.0</Text>
+            <View style={styles.sidebarSocialIcons}>
+              <TouchableOpacity style={styles.sidebarSocialIcon}>
+                <Icon name="facebook" size={20} color="#888" />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.sidebarSocialIcon}>
+                <Icon name="twitter" size={20} color="#888" />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.sidebarSocialIcon}>
+                <Icon name="instagram" size={20} color="#888" />
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Animated.View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -571,11 +790,12 @@ const ProfileScreen = () => {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#121212',
+    backgroundColor: '#FFFFFF',
   },
   container: {
     flex: 1,
-    backgroundColor: '#121212',
+    backgroundColor: '#F8F9FA',
+    marginTop: 30
   },
   scrollContent: {
     paddingBottom: 40,
@@ -586,167 +806,254 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingTop: 10,
-    paddingBottom: 20,
+    paddingBottom: 5,
   },
   backButton: {
-    padding: 4,
+    padding: 8,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0,0,0,0.05)',
   },
   headerTitle: {
     fontSize: 20,
-    fontWeight: 'bold',
-    color: '#FFF',
+    fontWeight: '700',
+    color: '#000',
   },
   moreButton: {
-    padding: 4,
+    padding: 8,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0,0,0,0.05)',
   },
-  profileCard: {
-    marginHorizontal: 20,
+  coverContainer: {
+    height: 70,
+    marginHorizontal: 16,
+    marginTop: 8,
     borderRadius: 24,
     overflow: 'hidden',
-    marginBottom: 20,
-    elevation: 10,
+    elevation: 4,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
   },
-  profileGradient: {
+  coverGradient: {
+    flex: 1,
+  },
+  coverOverlay: {
+    flex: 1,
     padding: 20,
+    justifyContent: 'flex-end',
+  },
+  coverBadgeContainer: {
+    alignSelf: 'flex-start',
+  },
+  coverBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 20,
+    gap: 6,
+  },
+  coverBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#000',
+  },
+  profileCardWrapper: {
+    marginTop: -50,
+    paddingHorizontal: 16,
+  },
+  profileCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 20,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.05)',
   },
   profileHeader: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  profileImageSection: {
-    alignItems: 'center',
-    marginRight: 20,
-  },
-  profileImageContainer: {
+  profileImageWrapper: {
     position: 'relative',
-    marginBottom: 8,
+    marginRight: 16,
+  },
+  profileImageRing: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    padding: 3,
+    backgroundColor: '#F9C349',
   },
   profileImage: {
-    width: 90,
-    height: 90,
-    borderRadius: 45,
-    borderWidth: 3,
-    borderColor: '#FFD700',
+    width: 74,
+    height: 74,
+    borderRadius: 37,
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
   },
   imageLoadingOverlay: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    borderRadius: 45,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    top: 3,
+    left: 3,
+    right: 3,
+    bottom: 3,
+    borderRadius: 37,
+    backgroundColor: 'rgba(255,255,255,0.7)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   cameraIcon: {
     position: 'absolute',
-    bottom: 2,
-    right: 2,
-    backgroundColor: '#FFD700',
-    borderRadius: 16,
+    bottom: 0,
+    right: 0,
+    backgroundColor: '#F9C349',
+    borderRadius: 14,
     width: 28,
     height: 28,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: '#121212',
+    borderColor: '#FFFFFF',
   },
-  verificationBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(78, 205, 196, 0.15)',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  verificationText: {
-    color: '#4ECDC4',
-    fontSize: 11,
-    fontWeight: '600',
-    marginLeft: 4,
-  },
-  profileInfoSection: {
+  userInfoContainer: {
     flex: 1,
   },
+  userNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 4,
+  },
   userName: {
-    color: '#FFF',
     fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 2,
+    fontWeight: '700',
+    color: '#000',
+  },
+  verificationBadge: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#E8F5F3',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  userPhoneContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 4,
   },
   userPhone: {
     color: '#888',
     fontSize: 13,
-    marginBottom: 4,
   },
-  userBio: {
-    color: '#AAA',
-    fontSize: 12,
-    marginBottom: 6,
-    fontStyle: 'italic',
-  },
-  userMeta: {
-    gap: 2,
-  },
-  metaItem: {
+  userBioContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
   },
-  metaText: {
+  userBio: {
     color: '#666',
-    fontSize: 11,
+    fontSize: 12,
+    fontStyle: 'italic',
+    flex: 1,
+  },
+  metaInfoContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#F0F0F0',
+    gap: 16,
+  },
+  metaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
+  },
+  metaDivider: {
+    width: 1,
+    height: 24,
+    backgroundColor: '#F0F0F0',
+  },
+  metaText: {
+    color: '#888',
+    fontSize: 12,
   },
   statsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    marginHorizontal: 20,
+    marginHorizontal: 16,
+    marginTop: 24,
     marginBottom: 24,
-    backgroundColor: '#1E1E1E',
-    paddingVertical: 16,
+    backgroundColor: '#FFFFFF',
+    paddingVertical: 20,
     borderRadius: 20,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
     borderWidth: 1,
-    borderColor: '#2A2A2A',
+    borderColor: 'rgba(0,0,0,0.05)',
   },
   statItem: {
     alignItems: 'center',
+  },
+  statIconWrapper: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
   },
   statIcon: {
     width: 40,
     height: 40,
     borderRadius: 20,
+    backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 6,
   },
   statValue: {
-    color: '#FFF',
+    color: '#000',
     fontSize: 20,
-    fontWeight: 'bold',
+    fontWeight: '700',
   },
   statLabel: {
     color: '#888',
-    fontSize: 12,
+    fontSize: 11,
+    marginTop: 2,
   },
   section: {
-    marginHorizontal: 20,
+    marginHorizontal: 16,
     marginBottom: 24,
   },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 16,
+  },
+  sectionTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
   },
   sectionTitle: {
-    color: '#FFF',
+    color: '#000',
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: '700',
   },
   editButtonContainer: {
     borderRadius: 20,
@@ -758,151 +1065,265 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     gap: 6,
+    borderRadius: 20,
+  },
+  editButtonActive: {
+    backgroundColor: '#FF3B30',
   },
   editButton: {
-    color: '#121212',
+    color: '#000',
     fontSize: 13,
     fontWeight: '600',
+  },
+  editButtonActiveText: {
+    color: '#FFF',
   },
   editForm: {
     gap: 12,
   },
   saveButton: {
+    borderRadius: 16,
+    overflow: 'hidden',
     marginTop: 8,
   },
+  saveButtonGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    gap: 8,
+  },
+  saveButtonText: {
+    color: '#000',
+    fontSize: 16,
+    fontWeight: '600',
+  },
   infoCard: {
-    backgroundColor: '#1E1E1E',
+    backgroundColor: '#F8F9FA',
     padding: 16,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#2A2A2A',
+    borderColor: 'rgba(0,0,0,0.05)',
   },
   infoRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 10,
+    alignItems: 'center',
+    paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#2A2A2A',
+    borderBottomColor: 'rgba(0,0,0,0.05)',
   },
   lastInfoRow: {
     borderBottomWidth: 0,
+    paddingBottom: 0,
+  },
+  infoLabelContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   infoLabel: {
     color: '#888',
     fontSize: 14,
   },
   infoValue: {
-    color: '#FFF',
+    color: '#000',
     fontSize: 14,
     fontWeight: '500',
-    maxWidth: '60%',
+    maxWidth: '55%',
     textAlign: 'right',
   },
-  preferenceItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#1E1E1E',
-    padding: 16,
-    borderRadius: 16,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: '#2A2A2A',
+  
+  // Sidebar Styles
+  sidebarOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#000',
   },
-  preferenceInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  sidebarPressable: {
     flex: 1,
-    gap: 14,
   },
-  preferenceIcon: {
-    width: 40,
-    height: 40,
+  sidebarContainer: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    width: width * 0.82,
+    height: '100%',
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 30,
+    borderBottomLeftRadius: 30,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: -4, height: 0 },
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  sidebarHeader: {
+    paddingTop: Platform.OS === 'ios' ? 50 : 40,
+    paddingHorizontal: 24,
+    paddingBottom: 20,
+    borderBottomLeftRadius: 30,
+  },
+  sidebarCloseButton: {
+    alignSelf: 'flex-end',
+    padding: 4,
+    backgroundColor: 'rgba(0,0,0,0.05)',
     borderRadius: 20,
-    backgroundColor: 'rgba(255, 215, 0, 0.1)',
+    marginBottom: 16,
+  },
+  sidebarUserInfo: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  sidebarAvatarContainer: {
+    position: 'relative',
+    marginBottom: 12,
+  },
+  sidebarAvatar: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    borderWidth: 3,
+    borderColor: '#FFFFFF',
+  },
+  sidebarCameraIcon: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    backgroundColor: '#F9C349',
+    borderRadius: 14,
+    width: 24,
+    height: 24,
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
   },
-  preferenceLabel: {
-    color: '#FFF',
-    fontSize: 14,
-    fontWeight: '500',
+  sidebarUserName: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#000',
+    marginBottom: 2,
   },
-  preferenceSub: {
-    color: '#666',
-    fontSize: 12,
+  sidebarUserEmail: {
+    fontSize: 13,
+    color: 'rgba(0,0,0,0.6)',
   },
-  menuItem: {
+  sidebarStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    backgroundColor: 'rgba(255,255,255,0.3)',
+    paddingVertical: 12,
+    borderRadius: 16,
+  },
+  sidebarStat: {
+    alignItems: 'center',
+  },
+  sidebarStatValue: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#000',
+  },
+  sidebarStatLabel: {
+    fontSize: 11,
+    color: 'rgba(0,0,0,0.6)',
+  },
+  sidebarStatDivider: {
+    width: 1,
+    backgroundColor: 'rgba(0,0,0,0.1)',
+  },
+  sidebarMenu: {
+    flex: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  sidebarMenuItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#1E1E1E',
-    padding: 16,
-    borderRadius: 16,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: '#2A2A2A',
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    marginBottom: 2,
   },
-  menuItemLeft: {
+  sidebarMenuItemDanger: {
+    marginTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#F0F0F0',
+    paddingTop: 16,
+  },
+  sidebarMenuItemLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 14,
+    flex: 1,
   },
-  menuIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
+  sidebarMenuItemIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: '#FFF8E8',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  menuItemText: {
-    color: '#FFF',
-    fontSize: 14,
-    fontWeight: '500',
+  sidebarMenuItemIconDanger: {
+    backgroundColor: '#FFF5F5',
   },
-  menuItemRight: {
+  sidebarMenuItemTextContainer: {
+    flex: 1,
+  },
+  sidebarMenuItemText: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: '#000',
+  },
+  sidebarMenuItemTextDanger: {
+    color: '#FF3B30',
+  },
+  sidebarMenuItemValue: {
+    fontSize: 12,
+    color: '#888',
+    marginTop: 1,
+  },
+  sidebarMenuItemRight: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
   },
-  menuBadge: {
-    backgroundColor: '#FFD700',
+  sidebarMenuBadge: {
+    backgroundColor: '#F9C349',
     borderRadius: 12,
     paddingHorizontal: 8,
     paddingVertical: 2,
   },
-  menuBadgeText: {
-    color: '#121212',
+  sidebarMenuBadgeText: {
+    color: '#000',
     fontSize: 11,
     fontWeight: 'bold',
   },
-  logoutContainer: {
-    marginHorizontal: 20,
-    marginTop: 8,
-    alignItems: 'center',
-  },
-  logoutButton: {
-    width: '100%',
-    borderRadius: 16,
-    overflow: 'hidden',
-    marginBottom: 16,
-  },
-  logoutGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+  sidebarFooter: {
+    paddingHorizontal: 24,
     paddingVertical: 16,
-    gap: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#F0F0F0',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
-  logoutText: {
-    color: '#FFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  versionText: {
-    color: '#444',
+  sidebarVersion: {
     fontSize: 12,
-    textAlign: 'center',
+    color: '#CCC',
+  },
+  sidebarSocialIcons: {
+    flexDirection: 'row',
+    gap: 16,
+  },
+  sidebarSocialIcon: {
+    padding: 4,
   },
 });
 

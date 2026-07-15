@@ -7,17 +7,39 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
-  RefreshControl
+  RefreshControl,
+  TextInput,
+  Modal,
+  Dimensions,
+  Image,
+  SafeAreaView,
+  StatusBar,
+  Platform,
 } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import { TextInput } from 'react-native';
+import IconMC from 'react-native-vector-icons/MaterialCommunityIcons';
+import IconIonic from 'react-native-vector-icons/Ionicons';
+import { LinearGradient } from 'expo-linear-gradient';
+import * as Animatable from 'react-native-animatable';
+import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import Button from '../../components/common/Button';
-import CarpoolMapPreview from '../../components/common/CarpoolMapPreview';
 import { getRideRequests, acceptRide, counterOffer, removeRideRequest } from '../../redux/slices/driverSlice';
 import { useSocket } from '../../context/SocketContext';
 import api from '../../services/api';
+
+const { width } = Dimensions.get('window');
+
+// Yellow Theme Colors
+const YELLOW_PRIMARY = '#F8B82A';
+const YELLOW_SECONDARY = '#F9C349';
+const WHITE = '#FFFFFF';
+const BLACK = '#000000';
+const GRAY_DARK = '#333333';
+const GRAY_MEDIUM = '#666666';
+const GRAY_LIGHT = '#F5F5F5';
+const GRAY_BG = '#F8F9FA';
 
 const RideRequestScreen = () => {
   const navigation = useNavigation();
@@ -28,6 +50,7 @@ const RideRequestScreen = () => {
   const [showCounterOffer, setShowCounterOffer] = useState(false);
   const [counterAmount, setCounterAmount] = useState('');
   const [activeRide, setActiveRide] = useState(null);
+  const [expandedCard, setExpandedCard] = useState(null);
 
   const socket = useSocket();
 
@@ -47,7 +70,6 @@ const RideRequestScreen = () => {
       
       const handleRideTaken = (data) => {
         console.log("DRIVER RECEIVED ride-taken:", JSON.stringify(data));
-        console.log('Driver: "Ride was taken by someone (or myself)"');
         dispatch(removeRideRequest(data.rideId));
       };
 
@@ -86,13 +108,13 @@ const RideRequestScreen = () => {
   };
 
   const getBannerColor = (status) => {
-    if (status === 'searching') return '#A29BFE'; // Purple
-    return '#FFD700'; // Gold
+    if (status === 'searching') return '#A29BFE';
+    return YELLOW_PRIMARY;
   };
 
   const getBannerTextColor = (status) => {
-    if (status === 'searching') return '#FFF';
-    return '#000';
+    if (status === 'searching') return WHITE;
+    return BLACK;
   };
 
   const fetchRideRequests = async () => {
@@ -109,7 +131,7 @@ const RideRequestScreen = () => {
   const handleAccept = async (item) => {
     Alert.alert(
       'Accept Ride',
-      'Are you sure you want to accept this ride?',
+      `Accept ride request from ${item.passengerId?.name || 'Passenger'}?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -134,7 +156,14 @@ const RideRequestScreen = () => {
   };
 
   const handleDecline = (rideId) => {
-    dispatch(removeRideRequest(rideId));
+    Alert.alert(
+      'Decline Ride',
+      'Are you sure you want to decline this ride request?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Decline', onPress: () => dispatch(removeRideRequest(rideId)) }
+      ]
+    );
   };
 
   const handleCounterOffer = async (rideId) => {
@@ -165,445 +194,894 @@ const RideRequestScreen = () => {
     return `${distance.toFixed(1)} km`;
   };
 
-  const renderRideRequest = (item) => (
-    <View key={item._id} style={styles.requestCard}>
-      <View style={styles.requestHeader}>
-        <View style={styles.riderInfo}>
-          <View style={[styles.avatar, item.type === 'parcel' && { backgroundColor: '#FFD700' }]}>
-            <Text style={styles.avatarText}>
-              {item.type === 'parcel' ? '📦' : (item.passengerId?.name?.charAt(0) || '?')}
-            </Text>
+  const formatTime = (date) => {
+    return new Date(date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
+  const toggleExpand = (id) => {
+    setExpandedCard(expandedCard === id ? null : id);
+  };
+
+  const renderRideRequest = (item) => {
+    const isExpanded = expandedCard === item._id;
+    
+    return (
+      <Animatable.View 
+        key={item._id} 
+        animation="fadeInUp" 
+        duration={500} 
+        delay={200}
+        style={styles.requestCard}
+      >
+        <TouchableOpacity 
+          activeOpacity={0.9}
+          onPress={() => toggleExpand(item._id)}
+        >
+          <View style={styles.requestHeader}>
+            <View style={styles.riderInfo}>
+              <View style={styles.avatarContainer}>
+                <LinearGradient
+                  colors={[YELLOW_PRIMARY, YELLOW_SECONDARY]}
+                  style={styles.avatarGradient}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                >
+                  <Text style={styles.avatarText}>
+                    {item.type === 'parcel' ? '📦' : (item.passengerId?.name?.charAt(0) || '?')}
+                  </Text>
+                </LinearGradient>
+                <View style={styles.onlineDot} />
+              </View>
+              <View style={styles.riderDetails}>
+                <Text style={styles.riderName}>
+                  {item.type === 'parcel' ? 'Parcel Delivery' : item.passengerId?.name || 'Unknown Rider'}
+                </Text>
+                <View style={styles.riderMeta}>
+                  <Icon name="star" size={12} color={YELLOW_PRIMARY} />
+                  <Text style={styles.riderRating}>
+                    {item.type === 'parcel' 
+                      ? `${item.parcel?.weight || 0}kg • ${item.parcel?.size || 'Medium'}` 
+                      : `${item.passengerId?.stats?.rating || item.passengerId?.rating || 0}`}
+                  </Text>
+                  <View style={styles.metaDot} />
+                  <Icon name="schedule" size={12} color={GRAY_MEDIUM} />
+                  <Text style={styles.riderTime}>{formatTime(item.createdAt)}</Text>
+                </View>
+              </View>
+            </View>
+            <View style={styles.distanceBadge}>
+              <Text style={styles.distanceText}>{formatDistance(item.distance || 0)}</Text>
+            </View>
           </View>
-          <View>
-            <Text style={styles.riderName}>
-              {item.type === 'parcel' ? 'Parcel Delivery' : item.passengerId?.name}
-            </Text>
-            <Text style={styles.riderRating}>
-              {item.type === 'parcel' 
-                ? `${item.parcel?.weight || 0}kg • ${item.parcel?.size || 'Medium'}` 
-                : `⭐ ${item.passengerId?.stats?.rating || item.passengerId?.rating || 0} (${item.passengerId?.stats?.totalRatings || 0} ratings)`}
-            </Text>
+
+          <View style={styles.routeInfo}>
+            <View style={styles.routePoint}>
+              <View style={styles.routeIconGreen}>
+                <Icon name="my-location" size={14} color={WHITE} />
+              </View>
+              <Text style={styles.routeText} numberOfLines={1}>
+                {item.pickup?.address || 'Pickup location'}
+              </Text>
+            </View>
+            <View style={styles.routeConnector}>
+              <View style={styles.routeLine} />
+              <View style={styles.routeDot} />
+            </View>
+            <View style={styles.routePoint}>
+              <View style={styles.routeIconRed}>
+                <Icon name="location-on" size={14} color={WHITE} />
+              </View>
+              <Text style={styles.routeText} numberOfLines={1}>
+                {item.dropoff?.address || 'Dropoff location'}
+              </Text>
+            </View>
           </View>
-        </View>
-        <View style={styles.distanceBadge}>
-          <Text style={styles.distanceText}>
-            {formatDistance(item.distance || 0)}
-          </Text>
-        </View>
-      </View>
 
-      {item.type === 'intercity' && item.scheduledTime && (
-        <View style={{ paddingHorizontal: 15, paddingBottom: 10 }}>
-          <Text style={{ color: '#FFD700', fontSize: 13, fontWeight: 'bold' }}>
-            Scheduled for: {new Date(item.scheduledTime).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-          </Text>
-        </View>
-      )}
-      {item.type === 'parcel' && item.parcel?.description && (
-        <View style={{ paddingHorizontal: 15, paddingBottom: 10 }}>
-          <Text style={{ color: '#888', fontSize: 13, fontStyle: 'italic' }}>
-            "{item.parcel.description}"
-          </Text>
-        </View>
-      )}
+          {isExpanded && (
+            <Animatable.View animation="fadeIn" duration={300}>
+              <View style={styles.expandedContent}>
+                <View style={styles.mapContainer}>
+                  <MapView
+                    style={styles.map}
+                    provider={PROVIDER_GOOGLE}
+                    initialRegion={{
+                      latitude: item.pickup?.coordinates?.[1] || 37.78825,
+                      longitude: item.pickup?.coordinates?.[0] || -122.4324,
+                      latitudeDelta: 0.02,
+                      longitudeDelta: 0.02,
+                    }}
+                    scrollEnabled={false}
+                    zoomEnabled={false}
+                  >
+                    <Marker
+                      coordinate={{
+                        latitude: item.pickup?.coordinates?.[1] || 37.78825,
+                        longitude: item.pickup?.coordinates?.[0] || -122.4324,
+                      }}
+                    >
+                      <View style={styles.mapMarkerGreen}>
+                        <Icon name="my-location" size={12} color={WHITE} />
+                      </View>
+                    </Marker>
+                    <Marker
+                      coordinate={{
+                        latitude: item.dropoff?.coordinates?.[1] || 37.7749,
+                        longitude: item.dropoff?.coordinates?.[0] || -122.4194,
+                      }}
+                    >
+                      <View style={styles.mapMarkerRed}>
+                        <Icon name="location-on" size={12} color={WHITE} />
+                      </View>
+                    </Marker>
+                  </MapView>
+                </View>
 
-      <View style={styles.routeInfo}>
-        <View style={styles.routePoint}>
-          <Icon name="location-on" size={16} color="#4ECDC4" />
-          <Text style={styles.routeText} numberOfLines={1}>
-            {item.pickup?.address}
-          </Text>
-        </View>
-        <View style={styles.routeLine} />
-        <View style={styles.routePoint}>
-          <Icon name="flag" size={16} color="#FF6B6B" />
-          <Text style={styles.routeText} numberOfLines={1}>
-            {item.dropoff?.address}
-          </Text>
-        </View>
-      </View>
+                <View style={styles.rideDetailsGrid}>
+                  <View style={styles.detailItem}>
+                    <IconMC name="car-sports" size={20} color={YELLOW_PRIMARY} />
+                    <Text style={styles.detailLabel}>Vehicle</Text>
+                    <Text style={styles.detailValue}>
+                      {item.type === 'parcel' ? 'Parcel' : (item.vehicleType || 'Economy')}
+                    </Text>
+                  </View>
+                  <View style={styles.detailItem}>
+                    <Icon name="people" size={20} color={YELLOW_PRIMARY} />
+                    <Text style={styles.detailLabel}>Seats</Text>
+                    <Text style={styles.detailValue}>{item.seats || 1}</Text>
+                  </View>
+                  <View style={styles.detailItem}>
+                    <Icon name="attach-money" size={20} color={YELLOW_PRIMARY} />
+                    <Text style={styles.detailLabel}>Fare</Text>
+                    <Text style={styles.detailValue}>Rs. {item.fare?.offered || item.fare?.accepted || 0}</Text>
+                  </View>
+                </View>
 
-      <CarpoolMapPreview 
-        pickup={item.pickup} 
-        dropoff={item.dropoff} 
-        style={{ height: 160, marginBottom: 12, borderRadius: 8, overflow: 'hidden' }} 
-      />
+                {item.type === 'parcel' && item.parcel?.description && (
+                  <View style={styles.parcelNote}>
+                    <Icon name="note" size={16} color={GRAY_MEDIUM} />
+                    <Text style={styles.parcelNoteText}>{item.parcel.description}</Text>
+                  </View>
+                )}
 
-      <View style={styles.requestFooter}>
-        <View style={styles.fareInfo}>
-          <Text style={styles.fareLabel}>Fare</Text>
-          <Text style={styles.fareAmount}>Rs. {item.fare?.offered || item.fare?.accepted || 0}</Text>
-        </View>
-        <View style={styles.vehicleInfo}>
-          <Icon name={item.type === 'parcel' ? 'local-shipping' : 'directions-car'} size={16} color="#888" />
-          <Text style={styles.vehicleText}>
-            {item.type === 'parcel' ? 'Parcel' : (item.vehicleType || 'Economy')}
-          </Text>
-        </View>
-      </View>
+                {item.type === 'intercity' && item.scheduledTime && (
+                  <View style={styles.scheduledBadge}>
+                    <Icon name="event" size={16} color={YELLOW_PRIMARY} />
+                    <Text style={styles.scheduledText}>
+                      Scheduled: {new Date(item.scheduledTime).toLocaleString([], { 
+                        month: 'short', 
+                        day: 'numeric', 
+                        hour: '2-digit', 
+                        minute: '2-digit' 
+                      })}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            </Animatable.View>
+          )}
+        </TouchableOpacity>
 
-      <View style={styles.actionButtons}>
-        <Button
-          title="Accept"
-          onPress={() => handleAccept(item)}
-          size="small"
-          style={styles.acceptButton}
-        />
-        <Button
-          title="Counter"
-          onPress={() => {
-            setSelectedRequest(item);
-            setShowCounterOffer(true);
-          }}
-          variant="outline"
-          size="small"
-          style={styles.counterButton}
-        />
-        <Button
-          title="Decline"
-          onPress={() => handleDecline(item._id)}
-          variant="danger"
-          size="small"
-          style={styles.declineButton}
-        />
-      </View>
-    </View>
-  );
+        <View style={styles.actionButtons}>
+          <TouchableOpacity
+            style={styles.declineButton}
+            onPress={() => handleDecline(item._id)}
+          >
+            <Icon name="close" size={20} color={GRAY_MEDIUM} />
+            <Text style={styles.declineButtonText}>Decline</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.counterButton}
+            onPress={() => {
+              setSelectedRequest(item);
+              setShowCounterOffer(true);
+            }}
+          >
+            <Icon name="trending-up" size={20} color={YELLOW_PRIMARY} />
+            <Text style={styles.counterButtonText}>Counter</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.acceptButton}
+            onPress={() => handleAccept(item)}
+          >
+            <LinearGradient
+              colors={[YELLOW_PRIMARY, YELLOW_SECONDARY]}
+              style={styles.acceptGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+            >
+              <Icon name="check" size={20} color={WHITE} />
+              <Text style={styles.acceptButtonText}>Accept</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
+      </Animatable.View>
+    );
+  };
 
   if (loading && !refreshing) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#FFD700" />
-      </View>
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={YELLOW_PRIMARY} />
+          <Text style={styles.loadingText}>Loading requests...</Text>
+        </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <ScrollView
-      style={styles.container}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#FFD700" />
-      }
-    >
-      <View style={styles.header}>
-        <Text style={styles.title}>Ride Requests</Text>
-        <Text style={styles.subtitle}>
-          {rideRequests.length} ride{rideRequests.length !== 1 ? 's' : ''} available
-        </Text>
-      </View>
-
-      {/* Active Ride Banner */}
-      {activeRide && (
-        <TouchableOpacity 
-          style={[styles.activeRideBanner, { backgroundColor: getBannerColor(activeRide.status) }]} 
-          onPress={() => navigation.navigate('ActiveRide', { ride: activeRide })}
-        >
-          <View style={styles.activeRideBannerContent}>
-            <View>
-              <Text style={[styles.activeRideBannerTitle, { color: getBannerTextColor(activeRide.status) }]}>
-                {getBannerTitle(activeRide.status)}
-              </Text>
-              <Text style={[styles.activeRideBannerSubtitle, { color: activeRide.status === 'searching' ? '#EEE' : '#333' }]}>
-                Passenger: {activeRide.passengerId?.name || 'Unknown'} • Status: {activeRide.status.toUpperCase()}
-              </Text>
-            </View>
-            <Icon name="chevron-right" size={24} color={getBannerTextColor(activeRide.status)} />
-          </View>
-        </TouchableOpacity>
-      )}
-
-      {rideRequests.length > 0 ? (
-        rideRequests.map(renderRideRequest)
-      ) : (
-        <View style={styles.emptyState}>
-          <Icon name="directions-car" size={64} color="#333" />
-          <Text style={styles.emptyTitle}>No Requests</Text>
-          <Text style={styles.emptyText}>
-            There are currently no ride or parcel requests in your area.
-            Make sure you're online and in a busy location.
-          </Text>
-        </View>
-      )}
-
-      {/* Counter Offer Modal */}
-      {showCounterOffer && selectedRequest && (
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Counter Offer</Text>
-            <Text style={styles.modalSubtitle}>
-              Original fare: Rs. {selectedRequest.fare?.offered || selectedRequest.fare?.accepted || 0}
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar barStyle="dark-content" backgroundColor={WHITE} />
+      
+      <View style={styles.container}>
+        {/* Header with Back Arrow */}
+        <View style={styles.header}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+            activeOpacity={0.7}
+          >
+            <IconIonic 
+              name={Platform.OS === 'ios' ? 'chevron-back' : 'arrow-back'} 
+              size={24} 
+              color={BLACK} 
+            />
+          </TouchableOpacity>
+          <View style={styles.headerTitleContainer}>
+            <Text style={styles.headerTitle}>Ride Requests</Text>
+            <Text style={styles.headerSubtitle}>
+              {rideRequests.length} ride{rideRequests.length !== 1 ? 's' : ''} available
             </Text>
-            <View style={styles.modalInput}>
-              <Text style={styles.modalInputLabel}>Your Offer</Text>
-              <TextInput
-                style={styles.modalInputField}
-                value={counterAmount}
-                onChangeText={setCounterAmount}
-                placeholder="Enter amount"
-                placeholderTextColor="#666"
-                keyboardType="numeric"
-                autoFocus
-              />
-            </View>
-            <View style={styles.modalButtons}>
-              <Button
-                title="Cancel"
-                onPress={() => {
-                  setShowCounterOffer(false);
-                  setCounterAmount('');
-                }}
-                variant="outline"
-                size="small"
-                style={styles.modalCancelButton}
-              />
-              <Button
-                title="Send Offer"
-                onPress={() => handleCounterOffer(selectedRequest._id)}
-                size="small"
-                style={styles.modalSendButton}
-              />
+          </View>
+          <TouchableOpacity style={styles.filterButton}>
+            <Icon name="filter-list" size={24} color={GRAY_DARK} />
+          </TouchableOpacity>
+        </View>
+
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl 
+              refreshing={refreshing} 
+              onRefresh={onRefresh} 
+              tintColor={YELLOW_PRIMARY}
+              colors={[YELLOW_PRIMARY]}
+            />
+          }
+        >
+          {/* Active Ride Banner */}
+          {activeRide && (
+            <Animatable.View animation="fadeInUp" duration={400}>
+              <TouchableOpacity 
+                style={[styles.activeRideBanner, { backgroundColor: getBannerColor(activeRide.status) }]} 
+                onPress={() => navigation.navigate('ActiveRide', { ride: activeRide })}
+                activeOpacity={0.9}
+              >
+                <View style={styles.activeRideBannerContent}>
+                  <View style={styles.activeRideLeft}>
+                    <View style={styles.activeRideIcon}>
+                      <Icon name="directions-car" size={20} color={getBannerTextColor(activeRide.status)} />
+                    </View>
+                    <View>
+                      <Text style={[styles.activeRideBannerTitle, { color: getBannerTextColor(activeRide.status) }]}>
+                        {getBannerTitle(activeRide.status)}
+                      </Text>
+                      <Text style={[styles.activeRideBannerSubtitle, { color: getBannerTextColor(activeRide.status) }]}>
+                        {activeRide.passengerId?.name || 'Unknown'} • {activeRide.status.toUpperCase()}
+                      </Text>
+                    </View>
+                  </View>
+                  <Icon name="chevron-right" size={24} color={getBannerTextColor(activeRide.status)} />
+                </View>
+              </TouchableOpacity>
+            </Animatable.View>
+          )}
+
+          {rideRequests.length > 0 ? (
+            rideRequests.map(renderRideRequest)
+          ) : (
+            <Animatable.View animation="fadeIn" duration={600} style={styles.emptyState}>
+              <View style={styles.emptyIconContainer}>
+                <IconMC name="car-search" size={64} color={GRAY_LIGHT} />
+              </View>
+              <Text style={styles.emptyTitle}>No Requests</Text>
+              <Text style={styles.emptyText}>
+                There are currently no ride or parcel requests in your area.
+              </Text>
+              <TouchableOpacity style={styles.emptyRefreshButton} onPress={onRefresh}>
+                <Text style={styles.emptyRefreshText}>Refresh</Text>
+                <Icon name="refresh" size={18} color={WHITE} />
+              </TouchableOpacity>
+            </Animatable.View>
+          )}
+
+          <View style={styles.bottomSpacer} />
+        </ScrollView>
+
+        {/* Counter Offer Modal */}
+        <Modal
+          animationType="slide"
+          transparent={true}
+          visible={showCounterOffer}
+          onRequestClose={() => {
+            setShowCounterOffer(false);
+            setCounterAmount('');
+          }}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHandle} />
+              
+              <Text style={styles.modalTitle}>Counter Offer</Text>
+              <Text style={styles.modalSubtitle}>
+                Original fare: Rs. {selectedRequest?.fare?.offered || selectedRequest?.fare?.accepted || 0}
+              </Text>
+              
+              <View style={styles.modalInputContainer}>
+                <Text style={styles.modalInputLabel}>Your Offer Amount</Text>
+                <View style={styles.modalInputWrapper}>
+                  <Text style={styles.modalCurrencySymbol}>Rs.</Text>
+                  <TextInput
+                    style={styles.modalInputField}
+                    value={counterAmount}
+                    onChangeText={setCounterAmount}
+                    placeholder="Enter amount"
+                    placeholderTextColor={GRAY_MEDIUM}
+                    keyboardType="numeric"
+                    autoFocus
+                  />
+                </View>
+              </View>
+
+              <View style={styles.modalButtons}>
+                <TouchableOpacity
+                  style={styles.modalCancelButton}
+                  onPress={() => {
+                    setShowCounterOffer(false);
+                    setCounterAmount('');
+                  }}
+                >
+                  <Text style={styles.modalCancelText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.modalSendButton}
+                  onPress={() => handleCounterOffer(selectedRequest?._id)}
+                >
+                  <LinearGradient
+                    colors={[YELLOW_PRIMARY, YELLOW_SECONDARY]}
+                    style={styles.modalSendGradient}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                  >
+                    <Text style={styles.modalSendText}>Send Offer</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
-        </View>
-      )}
-    </ScrollView>
+        </Modal>
+      </View>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: WHITE,
+  },
   container: {
     flex: 1,
-    backgroundColor: '#121212',
-    paddingHorizontal: 20,
-    paddingTop: 20,
+    backgroundColor: WHITE,
+    marginTop:20
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#121212',
+    backgroundColor: WHITE,
+  },
+  loadingText: {
+    color: GRAY_MEDIUM,
+    fontSize: 14,
+    marginTop: 12,
+    fontWeight: '500',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingTop: Platform.OS === 'ios' ? 8 : 12,
+    paddingBottom: 16,
+    backgroundColor: WHITE,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 4,
+  },
+  headerTitleContainer: {
+    flex: 1,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: BLACK,
+  },
+  headerSubtitle: {
+    fontSize: 13,
+    color: GRAY_MEDIUM,
+    marginTop: 1,
+  },
+  filterButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: GRAY_LIGHT,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   activeRideBanner: {
-    backgroundColor: '#FFD700',
-    marginBottom: 20,
-    borderRadius: 12,
+    marginHorizontal: 16,
+    marginTop: 16,
+    marginBottom: 16,
+    borderRadius: 16,
     padding: 16,
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
+    shadowColor: BLACK,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
   },
   activeRideBannerContent: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
+  activeRideLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  activeRideIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   activeRideBannerTitle: {
-    color: '#000',
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 4,
+    fontSize: 14,
+    fontWeight: '700',
   },
   activeRideBannerSubtitle: {
-    color: '#333',
-    fontSize: 14,
-  },
-  header: {
-    marginBottom: 24,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#FFF',
-  },
-  subtitle: {
-    color: '#888',
-    fontSize: 14,
-    marginTop: 4,
+    fontSize: 12,
+    fontWeight: '500',
+    opacity: 0.8,
   },
   requestCard: {
-    backgroundColor: '#1E1E1E',
-    borderRadius: 12,
-    padding: 16,
+    backgroundColor: WHITE,
+    marginHorizontal: 16,
     marginBottom: 16,
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#F0F0F0',
+    shadowColor: BLACK,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
   },
   requestHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
+    alignItems: 'flex-start',
   },
   riderInfo: {
     flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
   },
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#2A2A2A',
-    justifyContent: 'center',
-    alignItems: 'center',
+  avatarContainer: {
+    position: 'relative',
     marginRight: 12,
   },
+  avatarGradient: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   avatarText: {
-    color: '#FFD700',
-    fontSize: 18,
-    fontWeight: 'bold',
+    color: WHITE,
+    fontSize: 20,
+    fontWeight: '700',
+  },
+  onlineDot: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#4ECDC4',
+    borderWidth: 2,
+    borderColor: WHITE,
+  },
+  riderDetails: {
+    flex: 1,
   },
   riderName: {
-    color: '#FFF',
     fontSize: 16,
-    fontWeight: '500',
+    fontWeight: '600',
+    color: BLACK,
+  },
+  riderMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 2,
+    gap: 4,
   },
   riderRating: {
-    color: '#888',
+    fontSize: 13,
+    color: GRAY_MEDIUM,
+  },
+  metaDot: {
+    width: 3,
+    height: 3,
+    borderRadius: 1.5,
+    backgroundColor: GRAY_MEDIUM,
+    marginHorizontal: 4,
+  },
+  riderTime: {
     fontSize: 12,
+    color: GRAY_MEDIUM,
   },
   distanceBadge: {
-    backgroundColor: '#2A2A2A',
+    backgroundColor: GRAY_LIGHT,
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 12,
   },
   distanceText: {
-    color: '#FFF',
     fontSize: 12,
+    color: GRAY_MEDIUM,
+    fontWeight: '500',
   },
   routeInfo: {
-    marginBottom: 12,
+    marginTop: 12,
+    paddingLeft: 4,
   },
   routePoint: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: 4,
-    gap: 8,
+    gap: 10,
+  },
+  routeIconGreen: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#4ECDC4',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  routeIconRed: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#FF6B6B',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  routeText: {
+    fontSize: 14,
+    color: GRAY_DARK,
+    flex: 1,
+  },
+  routeConnector: {
+    alignItems: 'center',
+    marginLeft: 11,
+    paddingVertical: 2,
   },
   routeLine: {
     width: 2,
     height: 12,
-    backgroundColor: '#333',
-    marginLeft: 7,
+    backgroundColor: '#E0E0E0',
   },
-  routeText: {
-    color: '#888',
-    fontSize: 13,
-    flex: 1,
+  routeDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#E0E0E0',
+    marginTop: 2,
   },
-  requestFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingTop: 12,
+  expandedContent: {
+    marginTop: 12,
     borderTopWidth: 1,
-    borderTopColor: '#2A2A2A',
+    borderTopColor: '#F0F0F0',
+    paddingTop: 12,
   },
-  fareInfo: {
+  mapContainer: {
+    height: 140,
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginBottom: 12,
+  },
+  map: {
+    width: '100%',
+    height: '100%',
+  },
+  mapMarkerGreen: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#4ECDC4',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: WHITE,
+  },
+  mapMarkerRed: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#FF6B6B',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: WHITE,
+  },
+  rideDetailsGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingVertical: 8,
+    backgroundColor: GRAY_LIGHT,
+    borderRadius: 12,
+    marginBottom: 8,
+  },
+  detailItem: {
+    alignItems: 'center',
+  },
+  detailLabel: {
+    fontSize: 11,
+    color: GRAY_MEDIUM,
+    marginTop: 2,
+  },
+  detailValue: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: BLACK,
+    marginTop: 1,
+  },
+  parcelNote: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    backgroundColor: GRAY_LIGHT,
+    padding: 10,
+    borderRadius: 8,
+    marginTop: 8,
   },
-  fareLabel: {
-    color: '#888',
-    fontSize: 12,
+  parcelNoteText: {
+    fontSize: 13,
+    color: GRAY_DARK,
+    flex: 1,
   },
-  fareAmount: {
-    color: '#FFD700',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  vehicleInfo: {
+  scheduledBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 8,
+    backgroundColor: YELLOW_PRIMARY + '15',
+    padding: 10,
+    borderRadius: 8,
+    marginTop: 8,
   },
-  vehicleText: {
-    color: '#888',
-    fontSize: 12,
+  scheduledText: {
+    fontSize: 13,
+    color: YELLOW_PRIMARY,
+    fontWeight: '500',
   },
   actionButtons: {
     flexDirection: 'row',
-    marginTop: 12,
+    marginTop: 14,
     gap: 8,
-  },
-  acceptButton: {
-    flex: 1,
-  },
-  counterButton: {
-    flex: 1,
   },
   declineButton: {
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    gap: 6,
+  },
+  declineButtonText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: GRAY_MEDIUM,
+  },
+  counterButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: YELLOW_PRIMARY,
+    gap: 6,
+  },
+  counterButtonText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: YELLOW_PRIMARY,
+  },
+  acceptButton: {
+    flex: 1.5,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  acceptGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    gap: 6,
+  },
+  acceptButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: WHITE,
   },
   emptyState: {
     alignItems: 'center',
     paddingVertical: 60,
+    paddingHorizontal: 40,
   },
-  emptyTitle: {
-    color: '#FFF',
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginTop: 16,
-  },
-  emptyText: {
-    color: '#888',
-    fontSize: 14,
-    textAlign: 'center',
-    marginTop: 8,
-    paddingHorizontal: 20,
-  },
-  modalOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.8)',
+  emptyIconContainer: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: GRAY_LIGHT,
     justifyContent: 'center',
     alignItems: 'center',
+    marginBottom: 20,
+  },
+  emptyTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: BLACK,
+  },
+  emptyText: {
+    fontSize: 14,
+    color: GRAY_MEDIUM,
+    textAlign: 'center',
+    marginTop: 8,
+    lineHeight: 20,
+  },
+  emptyRefreshButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: YELLOW_PRIMARY,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 12,
+    marginTop: 20,
+    gap: 8,
+  },
+  emptyRefreshText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: WHITE,
+  },
+  bottomSpacer: {
+    height: 30,
+  },
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: '#1E1E1E',
-    borderRadius: 16,
+    backgroundColor: WHITE,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
     padding: 24,
-    width: '85%',
+    paddingBottom: Platform.OS === 'ios' ? 40 : 24,
+  },
+  modalHandle: {
+    width: 40,
+    height: 4,
+    backgroundColor: '#E0E0E0',
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 20,
   },
   modalTitle: {
-    color: '#FFF',
-    fontSize: 20,
-    fontWeight: 'bold',
+    fontSize: 22,
+    fontWeight: '700',
+    color: BLACK,
     marginBottom: 4,
   },
   modalSubtitle: {
-    color: '#888',
     fontSize: 14,
+    color: GRAY_MEDIUM,
     marginBottom: 20,
   },
-  modalInput: {
-    marginBottom: 20,
+  modalInputContainer: {
+    marginBottom: 24,
   },
   modalInputLabel: {
-    color: '#FFF',
     fontSize: 14,
+    fontWeight: '500',
+    color: BLACK,
     marginBottom: 8,
   },
+  modalInputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: GRAY_LIGHT,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+  },
+  modalCurrencySymbol: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: GRAY_DARK,
+    marginRight: 8,
+  },
   modalInputField: {
-    backgroundColor: '#2A2A2A',
-    color: '#FFF',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
+    flex: 1,
+    fontSize: 18,
+    fontWeight: '600',
+    color: BLACK,
+    paddingVertical: 14,
   },
   modalButtons: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 12,
   },
   modalCancelButton: {
     flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalCancelText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: GRAY_MEDIUM,
   },
   modalSendButton: {
-    flex: 1,
+    flex: 2,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  modalSendGradient: {
+    paddingVertical: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalSendText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: WHITE,
   },
 });
 

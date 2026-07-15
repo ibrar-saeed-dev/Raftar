@@ -8,13 +8,32 @@ import {
   TouchableOpacity,
   Image,
   ActivityIndicator,
-  Alert
+  Alert,
+  SafeAreaView,
+  StatusBar,
+  Platform,
+  Dimensions,
 } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import IconIonic from 'react-native-vector-icons/Ionicons';
+import IconMC from 'react-native-vector-icons/MaterialCommunityIcons';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import { registerDriver, getDriverProfile } from '../../redux/slices/driverSlice';
+
+const { width } = Dimensions.get('window');
+
+// Yellow Theme Colors
+const YELLOW_PRIMARY = '#F8B82A';
+const YELLOW_SECONDARY = '#F9C349';
+const WHITE = '#FFFFFF';
+const BLACK = '#000000';
+const GRAY_DARK = '#333333';
+const GRAY_MEDIUM = '#666666';
+const GRAY_LIGHT = '#F5F5F5';
+const GRAY_BG = '#F8F9FA';
 
 const DriverRegistrationScreen = () => {
   const dispatch = useDispatch();
@@ -73,16 +92,13 @@ const DriverRegistrationScreen = () => {
         documents: documents
       };
 
-      console.log('[DriverRegistration] Submitting payload to registerDriver...', Object.keys(payload));
       const res = await dispatch(registerDriver(payload));
       
       if (res.error) {
         Alert.alert('Registration Failed', res.payload || 'Failed to submit form');
-        console.error('[DriverRegistration] Registration error:', res.error);
         return;
       }
       
-      console.log('[DriverRegistration] Success! Checking profile again...');
       await dispatch(getDriverProfile());
       
       Alert.alert(
@@ -91,151 +107,416 @@ const DriverRegistrationScreen = () => {
         [{ text: 'OK', onPress: () => navigation.goBack() }]
       );
     } catch (error) {
-      console.error('[DriverRegistration] Catch block error:', error);
       Alert.alert('Error', 'An unexpected error occurred.');
     }
   };
 
   const renderImagePicker = (field, label, icon) => (
-    <TouchableOpacity style={styles.imagePicker} onPress={() => pickImage(field)}>
+    <TouchableOpacity 
+      style={styles.imagePicker} 
+      onPress={() => pickImage(field)}
+      activeOpacity={0.7}
+    >
       {documents[field] ? (
         <Image source={{ uri: documents[field].uri }} style={styles.previewImage} />
       ) : (
         <View style={styles.placeholder}>
-          <Icon name={icon} size={40} color="#666" />
-          <Text style={styles.placeholderText}>Upload {label}</Text>
+          <View style={styles.placeholderIcon}>
+            <Icon name={icon} size={28} color={YELLOW_PRIMARY} />
+          </View>
+          <Text style={styles.placeholderText}>{label}</Text>
+          <View style={styles.uploadBadge}>
+            <Icon name="cloud-upload" size={14} color={WHITE} />
+          </View>
         </View>
       )}
     </TouchableOpacity>
   );
 
+  const getDocumentStatus = () => {
+    const uploaded = Object.values(documents).filter(doc => doc !== null).length;
+    return `${uploaded} / ${Object.keys(documents).length} uploaded`;
+  };
+
+  const getVehicleTypeIcon = (type) => {
+    switch (type.toLowerCase()) {
+      case 'car': return 'car';
+      case 'bike': return 'motorbike';
+      case 'rickshaw': return 'auto-rickshaw';
+      default: return 'car';
+    }
+  };
+
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.title}>Driver Onboarding</Text>
-      <Text style={styles.subtitle}>Complete your profile to start earning</Text>
-
-      {/* Vehicle Details */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Vehicle Details</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Vehicle Type (car, bike, rickshaw)"
-          placeholderTextColor="#666"
-          value={vehicle.type}
-          onChangeText={text => setVehicle({ ...vehicle, type: text })}
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Make & Model (e.g. Toyota Corolla)"
-          placeholderTextColor="#666"
-          value={vehicle.model}
-          onChangeText={text => setVehicle({ ...vehicle, model: text })}
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Year"
-          placeholderTextColor="#666"
-          keyboardType="numeric"
-          value={vehicle.year}
-          onChangeText={text => setVehicle({ ...vehicle, year: text })}
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Color"
-          placeholderTextColor="#666"
-          value={vehicle.color}
-          onChangeText={text => setVehicle({ ...vehicle, color: text })}
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="License Plate Number"
-          placeholderTextColor="#666"
-          value={vehicle.plateNumber}
-          onChangeText={text => setVehicle({ ...vehicle, plateNumber: text })}
-        />
-      </View>
-
-      {/* Documents */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Documents & Photos</Text>
-        <View style={styles.grid}>
-          {renderImagePicker('selfie', 'Selfie / Profile Photo', 'face')}
-          {renderImagePicker('drivingLicense', 'Driving License', 'badge')}
-          {renderImagePicker('vehicleRegistration', 'Registration (Book)', 'description')}
-          {renderImagePicker('cnicFront', 'CNIC Front', 'credit-card')}
-          {renderImagePicker('cnicBack', 'CNIC Back', 'credit-card')}
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar barStyle="dark-content" backgroundColor={WHITE} />
+      
+      <View style={styles.container}>
+        {/* Header */}
+        <View style={styles.header}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+            activeOpacity={0.7}
+          >
+            <IconIonic 
+              name={Platform.OS === 'ios' ? 'chevron-back' : 'arrow-back'} 
+              size={24} 
+              color={BLACK} 
+            />
+          </TouchableOpacity>
+          <View style={styles.headerTitleContainer}>
+            <Text style={styles.headerTitle}>Driver Registration</Text>
+            <Text style={styles.headerSubtitle}>Complete your profile to start earning</Text>
+          </View>
+          <View style={styles.headerRightPlaceholder} />
         </View>
-      </View>
 
-      <TouchableOpacity 
-        style={[styles.submitButton, loading && styles.submitButtonDisabled]}
-        onPress={handleSubmit}
-        disabled={loading}
-      >
-        {loading ? (
-          <ActivityIndicator color="#121212" />
-        ) : (
-          <Text style={styles.submitButtonText}>Submit Application</Text>
-        )}
-      </TouchableOpacity>
-    </ScrollView>
+        <ScrollView 
+          style={styles.scrollView}
+          contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Progress Indicator */}
+          <View style={styles.progressContainer}>
+            <View style={styles.progressBar}>
+              <View style={[styles.progressFill, { width: '40%' }]} />
+            </View>
+            <Text style={styles.progressText}>Step 1 of 2</Text>
+          </View>
+
+          {/* Vehicle Details Section */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <View style={styles.sectionIcon}>
+                <IconMC name="car" size={20} color={YELLOW_PRIMARY} />
+              </View>
+              <Text style={styles.sectionTitle}>Vehicle Details</Text>
+            </View>
+            
+            <View style={styles.vehicleTypeRow}>
+              {['car', 'bike', 'rickshaw'].map((type) => (
+                <TouchableOpacity
+                  key={type}
+                  style={[
+                    styles.vehicleTypeButton,
+                    vehicle.type === type && styles.vehicleTypeActive
+                  ]}
+                  onPress={() => setVehicle({ ...vehicle, type })}
+                  activeOpacity={0.7}
+                >
+                  <IconMC 
+                    name={type === 'car' ? 'car' : type === 'bike' ? 'motorbike' : 'auto-rickshaw'} 
+                    size={22} 
+                    color={vehicle.type === type ? WHITE : GRAY_MEDIUM} 
+                  />
+                  <Text style={[
+                    styles.vehicleTypeText,
+                    vehicle.type === type && styles.vehicleTypeTextActive
+                  ]}>
+                    {type.charAt(0).toUpperCase() + type.slice(1)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <View style={styles.inputGroup}>
+              <View style={styles.inputIcon}>
+                <Icon name="directions-car" size={20} color={GRAY_MEDIUM} />
+              </View>
+              <TextInput
+                style={styles.input}
+                placeholder="Make & Model (e.g. Toyota Corolla)"
+                placeholderTextColor={GRAY_MEDIUM}
+                value={vehicle.model}
+                onChangeText={text => setVehicle({ ...vehicle, model: text })}
+              />
+            </View>
+
+            <View style={styles.inputRow}>
+              <View style={[styles.inputGroup, styles.inputHalf]}>
+                <View style={styles.inputIcon}>
+                  <Icon name="event" size={20} color={GRAY_MEDIUM} />
+                </View>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Year"
+                  placeholderTextColor={GRAY_MEDIUM}
+                  keyboardType="numeric"
+                  value={vehicle.year}
+                  onChangeText={text => setVehicle({ ...vehicle, year: text })}
+                />
+              </View>
+              <View style={[styles.inputGroup, styles.inputHalf]}>
+                <View style={styles.inputIcon}>
+                  <Icon name="palette" size={20} color={GRAY_MEDIUM} />
+                </View>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Color"
+                  placeholderTextColor={GRAY_MEDIUM}
+                  value={vehicle.color}
+                  onChangeText={text => setVehicle({ ...vehicle, color: text })}
+                />
+              </View>
+            </View>
+
+            <View style={styles.inputGroup}>
+              <View style={styles.inputIcon}>
+                <Icon name="confirmation-number" size={20} color={GRAY_MEDIUM} />
+              </View>
+              <TextInput
+                style={styles.input}
+                placeholder="License Plate Number"
+                placeholderTextColor={GRAY_MEDIUM}
+                value={vehicle.plateNumber}
+                onChangeText={text => setVehicle({ ...vehicle, plateNumber: text.toUpperCase() })}
+              />
+            </View>
+          </View>
+
+          {/* Documents Section */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <View style={styles.sectionIcon}>
+                <Icon name="folder" size={20} color={YELLOW_PRIMARY} />
+              </View>
+              <Text style={styles.sectionTitle}>Documents & Photos</Text>
+              <View style={styles.docStatus}>
+                <Text style={styles.docStatusText}>{getDocumentStatus()}</Text>
+              </View>
+            </View>
+
+            <View style={styles.documentGrid}>
+              {renderImagePicker('selfie', 'Selfie', 'face')}
+              {renderImagePicker('drivingLicense', 'Driving License', 'badge')}
+              {renderImagePicker('vehicleRegistration', 'Registration', 'description')}
+              {renderImagePicker('cnicFront', 'CNIC Front', 'credit-card')}
+              {renderImagePicker('cnicBack', 'CNIC Back', 'credit-card')}
+            </View>
+          </View>
+
+          {/* Submit Button */}
+          <TouchableOpacity 
+            style={[styles.submitButton, loading && styles.submitButtonDisabled]}
+            onPress={handleSubmit}
+            disabled={loading}
+            activeOpacity={0.8}
+          >
+            <LinearGradient
+              colors={[YELLOW_PRIMARY, YELLOW_SECONDARY]}
+              style={styles.submitGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+            >
+              {loading ? (
+                <ActivityIndicator color={WHITE} size="small" />
+              ) : (
+                <>
+                  <Icon name="check-circle" size={22} color={WHITE} />
+                  <Text style={styles.submitButtonText}>Submit Application</Text>
+                </>
+              )}
+            </LinearGradient>
+          </TouchableOpacity>
+
+          <View style={styles.bottomSpacer} />
+        </ScrollView>
+      </View>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: WHITE,
+  },
   container: {
     flex: 1,
-    backgroundColor: '#121212',
+    backgroundColor: GRAY_BG,
+    marginTop:23,
+    paddingBottom:30
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingTop: Platform.OS === 'ios' ? 8 : 12,
+    paddingBottom: 16,
+    backgroundColor: WHITE,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 4,
+  },
+  headerTitleContainer: {
+    flex: 1,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: BLACK,
+  },
+  headerSubtitle: {
+    fontSize: 13,
+    color: GRAY_MEDIUM,
+    marginTop: 1,
+  },
+  headerRightPlaceholder: {
+    width: 40,
+  },
+  scrollView: {
+    flex: 1,
   },
   content: {
-    padding: 20,
+    padding: 16,
     paddingBottom: 40,
   },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#FFD700',
-    marginBottom: 5,
+  progressContainer: {
+    marginBottom: 20,
+    backgroundColor: WHITE,
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#F0F0F0',
   },
-  subtitle: {
-    fontSize: 16,
-    color: '#888',
-    marginBottom: 30,
+  progressBar: {
+    height: 6,
+    backgroundColor: GRAY_LIGHT,
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: YELLOW_PRIMARY,
+    borderRadius: 3,
+  },
+  progressText: {
+    fontSize: 12,
+    color: GRAY_MEDIUM,
+    marginTop: 8,
   },
   section: {
-    marginBottom: 30,
+    backgroundColor: WHITE,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#F0F0F0',
+    shadowColor: BLACK,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  sectionIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: YELLOW_PRIMARY + '10',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#FFF',
-    marginBottom: 15,
+    fontSize: 16,
+    fontWeight: '600',
+    color: BLACK,
+    flex: 1,
+  },
+  docStatus: {
+    backgroundColor: YELLOW_PRIMARY + '10',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  docStatusText: {
+    fontSize: 11,
+    color: YELLOW_PRIMARY,
+    fontWeight: '500',
+  },
+  vehicleTypeRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 16,
+  },
+  vehicleTypeButton: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: GRAY_LIGHT,
+    borderWidth: 1,
+    borderColor: '#F0F0F0',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  vehicleTypeActive: {
+    backgroundColor: YELLOW_PRIMARY,
+    borderColor: YELLOW_PRIMARY,
+  },
+  vehicleTypeText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: GRAY_MEDIUM,
+  },
+  vehicleTypeTextActive: {
+    color: WHITE,
+  },
+  inputGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: GRAY_LIGHT,
+    borderRadius: 10,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#F0F0F0',
+  },
+  inputIcon: {
+    paddingHorizontal: 12,
   },
   input: {
-    backgroundColor: '#1E1E1E',
-    color: '#FFF',
-    padding: 15,
-    borderRadius: 10,
-    marginBottom: 15,
-    fontSize: 16,
-    borderWidth: 1,
-    borderColor: '#333',
+    flex: 1,
+    color: BLACK,
+    paddingVertical: 14,
+    paddingRight: 12,
+    fontSize: 14,
   },
-  grid: {
+  inputRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  inputHalf: {
+    flex: 1,
+  },
+  documentGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'space-between',
+    gap: 10,
   },
   imagePicker: {
     width: '48%',
     aspectRatio: 1,
-    backgroundColor: '#1E1E1E',
-    borderRadius: 10,
-    marginBottom: 15,
+    backgroundColor: GRAY_LIGHT,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#333',
+    borderColor: '#F0F0F0',
     borderStyle: 'dashed',
     overflow: 'hidden',
+    position: 'relative',
   },
   placeholder: {
     flex: 1,
@@ -243,11 +524,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 10,
   },
+  placeholderIcon: {
+    marginBottom: 6,
+  },
   placeholderText: {
-    color: '#666',
-    marginTop: 10,
+    color: GRAY_MEDIUM,
+    fontSize: 11,
     textAlign: 'center',
-    fontSize: 12,
+    fontWeight: '500',
+  },
+  uploadBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: YELLOW_PRIMARY,
+    borderRadius: 10,
+    padding: 4,
   },
   previewImage: {
     width: '100%',
@@ -255,20 +547,33 @@ const styles = StyleSheet.create({
     resizeMode: 'cover',
   },
   submitButton: {
-    backgroundColor: '#FFD700',
-    padding: 18,
-    borderRadius: 10,
-    alignItems: 'center',
-    marginTop: 20,
+    borderRadius: 14,
+    overflow: 'hidden',
+    marginTop: 8,
+    shadowColor: YELLOW_PRIMARY,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
   },
   submitButtonDisabled: {
-    opacity: 0.7,
+    opacity: 0.6,
+  },
+  submitGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    gap: 10,
   },
   submitButtonText: {
-    color: '#121212',
-    fontSize: 18,
-    fontWeight: 'bold',
-  }
+    color: WHITE,
+    fontSize: 17,
+    fontWeight: '600',
+  },
+  bottomSpacer: {
+    height: 20,
+  },
 });
 
 export default DriverRegistrationScreen;

@@ -11,20 +11,38 @@ import {
   ScrollView,
   TextInput,
   Platform,
-  Modal
+  Modal,
+  SafeAreaView,
+  StatusBar,
+  Image,
+  Dimensions,
 } from 'react-native';
-import MapView, { Marker, Polyline } from 'react-native-maps';
+import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import * as Location from 'expo-location';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import IconIonic from 'react-native-vector-icons/Ionicons';
+import IconMC from 'react-native-vector-icons/MaterialCommunityIcons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { startRide, completeRide, cancelRide } from '../../redux/slices/driverSlice';
 import { sendChatMessage } from '../../redux/slices/rideSlice';
-import Button from '../../components/common/Button';
 import { API_URL, GOOGLE_MAPS_API_KEY, VOIP_CALLING_ENABLED } from '../../config/constants';
 import RatingComponent from '../../components/common/RatingComponent';
 import { useSocket } from '../../context/SocketContext';
 import CallService from '../../services/CallService';
+
+const { width, height } = Dimensions.get('window');
+
+// Yellow Theme Colors
+const YELLOW_PRIMARY = '#F8B82A';
+const YELLOW_SECONDARY = '#F9C349';
+const WHITE = '#FFFFFF';
+const BLACK = '#000000';
+const GRAY_DARK = '#333333';
+const GRAY_MEDIUM = '#666666';
+const GRAY_LIGHT = '#F5F5F5';
+const GRAY_BG = '#F8F9FA';
 
 const ActiveRideScreen = () => {
   const navigation = useNavigation();
@@ -37,10 +55,16 @@ const ActiveRideScreen = () => {
   const [driverToPickupCoords, setDriverToPickupCoords] = useState([]);
   const [pickupToDropoffCoords, setPickupToDropoffCoords] = useState([]);
   const [distanceToPickup, setDistanceToPickup] = useState(null);
-  
-  // Also react to route param changes if navigated again
   const [rideState, setRideState] = useState(ride?.status === 'searching' ? 'pending' : (ride?.status || 'accepted'));
-  
+  const [loading, setLoading] = useState(false);
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [message, setMessage] = useState('');
+  const [messages, setMessages] = useState(ride?.chat || []);
+  const { user } = useSelector(state => state.auth);
+
+  const mapRef = useRef(null);
+  const locationInterval = useRef(null);
+
   useEffect(() => {
     if (VOIP_CALLING_ENABLED && socket) {
       CallService.init(socket);
@@ -53,34 +77,8 @@ const ActiveRideScreen = () => {
     }
   }, [ride]);
 
-  const [loading, setLoading] = useState(false);
-  const [isChatOpen, setIsChatOpen] = useState(false);
-  const [message, setMessage] = useState('');
-  const [messages, setMessages] = useState(ride?.chat || []);
-  const { user } = useSelector(state => state.auth);
-
-  const handleSendMessage = async () => {
-    if (!message.trim()) return;
-    
-    const msg = {
-      rideId: ride._id,
-      senderId: user.id,
-      message: message.trim(),
-      type: 'text',
-      timestamp: new Date()
-    };
-    
-    await dispatch(sendChatMessage(msg));
-    setMessages(prev => [...prev, msg]);
-    setMessage('');
-  };
-
-  const mapRef = useRef(null);
-  const locationInterval = useRef(null);
-
   useEffect(() => {
     setupLocationAndSocket();
-    
     return () => {
       if (locationInterval.current) clearInterval(locationInterval.current);
     };
@@ -97,26 +95,22 @@ const ActiveRideScreen = () => {
       return;
     }
 
-    // Try last known position first for instant map render
     let lastLoc = await Location.getLastKnownPositionAsync({});
     if (lastLoc) {
       setLocation(lastLoc.coords);
       fetchRoutes(lastLoc.coords);
     }
 
-    // Then fetch high accuracy position
     let loc = await Location.getCurrentPositionAsync({});
     setLocation(loc.coords);
     if (!lastLoc) {
       fetchRoutes(loc.coords);
     }
 
-    // Start emitting location every 5 seconds
     locationInterval.current = setInterval(async () => {
       try {
         const currentLoc = await Location.getCurrentPositionAsync({});
         setLocation(currentLoc.coords);
-        
         if (socket) {
           socket.emit('driver-location', {
             rideId: ride._id,
@@ -172,7 +166,7 @@ const ActiveRideScreen = () => {
   }, [socket, ride._id]);
 
   const getDistance = (lat1, lon1, lat2, lon2) => {
-    const R = 6371e3; // metres
+    const R = 6371e3;
     const p1 = lat1 * Math.PI/180;
     const p2 = lat2 * Math.PI/180;
     const dp = (lat2-lat1) * Math.PI/180;
@@ -181,7 +175,7 @@ const ActiveRideScreen = () => {
             Math.cos(p1) * Math.cos(p2) *
             Math.sin(dl/2) * Math.sin(dl/2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    return R * c; // in metres
+    return R * c;
   };
 
   const decodePolyline = (t, e) => {
@@ -203,7 +197,6 @@ const ActiveRideScreen = () => {
     const drvLat = drvLoc.latitude;
     const drvLng = drvLoc.longitude;
 
-    // Calculate straight-line distance locally
     const dist = getDistance(drvLat, drvLng, startLat, startLng);
     setDistanceToPickup(dist);
 
@@ -213,7 +206,6 @@ const ActiveRideScreen = () => {
       if (respJson1.routes?.length) {
         const points = decodePolyline(respJson1.routes[0].overview_polyline.points);
         setDriverToPickupCoords(points);
-        
         if (mapRef.current && rideState === 'accepted') {
           mapRef.current.fitToCoordinates(points, {
             edgePadding: { top: 50, right: 50, bottom: 50, left: 50 },
@@ -266,7 +258,6 @@ const ActiveRideScreen = () => {
       setLoading(true);
       try {
         await dispatch(completeRide(ride._id)).unwrap();
-        console.log('Driver: "Ride completed"');
         setRideState('completed');
         if (locationInterval.current) clearInterval(locationInterval.current);
       } catch (err) {
@@ -280,7 +271,7 @@ const ActiveRideScreen = () => {
   const handleCancel = () => {
     Alert.alert(
       'Cancel Ride',
-      'Are you sure you want to cancel this ride? This may affect your rating.',
+      'Are you sure you want to cancel this ride?',
       [
         { text: 'No', style: 'cancel' },
         { 
@@ -304,14 +295,41 @@ const ActiveRideScreen = () => {
     );
   };
 
-  if (!location) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#FFD700" />
-        <Text style={{ color: '#FFF', marginTop: 10 }}>Getting location...</Text>
-      </View>
-    );
-  }
+  const handleSendMessage = async () => {
+    if (!message.trim()) return;
+    const msg = {
+      rideId: ride._id,
+      senderId: user.id,
+      message: message.trim(),
+      type: 'text',
+      timestamp: new Date()
+    };
+    await dispatch(sendChatMessage(msg));
+    setMessages(prev => [...prev, msg]);
+    setMessage('');
+  };
+
+  const getRideStatusText = () => {
+    switch (rideState) {
+      case 'pending': return 'Waiting for Passenger...';
+      case 'accepted': return 'Heading to Pickup';
+      case 'arrived': return ride.type === 'parcel' ? 'Pick Up Parcel' : 'Start Ride';
+      case 'started': return ride.type === 'parcel' ? 'Delivering Parcel' : 'Ride in Progress';
+      case 'completed': return 'Completed';
+      default: return rideState;
+    }
+  };
+
+  const getStatusColor = () => {
+    switch (rideState) {
+      case 'pending': return GRAY_MEDIUM;
+      case 'accepted': return '#A29BFE';
+      case 'arrived': return '#4ECDC4';
+      case 'started': return YELLOW_PRIMARY;
+      case 'completed': return '#4ECDC4';
+      default: return GRAY_MEDIUM;
+    }
+  };
 
   const pickupCoords = ride.pickup?.location?.coordinates ? 
     { latitude: ride.pickup.location.coordinates[1], longitude: ride.pickup.location.coordinates[0] } : null;
@@ -319,586 +337,815 @@ const ActiveRideScreen = () => {
   const dropoffCoords = ride.dropoff?.location?.coordinates ? 
     { latitude: ride.dropoff.location.coordinates[1], longitude: ride.dropoff.location.coordinates[0] } : null;
 
+  if (!location) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={YELLOW_PRIMARY} />
+        <Text style={styles.loadingText}>Getting location...</Text>
+      </View>
+    );
+  }
+
   return (
-    <View style={styles.container}>
-      <TouchableOpacity
-        style={styles.floatingBackButton}
-        onPress={() => {
-          if (navigation.canGoBack()) {
-            navigation.goBack();
-          } else {
-            navigation.reset({
-              index: 0,
-              routes: [{ name: 'DriverHome' }],
-            });
-          }
-        }}
-      >
-        <Icon name="arrow-back" size={24} color="#FFF" />
-      </TouchableOpacity>
-
-      <MapView
-        ref={mapRef}
-        style={styles.map}
-        initialRegion={{
-          latitude: location.latitude,
-          longitude: location.longitude,
-          latitudeDelta: 0.05,
-          longitudeDelta: 0.05,
-        }}
-        showsUserLocation={false}
-      >
-        <Marker coordinate={location} title="You">
-          <View style={styles.driverMarker}>
-            <Icon name="directions-car" size={24} color="#FFF" />
-          </View>
-        </Marker>
-
-        {pickupCoords && (
-          <Marker coordinate={pickupCoords} title="Pickup">
-            <View style={styles.pickupMarker}>
-              <View style={styles.markerInner} />
-            </View>
-          </Marker>
-        )}
-
-        {dropoffCoords && (
-          <Marker coordinate={dropoffCoords} title="Dropoff">
-            <View style={styles.dropoffMarker}>
-              <Icon name="flag" size={16} color="#FFF" />
-            </View>
-          </Marker>
-        )}
-
-        {rideState === 'accepted' && driverToPickupCoords.length > 0 && (
-          <Polyline
-            coordinates={driverToPickupCoords}
-            strokeWidth={4}
-            strokeColor="#1E90FF"
-          />
-        )}
-
-        {(rideState === 'accepted' || rideState === 'arrived') && pickupToDropoffCoords.length > 0 && (
-          <Polyline
-            coordinates={pickupToDropoffCoords}
-            strokeWidth={4}
-            strokeColor="#999"
-            lineDashPattern={[10, 10]}
-          />
-        )}
-
-        {(rideState === 'started' || rideState === 'completed') && pickupToDropoffCoords.length > 0 && (
-          <Polyline
-            coordinates={pickupToDropoffCoords}
-            strokeWidth={4}
-            strokeColor="#1E90FF"
-          />
-        )}
-      </MapView>
-
-      <View style={styles.bottomCard}>
-        {rideState === 'completed' ? (
-          <View style={styles.summaryContainer}>
-            <Text style={styles.summaryTitle}>
-              {ride.type === 'parcel' ? 'Parcel Delivered' : 'Ride Completed'}
-            </Text>
-            <View style={styles.fareContainer}>
-              <Text style={styles.fareLabel}>Total Fare</Text>
-              <Text style={styles.fareValue}>Rs. {ride.fare?.final || ride.fare?.accepted || 0}</Text>
-              <Text style={styles.fareMethod}>Payment: Cash</Text>
-            </View>
-            <RatingComponent
-              bookingId={ride?._id}
-              tripType={ride?.type || 'ride'}
-              ratedUser={ride?.passengerId?._id || ride?.passengerId}
-              ratedUserRole="passenger"
-              onDone={() => navigation.navigate('DriverHome')}
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar barStyle="dark-content" backgroundColor={WHITE} />
+      
+      <View style={styles.container}>
+        {/* Header */}
+        <View style={styles.header}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => {
+              if (navigation.canGoBack()) {
+                navigation.goBack();
+              } else {
+                navigation.reset({
+                  index: 0,
+                  routes: [{ name: 'DriverHome' }],
+                });
+              }
+            }}
+            activeOpacity={0.7}
+          >
+            <IconIonic 
+              name={Platform.OS === 'ios' ? 'chevron-back' : 'arrow-back'} 
+              size={24} 
+              color={BLACK} 
             />
-          </View>
-        ) : (
-          <>
-            <View style={styles.passengerInfo}>
-              <View style={styles.passengerLeft}>
-                <View style={styles.avatar}>
-                  <Text style={styles.avatarText}>{ride.passengerId?.name?.charAt(0) || '?'}</Text>
-                </View>
-                <View style={styles.passengerDetailsText}>
-                  <Text style={styles.passengerName}>
-                    {ride.type === 'parcel' ? (ride.parcel?.receiverName || 'Receiver') : ride.passengerId?.name}
-                  </Text>
-                  <View style={styles.ratingContainer}>
-                    <Icon name="star" size={14} color="#FFD700" />
-                    <Text style={styles.passengerRating}>{ride.passengerId?.rating || '5.0'}</Text>
-                  </View>
-                  <Text style={styles.agreedFare}>
-                    {ride.type === 'parcel' ? 'Parcel Delivery' : 'Fare'}: Rs. {ride.fare?.accepted || ride.fare?.offered || 0}
-                  </Text>
-                </View>
-              </View>
-              <View style={styles.contactActions}>
-                {(rideState === 'pending' || rideState === 'accepted') && (
-                  <TouchableOpacity style={[styles.contactButton, { backgroundColor: '#FF6B6B' }]} onPress={handleCancel}>
-                    <Icon name="close" size={20} color="#FFF" />
-                  </TouchableOpacity>
-                )}
-                <TouchableOpacity style={styles.contactButton} onPress={() => setIsChatOpen(true)}>
-                  <Icon name="chat" size={20} color="#FFF" />
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.contactButton} onPress={async () => {
-                  if (VOIP_CALLING_ENABLED) {
-                    const calleeId = ride.passengerId?._id || ride.passengerId;
-                    const calleeName = ride.passengerId?.name || 'Passenger';
-                    navigation.navigate('InCall'); // Pre-navigate
-                    await CallService.startCall(ride._id, calleeId, calleeName);
-                  } else {
-                    Alert.alert('Notice', 'In-app calling is disabled right now');
-                  }
-                }}>
-                  <Icon name="phone" size={20} color="#FFF" />
-                </TouchableOpacity>
-              </View>
+          </TouchableOpacity>
+          <View style={styles.headerTitleContainer}>
+            <Text style={styles.headerTitle}>Active Ride</Text>
+            <View style={styles.headerStatus}>
+              <View style={[styles.statusDot, { backgroundColor: getStatusColor() }]} />
+              <Text style={[styles.headerSubtitle, { color: getStatusColor() }]}>
+                {getRideStatusText()}
+              </Text>
             </View>
+          </View>
+          <TouchableOpacity 
+            style={styles.cancelButton}
+            onPress={handleCancel}
+            activeOpacity={0.7}
+          >
+            <Icon name="close" size={22} color={GRAY_MEDIUM} />
+          </TouchableOpacity>
+        </View>
 
-            {ride.guest?.isGuestBooking && rideState !== 'pending' && (
-              <View style={styles.guestInfoContainer}>
-                <View style={styles.guestHeader}>
-                  <Icon name="person-pin" size={18} color="#FFD700" />
-                  <Text style={styles.guestTitle}>Guest Booking</Text>
-                </View>
-                
-                {!!ride.guest.name && (
-                  <Text style={styles.guestDetailText}>
-                    Name: <Text style={{color: '#FFF'}}>{ride.guest.name}</Text> {ride.guest.relation ? `(${ride.guest.relation})` : ''}
-                  </Text>
-                )}
-                {!ride.guest.name && !!ride.guest.relation && (
-                  <Text style={styles.guestDetailText}>
-                    Relation: <Text style={{color: '#FFF'}}>{ride.guest.relation}</Text>
-                  </Text>
-                )}
-                
-                {!!ride.guest.phoneNumber && (
-                  <TouchableOpacity 
-                    style={styles.guestPhoneRow}
-                    onPress={() => Linking.openURL(`tel:${ride.guest.phoneNumber}`)}
-                  >
-                    <Icon name="phone" size={16} color="#4ECDC4" />
-                    <Text style={styles.guestPhoneText}>Call Guest: {ride.guest.phoneNumber}</Text>
-                  </TouchableOpacity>
-                )}
-                
-                {!!ride.guest.note && (
-                  <View style={styles.guestNoteBox}>
-                    <Icon name="info-outline" size={14} color="#888" style={{marginTop: 2, marginRight: 6}} />
-                    <Text style={styles.guestNoteText}>{ride.guest.note}</Text>
-                  </View>
-                )}
+        {/* Map */}
+        <View style={styles.mapContainer}>
+          <MapView
+            ref={mapRef}
+            style={styles.map}
+            provider={PROVIDER_GOOGLE}
+            initialRegion={{
+              latitude: location.latitude,
+              longitude: location.longitude,
+              latitudeDelta: 0.02,
+              longitudeDelta: 0.02,
+            }}
+            showsUserLocation={false}
+            showsMyLocationButton={false}
+            showsCompass={false}
+          >
+            <Marker coordinate={location} title="You">
+              <View style={styles.driverMarker}>
+                <LinearGradient
+                  colors={[YELLOW_PRIMARY, YELLOW_SECONDARY]}
+                  style={styles.driverMarkerGradient}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                >
+                  <Icon name="directions-car" size={20} color={WHITE} />
+                </LinearGradient>
               </View>
+            </Marker>
+
+            {pickupCoords && (
+              <Marker coordinate={pickupCoords} title="Pickup">
+                <View style={styles.pickupMarker}>
+                  <View style={styles.pickupMarkerInner} />
+                </View>
+              </Marker>
             )}
 
-            <View style={styles.addresses}>
-              <View style={styles.addressRow}>
-                <View style={[styles.dot, { backgroundColor: '#4ECDC4' }]} />
-                <Text style={styles.addressText} numberOfLines={1}>{ride.pickup?.address}</Text>
-              </View>
-              <View style={styles.addressLine} />
-              <View style={styles.addressRow}>
-                <View style={[styles.dot, { backgroundColor: '#FF6B6B' }]} />
-                <Text style={styles.addressText} numberOfLines={1}>{ride.dropoff?.address}</Text>
-              </View>
-            </View>
-
-            <Button
-              title={
-                rideState === 'pending' ? 'Waiting for Passenger...' :
-                rideState === 'accepted' ? 'Arrived at Pickup' :
-                rideState === 'arrived' ? (ride.type === 'parcel' ? 'Pick Up Parcel' : 'Start Ride') :
-                (ride.type === 'parcel' ? 'Deliver Parcel' : 'Complete Ride')
-              }
-              onPress={handleStatusAction}
-              loading={loading}
-              disabled={rideState === 'pending'}
-              style={styles.actionButton}
-              color={
-                rideState === 'pending' ? '#666' :
-                rideState === 'accepted' ? '#A29BFE' :
-                rideState === 'arrived' ? '#4ECDC4' :
-                '#FF6B6B'
-              }
-            />
-          </>
-        )}
-      </View>
-
-      {/* Chat Modal */}
-      <Modal
-        visible={isChatOpen}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setIsChatOpen(false)}
-      >
-        <KeyboardAvoidingView
-          style={styles.chatModalContainer}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        >
-          <View style={styles.chatContentWrapper}>
-            <View style={styles.chatHeader}>
-              <Text style={styles.chatTitle}>Chat</Text>
-              <TouchableOpacity onPress={() => setIsChatOpen(false)}>
-                <Icon name="close" size={24} color="#FFF" />
-              </TouchableOpacity>
-            </View>
-            
-            <ScrollView 
-              style={styles.chatMessages}
-              contentContainerStyle={{ flexGrow: 1, paddingBottom: 10 }}
-              keyboardShouldPersistTaps="handled"
-            >
-              {messages.map((msg, index) => (
-                <View
-                  key={index}
-                  style={[
-                    styles.messageBubble,
-                    msg.senderId === user.id ? styles.sentMessage : styles.receivedMessage
-                  ]}
-                >
-                  <Text style={styles.messageText}>{msg.message}</Text>
-                  <Text style={styles.messageTime}>
-                    {new Date(msg.timestamp).toLocaleTimeString()}
-                  </Text>
+            {dropoffCoords && (
+              <Marker coordinate={dropoffCoords} title="Dropoff">
+                <View style={styles.dropoffMarker}>
+                  <Icon name="flag" size={14} color={WHITE} />
                 </View>
-              ))}
-            </ScrollView>
-            
-            <View style={styles.chatInput}>
-              <TextInput
-                style={styles.input}
-                placeholder="Type a message..."
-                placeholderTextColor="#666"
-                value={message}
-                onChangeText={setMessage}
-                multiline
+              </Marker>
+            )}
+
+            {rideState === 'accepted' && driverToPickupCoords.length > 0 && (
+              <Polyline
+                coordinates={driverToPickupCoords}
+                strokeWidth={3}
+                strokeColor="#A29BFE"
+                lineDashPattern={[8, 6]}
               />
-              <TouchableOpacity onPress={handleSendMessage}>
-                <Icon name="send" size={24} color="#FFD700" />
-              </TouchableOpacity>
+            )}
+
+            {(rideState === 'accepted' || rideState === 'arrived') && pickupToDropoffCoords.length > 0 && (
+              <Polyline
+                coordinates={pickupToDropoffCoords}
+                strokeWidth={3}
+                strokeColor={GRAY_LIGHT}
+                lineDashPattern={[10, 10]}
+              />
+            )}
+
+            {(rideState === 'started' || rideState === 'completed') && pickupToDropoffCoords.length > 0 && (
+              <Polyline
+                coordinates={pickupToDropoffCoords}
+                strokeWidth={4}
+                strokeColor={YELLOW_PRIMARY}
+              />
+            )}
+          </MapView>
+
+          {/* Map Overlay Info */}
+          <View style={styles.mapOverlay}>
+            <View style={styles.mapInfo}>
+              <IconMC name="map-marker-distance" size={14} color={WHITE} />
+              <Text style={styles.mapInfoText}>
+                {distanceToPickup ? `${(distanceToPickup / 1000).toFixed(1)} km to pickup` : 'Loading distance...'}
+              </Text>
             </View>
           </View>
-        </KeyboardAvoidingView>
-      </Modal>
+        </View>
 
-    </View>
+        {/* Bottom Card */}
+        <View style={styles.bottomCard}>
+          {rideState === 'completed' ? (
+            <View style={styles.completedContainer}>
+              <View style={styles.completedIcon}>
+                <LinearGradient
+                  colors={['#4ECDC4', '#44B39D']}
+                  style={styles.completedIconGradient}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                >
+                  <Icon name="check" size={32} color={WHITE} />
+                </LinearGradient>
+              </View>
+              <Text style={styles.completedTitle}>
+                {ride.type === 'parcel' ? 'Parcel Delivered' : 'Ride Completed'}
+              </Text>
+              <View style={styles.completedFare}>
+                <Text style={styles.completedFareLabel}>Total Fare</Text>
+                <Text style={styles.completedFareValue}>Rs. {ride.fare?.final || ride.fare?.accepted || 0}</Text>
+              </View>
+              <RatingComponent
+                bookingId={ride?._id}
+                tripType={ride?.type || 'ride'}
+                ratedUser={ride?.passengerId?._id || ride?.passengerId}
+                ratedUserRole="passenger"
+                onDone={() => navigation.navigate('DriverHome')}
+              />
+            </View>
+          ) : (
+            <>
+              {/* Passenger Info */}
+              <View style={styles.passengerInfo}>
+                <View style={styles.passengerLeft}>
+                  <View style={styles.avatarContainer}>
+                    <LinearGradient
+                      colors={[YELLOW_PRIMARY, YELLOW_SECONDARY]}
+                      style={styles.avatarGradient}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                    >
+                      <Text style={styles.avatarText}>
+                        {ride.passengerId?.name?.charAt(0) || '?'}
+                      </Text>
+                    </LinearGradient>
+                  </View>
+                  <View style={styles.passengerDetails}>
+                    <Text style={styles.passengerName}>
+                      {ride.type === 'parcel' ? (ride.parcel?.receiverName || 'Receiver') : ride.passengerId?.name}
+                    </Text>
+                    <View style={styles.passengerMeta}>
+                      <Icon name="star" size={12} color={YELLOW_PRIMARY} />
+                      <Text style={styles.passengerRating}>{ride.passengerId?.rating || '5.0'}</Text>
+                      <View style={styles.metaDot} />
+                      <IconMC name="cash" size={12} color={GRAY_MEDIUM} />
+                      <Text style={styles.passengerFare}>Rs. {ride.fare?.accepted || ride.fare?.offered || 0}</Text>
+                    </View>
+                  </View>
+                </View>
+                <View style={styles.contactActions}>
+                  <TouchableOpacity 
+                    style={styles.contactButton}
+                    onPress={() => setIsChatOpen(true)}
+                    activeOpacity={0.7}
+                  >
+                    <Icon name="chat" size={20} color={GRAY_DARK} />
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={styles.contactButton}
+                    onPress={async () => {
+                      if (VOIP_CALLING_ENABLED) {
+                        const calleeId = ride.passengerId?._id || ride.passengerId;
+                        const calleeName = ride.passengerId?.name || 'Passenger';
+                        navigation.navigate('InCall');
+                        await CallService.startCall(ride._id, calleeId, calleeName);
+                      } else {
+                        Alert.alert('Notice', 'In-app calling is disabled');
+                      }
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Icon name="phone" size={20} color={GRAY_DARK} />
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* Guest Info */}
+              {ride.guest?.isGuestBooking && rideState !== 'pending' && (
+                <View style={styles.guestContainer}>
+                  <View style={styles.guestHeader}>
+                    <Icon name="person-pin" size={16} color={YELLOW_PRIMARY} />
+                    <Text style={styles.guestTitle}>Guest Booking</Text>
+                  </View>
+                  {!!ride.guest.name && (
+                    <Text style={styles.guestDetail}>
+                      {ride.guest.name} {ride.guest.relation ? `(${ride.guest.relation})` : ''}
+                    </Text>
+                  )}
+                  {!!ride.guest.phoneNumber && (
+                    <TouchableOpacity 
+                      style={styles.guestPhone}
+                      onPress={() => Linking.openURL(`tel:${ride.guest.phoneNumber}`)}
+                    >
+                      <Icon name="phone" size={14} color="#4ECDC4" />
+                      <Text style={styles.guestPhoneText}>Call {ride.guest.phoneNumber}</Text>
+                    </TouchableOpacity>
+                  )}
+                  {!!ride.guest.note && (
+                    <View style={styles.guestNote}>
+                      <Icon name="info-outline" size={14} color={GRAY_MEDIUM} />
+                      <Text style={styles.guestNoteText}>{ride.guest.note}</Text>
+                    </View>
+                  )}
+                </View>
+              )}
+
+              {/* Addresses */}
+              <View style={styles.addresses}>
+                <View style={styles.addressRow}>
+                  <View style={[styles.addressDot, { backgroundColor: '#4ECDC4' }]} />
+                  <Text style={styles.addressText} numberOfLines={1}>{ride.pickup?.address}</Text>
+                </View>
+                <View style={styles.addressConnector}>
+                  <View style={styles.addressLine} />
+                </View>
+                <View style={styles.addressRow}>
+                  <View style={[styles.addressDot, { backgroundColor: '#FF6B6B' }]} />
+                  <Text style={styles.addressText} numberOfLines={1}>{ride.dropoff?.address}</Text>
+                </View>
+              </View>
+
+              {/* Action Button */}
+              <TouchableOpacity
+                style={styles.actionButton}
+                onPress={handleStatusAction}
+                disabled={rideState === 'pending' || loading}
+                activeOpacity={0.8}
+              >
+                <LinearGradient
+                  colors={rideState === 'pending' ? [GRAY_LIGHT, GRAY_LIGHT] : [YELLOW_PRIMARY, YELLOW_SECONDARY]}
+                  style={styles.actionGradient}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                >
+                  {loading ? (
+                    <ActivityIndicator color={rideState === 'pending' ? GRAY_MEDIUM : WHITE} size="small" />
+                  ) : (
+                    <>
+                      <Icon 
+                        name={
+                          rideState === 'accepted' ? 'my-location' :
+                          rideState === 'arrived' ? 'play-arrow' :
+                          'flag'
+                        } 
+                        size={20} 
+                        color={rideState === 'pending' ? GRAY_MEDIUM : WHITE} 
+                      />
+                      <Text style={[styles.actionText, rideState === 'pending' && styles.actionTextDisabled]}>
+                        {rideState === 'pending' ? 'Waiting for Passenger...' :
+                         rideState === 'accepted' ? 'Arrived at Pickup' :
+                         rideState === 'arrived' ? (ride.type === 'parcel' ? 'Pick Up Parcel' : 'Start Ride') :
+                         (ride.type === 'parcel' ? 'Deliver Parcel' : 'Complete Ride')}
+                      </Text>
+                    </>
+                  )}
+                </LinearGradient>
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
+
+        {/* Chat Modal */}
+        <Modal
+          visible={isChatOpen}
+          animationType="slide"
+          transparent={true}
+          onRequestClose={() => setIsChatOpen(false)}
+        >
+          <KeyboardAvoidingView
+            style={styles.chatModalContainer}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          >
+            <View style={styles.chatContent}>
+              <View style={styles.chatHeader}>
+                <Text style={styles.chatTitle}>Chat</Text>
+                <TouchableOpacity onPress={() => setIsChatOpen(false)} activeOpacity={0.7}>
+                  <Icon name="close" size={24} color={BLACK} />
+                </TouchableOpacity>
+              </View>
+              
+              <ScrollView 
+                style={styles.chatMessages}
+                contentContainerStyle={styles.chatMessagesContent}
+                showsVerticalScrollIndicator={false}
+              >
+                {messages.map((msg, index) => (
+                  <View
+                    key={index}
+                    style={[
+                      styles.messageBubble,
+                      msg.senderId === user.id ? styles.sentMessage : styles.receivedMessage
+                    ]}
+                  >
+                    <Text style={styles.messageText}>{msg.message}</Text>
+                    <Text style={styles.messageTime}>
+                      {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </Text>
+                  </View>
+                ))}
+              </ScrollView>
+              
+              <View style={styles.chatInput}>
+                <TextInput
+                  style={styles.chatInputField}
+                  placeholder="Type a message..."
+                  placeholderTextColor={GRAY_MEDIUM}
+                  value={message}
+                  onChangeText={setMessage}
+                  multiline
+                />
+                <TouchableOpacity 
+                  style={styles.sendButton}
+                  onPress={handleSendMessage}
+                  activeOpacity={0.7}
+                >
+                  <LinearGradient
+                    colors={[YELLOW_PRIMARY, YELLOW_SECONDARY]}
+                    style={styles.sendGradient}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                  >
+                    <Icon name="send" size={20} color={WHITE} />
+                  </LinearGradient>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </KeyboardAvoidingView>
+        </Modal>
+      </View>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: WHITE,
+  },
   container: {
     flex: 1,
-    backgroundColor: '#121212'
+    backgroundColor: GRAY_BG,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#121212',
+    backgroundColor: WHITE,
   },
-  map: {
+  loadingText: {
+    color: GRAY_MEDIUM,
+    fontSize: 14,
+    marginTop: 12,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingTop: Platform.OS === 'ios' ? 8 : 12,
+    paddingBottom: 16,
+    backgroundColor: WHITE,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 4,
+  },
+  headerTitleContainer: {
     flex: 1,
   },
-  floatingBackButton: {
-    position: 'absolute',
-    top: 50,
-    left: 20,
-    zIndex: 10,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: BLACK,
+  },
+  headerStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 2,
+    gap: 6,
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  headerSubtitle: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  cancelButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: GRAY_LIGHT,
     justifyContent: 'center',
     alignItems: 'center',
   },
+  mapContainer: {
+    height: height * 0.4,
+    position: 'relative',
+  },
+  map: {
+    width: '100%',
+    height: '100%',
+  },
+  mapOverlay: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+  },
+  mapInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    gap: 6,
+  },
+  mapInfoText: {
+    color: WHITE,
+    fontSize: 12,
+    fontWeight: '500',
+  },
   driverMarker: {
-    backgroundColor: '#1E1E1E',
-    padding: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  driverMarkerGradient: {
+    width: 40,
+    height: 40,
     borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
     borderWidth: 2,
-    borderColor: '#FFD700',
+    borderColor: WHITE,
+    shadowColor: BLACK,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
   },
   pickupMarker: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     backgroundColor: 'rgba(78, 205, 196, 0.3)',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
     borderColor: '#4ECDC4',
   },
-  markerInner: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+  pickupMarkerInner: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
     backgroundColor: '#4ECDC4',
   },
   dropoffMarker: {
     backgroundColor: '#FF6B6B',
-    padding: 4,
+    padding: 6,
     borderRadius: 12,
+    borderWidth: 2,
+    borderColor: WHITE,
   },
   bottomCard: {
-    backgroundColor: '#1E1E1E',
+    flex: 1,
+    backgroundColor: WHITE,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 20,
-    shadowColor: '#000',
+    shadowColor: BLACK,
     shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 10,
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    elevation: 8,
   },
   passengerInfo: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 16,
   },
   passengerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
   },
-  avatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: '#2A2A2A',
+  avatarContainer: {
+    marginRight: 12,
+  },
+  avatarGradient: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 15,
   },
   avatarText: {
-    color: '#FFD700',
+    color: WHITE,
     fontSize: 20,
-    fontWeight: 'bold',
+    fontWeight: '700',
   },
-  passengerName: {
-    color: '#FFF',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  agreedFare: {
-    color: '#FFD700',
-    fontSize: 14,
-    marginTop: 2,
-  },
-  passengerDetailsText: {
+  passengerDetails: {
     flex: 1,
   },
-  ratingContainer: {
+  passengerName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: BLACK,
+  },
+  passengerMeta: {
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: 2,
-    marginBottom: 2,
+    gap: 4,
   },
   passengerRating: {
-    color: '#888',
-    fontSize: 12,
-    marginLeft: 4,
+    fontSize: 13,
+    color: GRAY_MEDIUM,
+  },
+  metaDot: {
+    width: 3,
+    height: 3,
+    borderRadius: 1.5,
+    backgroundColor: GRAY_MEDIUM,
+    marginHorizontal: 2,
+  },
+  passengerFare: {
+    fontSize: 13,
+    color: GRAY_MEDIUM,
   },
   contactActions: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 8,
   },
   contactButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#2A2A2A',
+    backgroundColor: GRAY_LIGHT,
     justifyContent: 'center',
     alignItems: 'center',
-    marginLeft: 10,
   },
-  addresses: {
-    backgroundColor: '#2A2A2A',
+  guestContainer: {
+    backgroundColor: YELLOW_PRIMARY + '08',
     borderRadius: 12,
-    padding: 15,
-    marginBottom: 20,
-  },
-  guestInfoContainer: {
-    backgroundColor: 'rgba(255, 215, 0, 0.1)',
-    borderRadius: 12,
-    padding: 15,
-    marginBottom: 20,
+    padding: 12,
+    marginBottom: 16,
     borderWidth: 1,
-    borderColor: 'rgba(255, 215, 0, 0.3)',
+    borderColor: YELLOW_PRIMARY + '20',
   },
   guestHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
-  },
-  guestTitle: {
-    color: '#FFD700',
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginLeft: 8,
-  },
-  guestDetailText: {
-    color: '#CCC',
-    fontSize: 14,
+    gap: 6,
     marginBottom: 6,
   },
-  guestPhoneRow: {
+  guestTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: YELLOW_PRIMARY,
+  },
+  guestDetail: {
+    fontSize: 14,
+    color: GRAY_DARK,
+    marginBottom: 4,
+  },
+  guestPhone: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(78, 205, 196, 0.15)',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    marginTop: 4,
-    marginBottom: 8,
-    alignSelf: 'flex-start',
+    gap: 6,
+    paddingVertical: 4,
   },
   guestPhoneText: {
-    color: '#4ECDC4',
     fontSize: 14,
-    fontWeight: 'bold',
-    marginLeft: 8,
+    color: '#4ECDC4',
+    fontWeight: '500',
   },
-  guestNoteBox: {
+  guestNote: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
-    padding: 10,
-    borderRadius: 8,
+    alignItems: 'flex-start',
+    gap: 6,
     marginTop: 4,
   },
   guestNoteText: {
-    color: '#AAA',
     fontSize: 13,
+    color: GRAY_MEDIUM,
     flex: 1,
     fontStyle: 'italic',
+  },
+  addresses: {
+    backgroundColor: GRAY_LIGHT,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 16,
   },
   addressRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 10,
   },
-  dot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    marginRight: 10,
+  addressDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
   },
   addressText: {
-    color: '#FFF',
     fontSize: 14,
+    color: GRAY_DARK,
     flex: 1,
+  },
+  addressConnector: {
+    alignItems: 'center',
+    paddingLeft: 3,
   },
   addressLine: {
     width: 2,
-    height: 15,
-    backgroundColor: '#444',
-    marginLeft: 4,
-    marginVertical: 4,
+    height: 12,
+    backgroundColor: '#D0D0D0',
+    marginVertical: 2,
   },
   actionButton: {
-    marginTop: 5,
+    borderRadius: 14,
+    overflow: 'hidden',
   },
-  summaryContainer: {
+  actionGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    gap: 8,
+  },
+  actionText: {
+    color: WHITE,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  actionTextDisabled: {
+    color: GRAY_MEDIUM,
+  },
+  completedContainer: {
     alignItems: 'center',
     paddingVertical: 10,
+    flex: 1,
+    justifyContent: 'center',
   },
-  summaryTitle: {
+  completedIcon: {
+    marginBottom: 16,
+  },
+  completedIconGradient: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  completedTitle: {
+    fontSize: 22,
+    fontWeight: '700',
     color: '#4ECDC4',
-    fontSize: 24,
-    fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  completedFare: {
+    alignItems: 'center',
     marginBottom: 20,
   },
-  fareContainer: {
-    alignItems: 'center',
-    marginBottom: 30,
-  },
-  fareLabel: {
-    color: '#888',
+  completedFareLabel: {
     fontSize: 14,
-    marginBottom: 5,
+    color: GRAY_MEDIUM,
   },
-  fareValue: {
-    color: '#FFD700',
-    fontSize: 40,
-    fontWeight: 'bold',
-    marginBottom: 10,
-  },
-  fareMethod: {
-    color: '#FFF',
-    fontSize: 16,
-  },
-  doneButton: {
-    width: '100%',
+  completedFareValue: {
+    fontSize: 32,
+    fontWeight: '700',
+    color: YELLOW_PRIMARY,
+    marginTop: 4,
   },
   chatModalContainer: {
     flex: 1,
     justifyContent: 'flex-end',
     backgroundColor: 'rgba(0,0,0,0.5)',
   },
-  chatContentWrapper: {
+  chatContent: {
     height: '50%',
-    backgroundColor: '#1E1E1E',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 15,
+    backgroundColor: WHITE,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 16,
   },
   chatHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 15,
+    marginBottom: 12,
   },
   chatTitle: {
-    color: '#FFF',
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: '700',
+    color: BLACK,
   },
   chatMessages: {
     flex: 1,
-    marginBottom: 10,
+  },
+  chatMessagesContent: {
+    flexGrow: 1,
+    paddingBottom: 10,
   },
   messageBubble: {
     maxWidth: '80%',
     padding: 10,
-    borderRadius: 10,
-    marginBottom: 10,
+    borderRadius: 12,
+    marginBottom: 8,
   },
   sentMessage: {
-    backgroundColor: '#FFD700',
+    backgroundColor: YELLOW_PRIMARY,
     alignSelf: 'flex-end',
   },
   receivedMessage: {
-    backgroundColor: '#2A2A2A',
+    backgroundColor: GRAY_LIGHT,
     alignSelf: 'flex-start',
   },
   messageText: {
-    color: '#FFF',
     fontSize: 14,
+    color: BLACK,
   },
   messageTime: {
-    color: '#888',
     fontSize: 10,
-    marginTop: 5,
+    color: GRAY_MEDIUM,
+    marginTop: 4,
   },
   chatInput: {
     flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#2A2A2A',
-    borderRadius: 25,
-    paddingHorizontal: 15,
-    paddingVertical: 5,
+    alignItems: 'flex-end',
+    backgroundColor: GRAY_LIGHT,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    gap: 8,
   },
-  input: {
+  chatInputField: {
     flex: 1,
-    color: '#FFF',
-    paddingHorizontal: 10,
+    color: BLACK,
+    paddingHorizontal: 4,
+    paddingVertical: 8,
     maxHeight: 100,
-  }
+    fontSize: 14,
+  },
+  sendButton: {
+    borderRadius: 20,
+    overflow: 'hidden',
+  },
+  sendGradient: {
+    padding: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
 });
 
 export default ActiveRideScreen;

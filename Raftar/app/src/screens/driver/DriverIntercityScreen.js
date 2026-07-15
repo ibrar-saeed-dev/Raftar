@@ -8,29 +8,46 @@ import {
   ActivityIndicator,
   Alert,
   TextInput,
-  RefreshControl
+  RefreshControl,
+  SafeAreaView,
+  StatusBar,
+  Platform,
+  Dimensions,
+  Modal,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import * as Animatable from 'react-native-animatable';
+import IconIonic from 'react-native-vector-icons/Ionicons';
+import IconMC from 'react-native-vector-icons/MaterialCommunityIcons';
+import { LinearGradient } from 'expo-linear-gradient';
 import api from '../../services/api';
 import { useDispatch } from 'react-redux';
 import { useSocket } from '../../context/SocketContext';
-import Button from '../../components/common/Button';
 import { counterOffer } from '../../redux/slices/driverSlice';
+
+const { width } = Dimensions.get('window');
+
+// Yellow Theme Colors
+const YELLOW_PRIMARY = '#F8B82A';
+const YELLOW_SECONDARY = '#F9C349';
+const WHITE = '#FFFFFF';
+const BLACK = '#000000';
+const GRAY_DARK = '#333333';
+const GRAY_MEDIUM = '#666666';
+const GRAY_LIGHT = '#F5F5F5';
+const GRAY_BG = '#F8F9FA';
 
 const DriverIntercityScreen = () => {
   const navigation = useNavigation();
   const dispatch = useDispatch();
   const socket = useSocket();
 
-  const [viewMode, setViewMode] = useState('mode_select'); // 'mode_select' or 'private'
-  const [activeTab, setActiveTab] = useState('available'); // 'available' or 'upcoming'
+  const [viewMode, setViewMode] = useState('mode_select');
+  const [activeTab, setActiveTab] = useState('available');
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [availableRequests, setAvailableRequests] = useState([]);
   const [myUpcomingRides, setMyUpcomingRides] = useState([]);
-
-  // Counter offer state
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [showCounterOffer, setShowCounterOffer] = useState(false);
   const [counterAmount, setCounterAmount] = useState('');
@@ -68,7 +85,13 @@ const DriverIntercityScreen = () => {
       console.error('Fetch intercity error:', error);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchData();
   };
 
   const handleCounterOffer = async (rideId) => {
@@ -121,242 +144,1089 @@ const DriverIntercityScreen = () => {
     return distance < 1 ? `${(distance * 1000).toFixed(0)} m` : `${distance.toFixed(1)} km`;
   };
 
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'accepted': return '#4ECDC4';
+      case 'started': return YELLOW_PRIMARY;
+      case 'completed': return '#45B7D1';
+      default: return GRAY_MEDIUM;
+    }
+  };
+
+  const getStatusLabel = (status) => {
+    switch (status) {
+      case 'accepted': return 'Accepted';
+      case 'started': return 'In Progress';
+      case 'completed': return 'Completed';
+      default: return status;
+    }
+  };
+
   const renderAvailableRequest = ({ item }) => (
     <View style={styles.requestCard}>
       <View style={styles.requestHeader}>
         <View style={styles.riderInfo}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{item.passengerId?.name?.charAt(0) || '?'}</Text>
+          <View style={styles.avatarContainer}>
+            <LinearGradient
+              colors={[YELLOW_PRIMARY, YELLOW_SECONDARY]}
+              style={styles.avatarGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            >
+              <Text style={styles.avatarText}>
+                {item.passengerId?.name?.charAt(0) || '?'}
+              </Text>
+            </LinearGradient>
+            <View style={styles.onlineDot} />
           </View>
           <View>
-            <Text style={styles.riderName}>{item.passengerId?.name}</Text>
-            <Text style={styles.riderRating}>⭐ {item.passengerId?.stats?.rating || 0}</Text>
+            <Text style={styles.riderName}>{item.passengerId?.name || 'Unknown'}</Text>
+            <View style={styles.riderMeta}>
+              <Icon name="star" size={12} color={YELLOW_PRIMARY} />
+              <Text style={styles.riderRating}>{item.passengerId?.stats?.rating || 0}</Text>
+              <View style={styles.metaDot} />
+              <Icon name="schedule" size={12} color={GRAY_MEDIUM} />
+              <Text style={styles.riderTime}>
+                {item.scheduledTime ? new Date(item.scheduledTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Now'}
+              </Text>
+            </View>
           </View>
         </View>
         <View style={styles.distanceBadge}>
+          <IconMC name="map-marker-distance" size={12} color={YELLOW_PRIMARY} />
           <Text style={styles.distanceText}>{formatDistance(item.distance)}</Text>
         </View>
       </View>
 
       {item.scheduledTime && (
-        <View style={{ paddingHorizontal: 15, paddingBottom: 10 }}>
-          <Text style={{ color: '#FFD700', fontSize: 13, fontWeight: 'bold' }}>
-            Scheduled for: {new Date(item.scheduledTime).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+        <View style={styles.scheduledBadge}>
+          <Icon name="event" size={14} color={YELLOW_PRIMARY} />
+          <Text style={styles.scheduledText}>
+            Scheduled: {new Date(item.scheduledTime).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
           </Text>
         </View>
       )}
 
       <View style={styles.routeInfo}>
         <View style={styles.routePoint}>
-          <Icon name="my-location" size={16} color="#4ECDC4" />
-          <Text style={styles.routeText} numberOfLines={1}>{item.pickup?.address}</Text>
+          <View style={styles.routeIconGreen}>
+            <Icon name="my-location" size={12} color={WHITE} />
+          </View>
+          <Text style={styles.routeText} numberOfLines={1}>{item.pickup?.address || 'Pickup location'}</Text>
         </View>
-        <View style={styles.routeLine} />
+        <View style={styles.routeConnector}>
+          <View style={styles.routeLine} />
+          <View style={styles.routeDot} />
+        </View>
         <View style={styles.routePoint}>
-          <Icon name="location-on" size={16} color="#FF6B6B" />
-          <Text style={styles.routeText} numberOfLines={1}>{item.dropoff?.address}</Text>
+          <View style={styles.routeIconRed}>
+            <Icon name="location-on" size={12} color={WHITE} />
+          </View>
+          <Text style={styles.routeText} numberOfLines={1}>{item.dropoff?.address || 'Dropoff location'}</Text>
         </View>
       </View>
 
       <View style={styles.requestFooter}>
         <View style={styles.fareInfo}>
-          <Text style={styles.fareLabel}>Fare</Text>
+          <Text style={styles.fareLabel}>Estimated Fare</Text>
           <Text style={styles.fareAmount}>Rs. {item.fare?.offered || item.fare?.accepted || 0}</Text>
         </View>
         <View style={styles.vehicleInfo}>
-          <Icon name="directions-car" size={16} color="#888" />
-          <Text style={styles.vehicleText}>{item.vehicleType || 'Car'}</Text>
+          <IconMC name="car" size={16} color={GRAY_MEDIUM} />
+          <Text style={styles.vehicleText}>{item.vehicleType || 'Economy'}</Text>
         </View>
       </View>
 
       <View style={styles.actionButtons}>
-        <Button title="Accept" onPress={() => handleAccept(item)} size="small" style={styles.acceptButton} />
-        <Button title="Counter" onPress={() => { setSelectedRequest(item); setShowCounterOffer(true); }} variant="outline" size="small" style={styles.counterButton} />
+        <TouchableOpacity 
+          style={[styles.actionBtn, styles.declineBtn]}
+          onPress={() => {}}
+        >
+          <Text style={styles.declineBtnText}>Decline</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={[styles.actionBtn, styles.counterBtn]}
+          onPress={() => { setSelectedRequest(item); setShowCounterOffer(true); }}
+        >
+          <Icon name="trending-up" size={16} color={YELLOW_PRIMARY} />
+          <Text style={styles.counterBtnText}>Counter</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={[styles.actionBtn, styles.acceptBtn]}
+          onPress={() => handleAccept(item)}
+        >
+          <LinearGradient
+            colors={[YELLOW_PRIMARY, YELLOW_SECONDARY]}
+            style={styles.acceptGradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+          >
+            <Icon name="check" size={16} color={WHITE} />
+            <Text style={styles.acceptBtnText}>Accept</Text>
+          </LinearGradient>
+        </TouchableOpacity>
       </View>
     </View>
   );
 
   const renderUpcomingRide = ({ item }) => (
-    <Animatable.View animation="fadeInUp" duration={400} style={styles.cardWrapper}>
-      <TouchableOpacity style={styles.card} onPress={() => navigation.navigate('ActiveRide', { ride: item })}>
-        <View style={styles.cardHeader}>
-          <Text style={styles.dateText}>
-            {item.scheduledTime ? new Date(item.scheduledTime).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'No Date'}
+    <View style={styles.upcomingCard}>
+      <TouchableOpacity 
+        style={styles.upcomingCardContent}
+        onPress={() => navigation.navigate('ActiveRide', { ride: item })}
+        activeOpacity={0.7}
+      >
+        <View style={styles.upcomingHeader}>
+          <View style={styles.upcomingDate}>
+            <Icon name="event" size={16} color={YELLOW_PRIMARY} />
+            <Text style={styles.upcomingDateText}>
+              {item.scheduledTime ? 
+                new Date(item.scheduledTime).toLocaleString([], { 
+                  month: 'short', 
+                  day: 'numeric', 
+                  hour: '2-digit', 
+                  minute: '2-digit' 
+                }) : 'No Date'}
+            </Text>
+          </View>
+          <View style={[styles.upcomingStatus, { backgroundColor: getStatusColor(item.status) + '15' }]}>
+            <View style={[styles.upcomingStatusDot, { backgroundColor: getStatusColor(item.status) }]} />
+            <Text style={[styles.upcomingStatusText, { color: getStatusColor(item.status) }]}>
+              {getStatusLabel(item.status)}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.upcomingRoute}>
+          <View style={styles.upcomingRoutePoint}>
+            <View style={styles.upcomingRouteIconGreen}>
+              <Icon name="my-location" size={10} color={WHITE} />
+            </View>
+            <Text style={styles.upcomingRouteText} numberOfLines={1}>
+              {item.pickup?.address || 'Pickup'}
+            </Text>
+          </View>
+          <View style={styles.upcomingRouteConnector}>
+            <View style={styles.upcomingRouteLine} />
+          </View>
+          <View style={styles.upcomingRoutePoint}>
+            <View style={styles.upcomingRouteIconRed}>
+              <Icon name="location-on" size={10} color={WHITE} />
+            </View>
+            <Text style={styles.upcomingRouteText} numberOfLines={1}>
+              {item.dropoff?.address || 'Dropoff'}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.upcomingFooter}>
+          <View style={styles.upcomingPassenger}>
+            <View style={styles.upcomingAvatarSmall}>
+              <Text style={styles.upcomingAvatarText}>
+                {item.passengerId?.name?.charAt(0) || '?'}
+              </Text>
+            </View>
+            <Text style={styles.upcomingPassengerName}>
+              {item.passengerId?.name || 'Unknown'}
+            </Text>
+          </View>
+          <Text style={styles.upcomingFare}>
+            Rs. {item.fare?.accepted || item.fare?.offered || 0}
           </Text>
-          <View style={styles.statusBadge}>
-            <Text style={styles.statusText}>{item.status.toUpperCase()}</Text>
-          </View>
-        </View>
-        <View style={styles.locations}>
-          <View style={styles.locationRow}>
-            <Icon name="my-location" size={16} color="#4ECDC4" />
-            <Text style={styles.locationText} numberOfLines={1}>{item.pickup?.address}</Text>
-          </View>
-          <View style={styles.locationRow}>
-            <Icon name="location-on" size={16} color="#FF6B6B" />
-            <Text style={styles.locationText} numberOfLines={1}>{item.dropoff?.address}</Text>
-          </View>
-        </View>
-        <View style={styles.cardFooter}>
-           <Text style={styles.fareText}>Rs. {item.fare?.accepted || item.fare?.offered || 0}</Text>
-           <Text style={styles.passengerText}>Passenger: {item.passengerId?.name || 'Unknown'}</Text>
         </View>
       </TouchableOpacity>
-    </Animatable.View>
+    </View>
   );
 
   const renderModeSelect = () => (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <Icon name="arrow-back" size={24} color="#FFF" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Select Mode</Text>
-        <View style={{width: 24}} />
-      </View>
-      <View style={{ padding: 20, gap: 20, flex: 1, justifyContent: 'center' }}>
-        <TouchableOpacity 
-          style={[styles.vehicleCardMode, { padding: 30, alignItems: 'center' }]} 
-          onPress={() => setViewMode('private')}
-        >
-          <Icon name="directions-car" size={60} color="#FFD700" />
-          <Text style={{ color: '#FFF', fontSize: 24, fontWeight: 'bold', marginTop: 10 }}>Private Ride</Text>
-          <Text style={{ color: '#888', textAlign: 'center', marginTop: 10 }}>Accept private intercity ride requests.</Text>
-        </TouchableOpacity>
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar barStyle="dark-content" backgroundColor={WHITE} />
+      
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+            activeOpacity={0.7}
+          >
+            <IconIonic 
+              name={Platform.OS === 'ios' ? 'chevron-back' : 'arrow-back'} 
+              size={24} 
+              color={BLACK} 
+            />
+          </TouchableOpacity>
+          <View style={styles.headerTitleContainer}>
+            <Text style={styles.headerTitle}>Intercity</Text>
+            <Text style={styles.headerSubtitle}>Choose your service mode</Text>
+          </View>
+          <View style={styles.headerRightPlaceholder} />
+        </View>
 
-        <TouchableOpacity 
-          style={[styles.vehicleCardMode, { padding: 30, alignItems: 'center' }]} 
-          onPress={() => navigation.navigate('ManageCarpools', { isIntercity: true })}
-        >
-          <Icon name="people" size={60} color="#4ECDC4" />
-          <Text style={{ color: '#FFF', fontSize: 24, fontWeight: 'bold', marginTop: 10 }}>Carpool</Text>
-          <Text style={{ color: '#888', textAlign: 'center', marginTop: 10 }}>Offer shared seats to passengers.</Text>
-        </TouchableOpacity>
+        <View style={styles.modeContainer}>
+          <View style={styles.modeCard}>
+            <TouchableOpacity 
+              style={styles.modeCardContent}
+              onPress={() => setViewMode('private')}
+              activeOpacity={0.8}
+            >
+              <View style={styles.modeCardInner}>
+                <View style={styles.modeIconContainer}>
+                  <LinearGradient
+                    colors={[YELLOW_PRIMARY, YELLOW_SECONDARY]}
+                    style={styles.modeIconGradient}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                  >
+                    <Icon name="directions-car" size={32} color={WHITE} />
+                  </LinearGradient>
+                </View>
+                <Text style={styles.modeTitle}>Private Ride</Text>
+                <Text style={styles.modeDescription}>
+                  Accept private intercity ride requests from passengers
+                </Text>
+                <View style={styles.modeArrow}>
+                  <Icon name="chevron-right" size={24} color={YELLOW_PRIMARY} />
+                </View>
+              </View>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.modeCard}>
+            <TouchableOpacity 
+              style={styles.modeCardContent}
+              onPress={() => navigation.navigate('ManageCarpools', { isIntercity: true })}
+              activeOpacity={0.8}
+            >
+              <View style={styles.modeCardInner}>
+                <View style={styles.modeIconContainer}>
+                  <LinearGradient
+                    colors={['#4ECDC4', '#44B39D']}
+                    style={[styles.modeIconGradient, { backgroundColor: '#4ECDC4' }]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                  >
+                    <Icon name="people" size={32} color={WHITE} />
+                  </LinearGradient>
+                </View>
+                <Text style={styles.modeTitle}>Carpool</Text>
+                <Text style={styles.modeDescription}>
+                  Offer shared seats to passengers traveling the same route
+                </Text>
+                <View style={styles.modeArrow}>
+                  <Icon name="chevron-right" size={24} color="#4ECDC4" />
+                </View>
+              </View>
+            </TouchableOpacity>
+          </View>
+        </View>
       </View>
-    </View>
+    </SafeAreaView>
   );
 
   const renderPrivateList = () => (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => setViewMode('mode_select')}>
-          <Icon name="arrow-back" size={24} color="#FFF" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Private Intercity</Text>
-        <View style={{width: 24}} />
-      </View>
-
-      <View style={styles.tabContainer}>
-        <TouchableOpacity style={[styles.tab, activeTab === 'available' && styles.activeTab]} onPress={() => setActiveTab('available')}>
-          <Text style={[styles.tabText, activeTab === 'available' && styles.activeTabText]}>Available Requests</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.tab, activeTab === 'upcoming' && styles.activeTab]} onPress={() => setActiveTab('upcoming')}>
-          <Text style={[styles.tabText, activeTab === 'upcoming' && styles.activeTabText]}>My Upcoming</Text>
-        </TouchableOpacity>
-      </View>
-
-      {loading ? (
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color="#FFD700" />
-        </View>
-      ) : (
-        <FlatList
-          data={activeTab === 'available' ? availableRequests : myUpcomingRides}
-          renderItem={activeTab === 'available' ? renderAvailableRequest : renderUpcomingRide}
-          keyExtractor={item => item._id}
-          contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
-          ListEmptyComponent={
-            <Text style={styles.emptyText}>
-              {activeTab === 'available' ? 'No intercity requests available.' : 'You have no upcoming intercity rides.'}
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar barStyle="dark-content" backgroundColor={WHITE} />
+      
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => setViewMode('mode_select')}
+            activeOpacity={0.7}
+          >
+            <IconIonic 
+              name={Platform.OS === 'ios' ? 'chevron-back' : 'arrow-back'} 
+              size={24} 
+              color={BLACK} 
+            />
+          </TouchableOpacity>
+          <View style={styles.headerTitleContainer}>
+            <Text style={styles.headerTitle}>Private Intercity</Text>
+            <Text style={styles.headerSubtitle}>
+              {activeTab === 'available' ? availableRequests.length : myUpcomingRides.length} rides
             </Text>
-          }
-          refreshControl={<RefreshControl refreshing={loading} onRefresh={fetchData} tintColor="#FFD700" />}
-        />
-      )}
+          </View>
+          <TouchableOpacity style={styles.refreshButton} onPress={onRefresh}>
+            <Icon name="refresh" size={22} color={GRAY_DARK} />
+          </TouchableOpacity>
+        </View>
 
-      {showCounterOffer && selectedRequest && (
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Counter Offer</Text>
-            <Text style={styles.modalSubtitle}>Original fare: Rs. {selectedRequest.fare?.offered || selectedRequest.fare?.accepted || 0}</Text>
-            <View style={styles.modalInput}>
-              <Text style={styles.modalInputLabel}>Your Offer</Text>
-              <TextInput style={styles.modalInputField} value={counterAmount} onChangeText={setCounterAmount} placeholder="Enter amount" placeholderTextColor="#666" keyboardType="numeric" autoFocus />
+        <View style={styles.tabContainer}>
+          <TouchableOpacity 
+            style={[styles.tab, activeTab === 'available' && styles.activeTab]} 
+            onPress={() => setActiveTab('available')}
+            activeOpacity={0.7}
+          >
+            <View style={styles.tabContent}>
+              <IconMC name="clock-time-four" size={16} color={activeTab === 'available' ? YELLOW_PRIMARY : GRAY_MEDIUM} />
+              <Text style={[styles.tabText, activeTab === 'available' && styles.activeTabText]}>
+                Available
+              </Text>
+              {availableRequests.length > 0 && (
+                <View style={styles.tabBadge}>
+                  <Text style={styles.tabBadgeText}>{availableRequests.length}</Text>
+                </View>
+              )}
             </View>
-            <View style={styles.modalButtons}>
-              <Button title="Cancel" onPress={() => { setShowCounterOffer(false); setCounterAmount(''); }} variant="outline" size="small" style={styles.modalCancelButton} />
-              <Button title="Send Offer" onPress={() => handleCounterOffer(selectedRequest._id)} size="small" style={styles.modalSendButton} />
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.tab, activeTab === 'upcoming' && styles.activeTab]} 
+            onPress={() => setActiveTab('upcoming')}
+            activeOpacity={0.7}
+          >
+            <View style={styles.tabContent}>
+              <IconMC name="calendar-clock" size={16} color={activeTab === 'upcoming' ? YELLOW_PRIMARY : GRAY_MEDIUM} />
+              <Text style={[styles.tabText, activeTab === 'upcoming' && styles.activeTabText]}>
+                Upcoming
+              </Text>
+            </View>
+          </TouchableOpacity>
+        </View>
+
+        {loading && !refreshing ? (
+          <View style={styles.center}>
+            <ActivityIndicator size="large" color={YELLOW_PRIMARY} />
+            <Text style={styles.loadingText}>Loading rides...</Text>
+          </View>
+        ) : (
+          <FlatList
+            data={activeTab === 'available' ? availableRequests : myUpcomingRides}
+            renderItem={activeTab === 'available' ? renderAvailableRequest : renderUpcomingRide}
+            keyExtractor={item => item._id}
+            contentContainerStyle={styles.listContent}
+            ListEmptyComponent={
+              <View style={styles.emptyContainer}>
+                <View style={styles.emptyIconContainer}>
+                  <IconMC name="car-search" size={48} color={GRAY_LIGHT} />
+                </View>
+                <Text style={styles.emptyTitle}>
+                  {activeTab === 'available' ? 'No Requests Available' : 'No Upcoming Rides'}
+                </Text>
+                <Text style={styles.emptyText}>
+                  {activeTab === 'available' 
+                    ? 'There are no intercity ride requests at the moment.' 
+                    : 'You have no upcoming intercity rides.'}
+                </Text>
+              </View>
+            }
+            refreshControl={
+              <RefreshControl 
+                refreshing={refreshing} 
+                onRefresh={onRefresh} 
+                tintColor={YELLOW_PRIMARY}
+                colors={[YELLOW_PRIMARY]}
+              />
+            }
+            showsVerticalScrollIndicator={false}
+          />
+        )}
+
+        {/* Counter Offer Modal */}
+        <Modal
+          animationType="slide"
+          transparent={true}
+          visible={showCounterOffer}
+          onRequestClose={() => {
+            setShowCounterOffer(false);
+            setCounterAmount('');
+          }}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHandle} />
+              
+              <Text style={styles.modalTitle}>Counter Offer</Text>
+              <Text style={styles.modalSubtitle}>
+                Original fare: Rs. {selectedRequest?.fare?.offered || selectedRequest?.fare?.accepted || 0}
+              </Text>
+              
+              <View style={styles.modalInputContainer}>
+                <Text style={styles.modalInputLabel}>Your Offer Amount</Text>
+                <View style={styles.modalInputWrapper}>
+                  <Text style={styles.modalCurrencySymbol}>Rs.</Text>
+                  <TextInput
+                    style={styles.modalInputField}
+                    value={counterAmount}
+                    onChangeText={setCounterAmount}
+                    placeholder="Enter amount"
+                    placeholderTextColor={GRAY_MEDIUM}
+                    keyboardType="numeric"
+                    autoFocus
+                  />
+                </View>
+              </View>
+
+              <View style={styles.modalButtons}>
+                <TouchableOpacity
+                  style={styles.modalCancelButton}
+                  onPress={() => {
+                    setShowCounterOffer(false);
+                    setCounterAmount('');
+                  }}
+                >
+                  <Text style={styles.modalCancelText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.modalSendButton}
+                  onPress={() => handleCounterOffer(selectedRequest?._id)}
+                >
+                  <LinearGradient
+                    colors={[YELLOW_PRIMARY, YELLOW_SECONDARY]}
+                    style={styles.modalSendGradient}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                  >
+                    <Text style={styles.modalSendText}>Send Offer</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
-        </View>
-      )}
-    </View>
+        </Modal>
+      </View>
+    </SafeAreaView>
   );
 
   return viewMode === 'mode_select' ? renderModeSelect() : renderPrivateList();
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#121212' },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 10, paddingBottom: 10 },
-  backButton: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#1E1E1E', justifyContent: 'center', alignItems: 'center' },
-  headerTitle: { fontSize: 20, fontWeight: 'bold', color: '#FFF' },
-  tabContainer: { flexDirection: 'row', paddingHorizontal: 20, marginBottom: 10 },
-  tab: { flex: 1, paddingVertical: 12, alignItems: 'center', borderBottomWidth: 2, borderBottomColor: '#2A2A2A' },
-  activeTab: { borderBottomColor: '#FFD700' },
-  tabText: { color: '#888', fontWeight: 'bold' },
-  activeTabText: { color: '#FFD700' },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  vehicleCardMode: { backgroundColor: '#1E1E1E', borderRadius: 16, overflow: 'hidden' },
-  cardWrapper: { marginBottom: 16 },
-  card: { backgroundColor: '#1E1E1E', borderRadius: 12, padding: 16, borderColor: '#4ECDC4', borderWidth: 1 },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
-  dateText: { color: '#FFF', fontSize: 16, fontWeight: 'bold' },
-  statusBadge: { backgroundColor: '#4ECDC4', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
-  statusText: { color: '#121212', fontSize: 12, fontWeight: 'bold' },
-  locations: { marginBottom: 12 },
-  locationRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
-  locationText: { color: '#CCC', marginLeft: 8, flex: 1 },
-  cardFooter: { flexDirection: 'row', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: '#333', paddingTop: 12 },
-  fareText: { color: '#FFD700', fontWeight: 'bold' },
-  passengerText: { color: '#888' },
-  emptyText: { color: '#888', textAlign: 'center', marginTop: 40 },
-  
-  // Request Card Styles
-  requestCard: { backgroundColor: '#1E1E1E', borderRadius: 15, marginHorizontal: 20, marginBottom: 15, paddingVertical: 15, elevation: 5, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 3.84 },
-  requestHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 15, marginBottom: 15 },
-  riderInfo: { flexDirection: 'row', alignItems: 'center' },
-  avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#2A2A2A', justifyContent: 'center', alignItems: 'center', marginRight: 10 },
-  avatarText: { color: '#FFF', fontSize: 18, fontWeight: 'bold' },
-  riderName: { color: '#FFF', fontSize: 16, fontWeight: 'bold' },
-  riderRating: { color: '#888', fontSize: 13, marginTop: 2 },
-  distanceBadge: { backgroundColor: '#2A2A2A', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 12 },
-  distanceText: { color: '#FFD700', fontSize: 12, fontWeight: 'bold' },
-  routeInfo: { paddingHorizontal: 15, marginBottom: 15 },
-  routePoint: { flexDirection: 'row', alignItems: 'center' },
-  routeText: { color: '#CCC', marginLeft: 10, flex: 1, fontSize: 14 },
-  routeLine: { width: 2, height: 20, backgroundColor: '#333', marginLeft: 7, marginVertical: 4 },
-  requestFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 15, paddingTop: 15, borderTopWidth: 1, borderTopColor: '#2A2A2A', marginBottom: 15 },
+  safeArea: {
+    flex: 1,
+    backgroundColor: WHITE,
+  },
+  container: {
+    flex: 1,
+    backgroundColor: GRAY_BG,
+    marginTop:23
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingTop: Platform.OS === 'ios' ? 8 : 12,
+    paddingBottom: 16,
+    backgroundColor: WHITE,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 4,
+  },
+  headerTitleContainer: {
+    flex: 1,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: BLACK,
+  },
+  headerSubtitle: {
+    fontSize: 13,
+    color: GRAY_MEDIUM,
+    marginTop: 1,
+  },
+  headerRightPlaceholder: {
+    width: 40,
+  },
+  refreshButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: GRAY_LIGHT,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modeContainer: {
+    padding: 16,
+    paddingTop: 20,
+    flex: 1,
+  },
+  modeCard: {
+    marginBottom: 16,
+    borderRadius: 16,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#F0F0F0',
+    backgroundColor: WHITE,
+    shadowColor: BLACK,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  modeCardContent: {
+    overflow: 'hidden',
+  },
+  modeCardInner: {
+    padding: 24,
+  },
+  modeIconContainer: {
+    marginBottom: 16,
+  },
+  modeIconGradient: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modeTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: BLACK,
+    marginBottom: 6,
+  },
+  modeDescription: {
+    fontSize: 14,
+    color: GRAY_MEDIUM,
+    lineHeight: 20,
+  },
+  modeArrow: {
+    marginTop: 16,
+    alignSelf: 'flex-start',
+  },
+  tabContainer: {
+    flexDirection: 'row',
+    backgroundColor: WHITE,
+    paddingHorizontal: 16,
+    paddingVertical: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: 'center',
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
+  activeTab: {
+    borderBottomColor: YELLOW_PRIMARY,
+  },
+  tabContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  tabText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: GRAY_MEDIUM,
+  },
+  activeTabText: {
+    color: YELLOW_PRIMARY,
+    fontWeight: '600',
+  },
+  tabBadge: {
+    backgroundColor: YELLOW_PRIMARY,
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    minWidth: 18,
+    alignItems: 'center',
+  },
+  tabBadgeText: {
+    color: WHITE,
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  requestCard: {
+    backgroundColor: WHITE,
+    marginHorizontal: 16,
+    marginBottom: 16,
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#F0F0F0',
+    shadowColor: BLACK,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  requestHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+  },
+  riderInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  avatarContainer: {
+    position: 'relative',
+    marginRight: 12,
+  },
+  avatarGradient: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarText: {
+    color: WHITE,
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  onlineDot: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#4ECDC4',
+    borderWidth: 2,
+    borderColor: WHITE,
+  },
+  riderName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: BLACK,
+  },
+  riderMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 2,
+    gap: 4,
+  },
+  riderRating: {
+    fontSize: 13,
+    color: GRAY_MEDIUM,
+  },
+  metaDot: {
+    width: 3,
+    height: 3,
+    borderRadius: 1.5,
+    backgroundColor: GRAY_MEDIUM,
+    marginHorizontal: 2,
+  },
+  riderTime: {
+    fontSize: 12,
+    color: GRAY_MEDIUM,
+  },
+  distanceBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: GRAY_LIGHT,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 4,
+  },
+  distanceText: {
+    fontSize: 12,
+    color: GRAY_DARK,
+    fontWeight: '500',
+  },
+  scheduledBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: YELLOW_PRIMARY + '10',
+    padding: 8,
+    borderRadius: 8,
+    marginBottom: 12,
+    gap: 6,
+  },
+  scheduledText: {
+    fontSize: 13,
+    color: YELLOW_PRIMARY,
+    fontWeight: '500',
+  },
+  routeInfo: {
+    marginBottom: 12,
+  },
+  routePoint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  routeIconGreen: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#4ECDC4',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  routeIconRed: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#FF6B6B',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  routeText: {
+    fontSize: 14,
+    color: GRAY_DARK,
+    flex: 1,
+  },
+  routeConnector: {
+    alignItems: 'center',
+    marginLeft: 11,
+    paddingVertical: 2,
+  },
+  routeLine: {
+    width: 2,
+    height: 12,
+    backgroundColor: '#E0E0E0',
+  },
+  routeDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#E0E0E0',
+    marginTop: 2,
+  },
+  requestFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#F0F0F0',
+    marginBottom: 12,
+  },
   fareInfo: {},
-  fareLabel: { color: '#888', fontSize: 12 },
-  fareAmount: { color: '#4ECDC4', fontSize: 20, fontWeight: 'bold', marginTop: 2 },
-  vehicleInfo: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#2A2A2A', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 12 },
-  vehicleText: { color: '#CCC', fontSize: 13, marginLeft: 5 },
-  actionButtons: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 15, gap: 10 },
-  acceptButton: { flex: 1 },
-  counterButton: { flex: 1 },
-  
-  // Modal Styles
-  modalOverlay: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center', zIndex: 1000 },
-  modalContent: { backgroundColor: '#1E1E1E', width: '80%', borderRadius: 15, padding: 20, elevation: 5 },
-  modalTitle: { color: '#FFF', fontSize: 20, fontWeight: 'bold', marginBottom: 5 },
-  modalSubtitle: { color: '#888', fontSize: 14, marginBottom: 20 },
-  modalInput: { marginBottom: 20 },
-  modalInputLabel: { color: '#CCC', fontSize: 14, marginBottom: 10 },
-  modalInputField: { backgroundColor: '#2A2A2A', borderRadius: 8, color: '#FFF', padding: 15, fontSize: 18, fontWeight: 'bold' },
-  modalButtons: { flexDirection: 'row', justifyContent: 'space-between', gap: 10 },
-  modalCancelButton: { flex: 1 },
-  modalSendButton: { flex: 1 }
+  fareLabel: {
+    fontSize: 12,
+    color: GRAY_MEDIUM,
+  },
+  fareAmount: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: YELLOW_PRIMARY,
+    marginTop: 2,
+  },
+  vehicleInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: GRAY_LIGHT,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  vehicleText: {
+    fontSize: 12,
+    color: GRAY_MEDIUM,
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  actionBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 4,
+  },
+  declineBtn: {
+    backgroundColor: GRAY_LIGHT,
+  },
+  declineBtnText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: GRAY_MEDIUM,
+  },
+  counterBtn: {
+    backgroundColor: GRAY_LIGHT,
+    borderWidth: 1,
+    borderColor: YELLOW_PRIMARY,
+  },
+  counterBtnText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: YELLOW_PRIMARY,
+  },
+  acceptBtn: {
+    flex: 1.5,
+    overflow: 'hidden',
+    padding: 0,
+  },
+  acceptGradient: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    gap: 4,
+  },
+  acceptBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: WHITE,
+  },
+  upcomingCard: {
+    marginHorizontal: 16,
+    marginBottom: 16,
+  },
+  upcomingCardContent: {
+    backgroundColor: WHITE,
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#F0F0F0',
+    shadowColor: BLACK,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  upcomingHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  upcomingDate: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  upcomingDateText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: GRAY_DARK,
+  },
+  upcomingStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 4,
+  },
+  upcomingStatusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  upcomingStatusText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  upcomingRoute: {
+    marginBottom: 12,
+  },
+  upcomingRoutePoint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  upcomingRouteIconGreen: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#4ECDC4',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  upcomingRouteIconRed: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#FF6B6B',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  upcomingRouteText: {
+    fontSize: 13,
+    color: GRAY_DARK,
+    flex: 1,
+  },
+  upcomingRouteConnector: {
+    alignItems: 'center',
+    marginLeft: 9,
+    paddingVertical: 2,
+  },
+  upcomingRouteLine: {
+    width: 2,
+    height: 10,
+    backgroundColor: '#E0E0E0',
+  },
+  upcomingFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#F0F0F0',
+  },
+  upcomingPassenger: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  upcomingAvatarSmall: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: YELLOW_PRIMARY,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  upcomingAvatarText: {
+    color: WHITE,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  upcomingPassengerName: {
+    fontSize: 13,
+    color: GRAY_DARK,
+    fontWeight: '500',
+  },
+  upcomingFare: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: YELLOW_PRIMARY,
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    paddingVertical: 60,
+    paddingHorizontal: 40,
+  },
+  emptyIconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: GRAY_LIGHT,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: BLACK,
+  },
+  emptyText: {
+    fontSize: 14,
+    color: GRAY_MEDIUM,
+    textAlign: 'center',
+    marginTop: 8,
+    lineHeight: 20,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: WHITE,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+    paddingBottom: Platform.OS === 'ios' ? 40 : 24,
+  },
+  modalHandle: {
+    width: 40,
+    height: 4,
+    backgroundColor: '#E0E0E0',
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 20,
+  },
+  modalTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: BLACK,
+    marginBottom: 4,
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    color: GRAY_MEDIUM,
+    marginBottom: 20,
+  },
+  modalInputContainer: {
+    marginBottom: 24,
+  },
+  modalInputLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: BLACK,
+    marginBottom: 8,
+  },
+  modalInputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: GRAY_LIGHT,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+  },
+  modalCurrencySymbol: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: GRAY_DARK,
+    marginRight: 8,
+  },
+  modalInputField: {
+    flex: 1,
+    fontSize: 18,
+    fontWeight: '600',
+    color: BLACK,
+    paddingVertical: 14,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  modalCancelButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalCancelText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: GRAY_MEDIUM,
+  },
+  modalSendButton: {
+    flex: 2,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  modalSendGradient: {
+    paddingVertical: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalSendText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: WHITE,
+  },
+  listContent: {
+    paddingBottom: 100,
+  },
+  center: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    color: GRAY_MEDIUM,
+    fontSize: 14,
+    marginTop: 12,
+    fontWeight: '500',
+  },
 });
 
 export default DriverIntercityScreen;

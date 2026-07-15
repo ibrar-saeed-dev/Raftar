@@ -21,6 +21,7 @@ import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import IconIonic from 'react-native-vector-icons/Ionicons';
 import IconFA from 'react-native-vector-icons/FontAwesome5';
+import IconMC from 'react-native-vector-icons/MaterialCommunityIcons';
 import CustomPlacesAutocomplete from '../../components/common/CustomPlacesAutocomplete';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Animatable from 'react-native-animatable';
@@ -173,9 +174,9 @@ const SendParcelScreen = () => {
   };
 
   const parcelSizes = [
-    { id: 'bike', label: 'Bike', icon: 'motorcycle', iconType: 'material', price: 100, dimensions: 'Small parcels', capacity: 'Small' },
-    { id: 'rickshaw', label: 'Rickshaw', icon: 'bicycle', iconType: 'material-community', price: 150, dimensions: 'Medium parcels', capacity: 'Medium' },
-    { id: 'car', label: 'Car', icon: 'directions-car', iconType: 'material', price: 200, dimensions: 'Large parcels', capacity: 'Large' }
+    { id: 'bike', label: 'Bike', icon: 'motorbike', iconType: 'material-community', price: 100, dimensions: 'Small parcels', capacity: 'Small' },
+    { id: 'rickshaw', label: 'Rickshaw', icon: 'rickshaw', iconType: 'material-community', price: 150, dimensions: 'Medium parcels', capacity: 'Medium' },
+    { id: 'car', label: 'Car', icon: 'car', iconType: 'material-community', price: 200, dimensions: 'Large parcels', capacity: 'Large' }
   ];
 
   const handleChange = (field, value) => {
@@ -313,6 +314,7 @@ const SendParcelScreen = () => {
   const getIcon = (icon, iconType, size, color) => {
     switch (iconType) {
       case 'material': return <Icon name={icon} size={size} color={color} />;
+      case 'material-community': return <IconMC name={icon} size={size} color={color} />;
       case 'ionicon': return <IconIonic name={icon} size={size} color={color} />;
       default: return <Icon name={icon} size={size} color={color} />;
     }
@@ -323,33 +325,45 @@ const SendParcelScreen = () => {
     return (
       <TouchableOpacity
         key={size.id}
-        style={[styles.sizeCard, isSelected && styles.sizeCardSelected]}
+        style={[
+          styles.sizeCard,
+          isSelected && styles.sizeCardSelected
+        ]}
         onPress={() => handleChange('size', size.id)}
         activeOpacity={0.8}
       >
-        <LinearGradient
-          colors={isSelected ? ['rgba(255, 215, 0, 0.15)', 'rgba(255, 215, 0, 0.05)'] : ['#2A2A2A', '#1E1E1E']}
-          style={styles.sizeGradient}
-        >
-          <View style={[styles.sizeIconContainer, isSelected && { backgroundColor: 'rgba(255, 215, 0, 0.2)' }]}>
-            {getIcon(size.icon, size.iconType, 32, isSelected ? '#FFD700' : '#666')}
+        <View style={[
+          styles.sizeCardContent,
+          isSelected && { borderColor: '#F9C349' }
+        ]}>
+          <View style={[
+            styles.sizeIconContainer,
+            { backgroundColor: isSelected ? '#F9C34915' : '#F5F5F5' }
+          ]}>
+            {getIcon(size.icon, size.iconType, 28, isSelected ? '#F9C349' : '#999')}
           </View>
-          <Text style={[styles.sizeLabel, isSelected && styles.sizeLabelSelected]}>{size.label}</Text>
-          <Text style={[styles.sizePrice, isSelected && styles.sizePriceSelected]}>Rs. {size.price}</Text>
+          <Text style={[
+            styles.sizeLabel,
+            isSelected && styles.sizeLabelSelected
+          ]}>{size.label}</Text>
+          <Text style={[
+            styles.sizePrice,
+            isSelected && styles.sizePriceSelected
+          ]}>₨ {size.price}</Text>
           <Text style={styles.sizeDimensions}>{size.dimensions}</Text>
           {isSelected && (
             <View style={styles.selectedCheck}>
-              <Icon name="check-circle" size={20} color="#FFD700" />
+              <Icon name="check" size={14} color="#FFF" />
             </View>
           )}
-        </LinearGradient>
+        </View>
       </TouchableOpacity>
     );
   };
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor="#121212" />
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
       
       <KeyboardAvoidingView 
         style={styles.container}
@@ -368,12 +382,14 @@ const SendParcelScreen = () => {
             <TouchableOpacity 
               style={styles.backButton}
               onPress={() => navigation.goBack()}
+              activeOpacity={0.7}
             >
-              <Icon name="arrow-back" size={24} color="#FFF" />
+              <Icon name="arrow-back" size={24} color="#000" />
             </TouchableOpacity>
             <Text style={styles.headerTitle}>Send Parcel</Text>
-            <TouchableOpacity style={styles.historyButton}>
-              <Icon name="history" size={24} color="#FFF" />
+            <TouchableOpacity style={styles.historyButton} activeOpacity={0.7}>
+              <Icon name="history" size={24} color="#000" />
+              <View style={styles.historyBadge} />
             </TouchableOpacity>
           </View>
 
@@ -386,7 +402,7 @@ const SendParcelScreen = () => {
             <Animatable.View animation="fadeIn" duration={600} style={styles.mapContainer}>
               {locationLoading ? (
                 <View style={styles.mapLoading}>
-                  <ActivityIndicator size="large" color="#FFD700" />
+                  <ActivityIndicator size="large" color="#F9C349" />
                   <Text style={styles.mapLoadingText}>Finding your location...</Text>
                 </View>
               ) : (
@@ -396,8 +412,8 @@ const SendParcelScreen = () => {
                   initialRegion={{
                     latitude: pickup?.location?.coordinates[1] || 33.6844,
                     longitude: pickup?.location?.coordinates[0] || 73.0479,
-                    latitudeDelta: 0.05,
-                    longitudeDelta: 0.05,
+                    latitudeDelta: 0.02,
+                    longitudeDelta: 0.02,
                   }}
                 >
                   {pickup?.location?.coordinates && (
@@ -421,18 +437,23 @@ const SendParcelScreen = () => {
                       }}
                       title="Dropoff"
                     >
-                      <Icon name="flag" size={24} color="#FF6B6B" />
+                      <View style={styles.dropoffMarker}>
+                        <Icon name="flag" size={18} color="#FFF" />
+                      </View>
                     </Marker>
                   )}
                   {routeCoords.length > 0 && (
                     <Polyline
                       coordinates={routeCoords}
                       strokeWidth={4}
-                      strokeColor="#4ECDC4"
+                      strokeColor="#F9C349"
                     />
                   )}
                 </MapView>
               )}
+              <TouchableOpacity style={styles.mapOverlayBtn} onPress={() => openMapPicker('pickup')} activeOpacity={0.8}>
+                <Icon name="edit-location" size={20} color="#F9C349" />
+              </TouchableOpacity>
             </Animatable.View>
 
             {/* Pickup & Delivery Section */}
@@ -443,16 +464,17 @@ const SendParcelScreen = () => {
               style={styles.section}
             >
               <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>📦 Pickup & Delivery</Text>
-                <TouchableOpacity style={styles.quickFillButton}>
-                  <Icon name="my-location" size={16} color="#FFD700" />
-                  <Text style={styles.quickFillText}>Use Current</Text>
+                <Text style={styles.sectionTitle}>📍 Pickup & Delivery</Text>
+                <TouchableOpacity style={styles.quickFillButton} onPress={getCurrentLocation} activeOpacity={0.7}>
+                  <Icon name="my-location" size={18} color="#F9C349" />
+                  <Text style={styles.quickFillText}>Current</Text>
                 </TouchableOpacity>
               </View>
               
               <View style={styles.locationInputWrapper}>
                 <View style={styles.locationDot}>
                   <View style={[styles.dot, { backgroundColor: '#4ECDC4' }]} />
+                  <View style={styles.dotLine} />
                 </View>
                 <View style={styles.locationInputContainer}>
                   <CustomPlacesAutocomplete
@@ -471,15 +493,16 @@ const SendParcelScreen = () => {
                       });
                     }}
                     styles={{
-                      textInput: styles.locationTextInput,
+                      textInputContainer: styles.pickupInputContainer,
+                      textInput: styles.pickupTextInput,
                       container: styles.autocompleteContainer,
                       listView: styles.autocompleteList,
                       row: styles.autocompleteRow,
                       description: styles.autocompleteDescription
                     }}
-                    placeholderTextColor="#666"
+                    placeholderTextColor="#999"
                     renderRightButton={() => (
-                      <TouchableOpacity onPress={() => openMapPicker('pickup')} style={styles.mapIconBtn}>
+                      <TouchableOpacity onPress={() => openMapPicker('pickup')} style={styles.mapIconBtn} activeOpacity={0.7}>
                         <Icon name="map" size={22} color="#4ECDC4" />
                       </TouchableOpacity>
                     )}
@@ -510,15 +533,16 @@ const SendParcelScreen = () => {
                       });
                     }}
                     styles={{
-                      textInput: styles.locationTextInput,
+                      textInputContainer: styles.dropoffInputContainer,
+                      textInput: styles.dropoffTextInput,
                       container: styles.autocompleteContainer,
                       listView: styles.autocompleteList,
                       row: styles.autocompleteRow,
                       description: styles.autocompleteDescription
                     }}
-                    placeholderTextColor="#666"
+                    placeholderTextColor="#999"
                     renderRightButton={() => (
-                      <TouchableOpacity onPress={() => openMapPicker('dropoff')} style={styles.mapIconBtn}>
+                      <TouchableOpacity onPress={() => openMapPicker('dropoff')} style={styles.mapIconBtn} activeOpacity={0.7}>
                         <Icon name="map" size={22} color="#FF6B6B" />
                       </TouchableOpacity>
                     )}
@@ -534,7 +558,7 @@ const SendParcelScreen = () => {
               delay={200}
               style={styles.section}
             >
-              <Text style={styles.sectionTitle}>📋 Parcel Details</Text>
+              <Text style={styles.sectionTitle}>📦 Parcel Details</Text>
               
               <Text style={styles.sizeTitle}>Select Vehicle for Delivery</Text>
               <View style={styles.sizeContainer}>
@@ -543,53 +567,66 @@ const SendParcelScreen = () => {
 
               <View style={styles.inputGrid}>
                 <View style={styles.inputHalf}>
-                  <Input
-                    label="Weight (kg)"
-                    value={parcelDetails.weight}
-                    onChangeText={(value) => handleChange('weight', value)}
-                    placeholder="0.0"
-                    keyboardType="numeric"
-                    icon="scale"
-                  />
+                  <View style={styles.inputWrapper}>
+                    <Icon name="scale" size={20} color="#F9C349" style={styles.inputIcon} />
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Weight (kg)"
+                      placeholderTextColor="#999"
+                      value={parcelDetails.weight}
+                      onChangeText={(value) => handleChange('weight', value)}
+                      keyboardType="numeric"
+                    />
+                  </View>
                 </View>
                 <View style={styles.inputHalf}>
-                  <Input
-                    label="COD Amount"
-                    value={parcelDetails.codAmount}
-                    onChangeText={(value) => handleChange('codAmount', value)}
-                    placeholder="0.00"
-                    keyboardType="numeric"
-                    icon="attach-money"
-                  />
+                  <View style={styles.inputWrapper}>
+                    <Icon name="attach-money" size={20} color="#F9C349" style={styles.inputIcon} />
+                    <TextInput
+                      style={styles.input}
+                      placeholder="COD Amount"
+                      placeholderTextColor="#999"
+                      value={parcelDetails.codAmount}
+                      onChangeText={(value) => handleChange('codAmount', value)}
+                      keyboardType="numeric"
+                    />
+                  </View>
                 </View>
               </View>
 
-              <Input
-                label="Description"
-                value={parcelDetails.description}
-                onChangeText={(value) => handleChange('description', value)}
-                placeholder="Describe your parcel (e.g., Books, Electronics, Documents)"
-                icon="description"
-                multiline
-                numberOfLines={3}
-              />
+              <View style={styles.inputWrapper}>
+                <Icon name="description" size={20} color="#F9C349" style={styles.inputIcon} />
+                <TextInput
+                  style={[styles.input, styles.textArea]}
+                  placeholder="Describe your parcel (e.g., Books, Electronics, Documents)"
+                  placeholderTextColor="#999"
+                  value={parcelDetails.description}
+                  onChangeText={(value) => handleChange('description', value)}
+                  multiline
+                  numberOfLines={3}
+                />
+              </View>
 
-              <Input
-                label="Special Instructions"
-                value={parcelDetails.instructions}
-                onChangeText={(value) => handleChange('instructions', value)}
-                placeholder="Any special instructions for delivery"
-                icon="info"
-                multiline
-                numberOfLines={2}
-              />
+              <View style={styles.inputWrapper}>
+                <Icon name="info" size={20} color="#F9C349" style={styles.inputIcon} />
+                <TextInput
+                  style={[styles.input, styles.textArea]}
+                  placeholder="Special instructions for delivery"
+                  placeholderTextColor="#999"
+                  value={parcelDetails.instructions}
+                  onChangeText={(value) => handleChange('instructions', value)}
+                  multiline
+                  numberOfLines={2}
+                />
+              </View>
 
               <View style={styles.optionsRow}>
                 <TouchableOpacity 
                   style={[styles.optionButton, parcelDetails.fragile && styles.optionButtonActive]}
                   onPress={() => handleChange('fragile', !parcelDetails.fragile)}
+                  activeOpacity={0.7}
                 >
-                  <Icon name="warning" size={20} color={parcelDetails.fragile ? '#FFD700' : '#666'} />
+                  <Icon name="warning" size={20} color={parcelDetails.fragile ? '#F9C349' : '#999'} />
                   <Text style={[styles.optionText, parcelDetails.fragile && styles.optionTextActive]}>
                     Fragile
                   </Text>
@@ -597,8 +634,9 @@ const SendParcelScreen = () => {
                 <TouchableOpacity 
                   style={[styles.optionButton, parcelDetails.urgent && styles.optionButtonActive]}
                   onPress={() => handleChange('urgent', !parcelDetails.urgent)}
+                  activeOpacity={0.7}
                 >
-                  <Icon name="flash-on" size={20} color={parcelDetails.urgent ? '#FFD700' : '#666'} />
+                  <Icon name="flash-on" size={20} color={parcelDetails.urgent ? '#F9C349' : '#999'} />
                   <Text style={[styles.optionText, parcelDetails.urgent && styles.optionTextActive]}>
                     Urgent
                   </Text>
@@ -615,22 +653,28 @@ const SendParcelScreen = () => {
             >
               <Text style={styles.sectionTitle}>👤 Receiver Details</Text>
               
-              <Input
-                label="Receiver Name *"
-                value={parcelDetails.receiverName}
-                onChangeText={(value) => handleChange('receiverName', value)}
-                placeholder="Enter receiver name"
-                icon="person"
-              />
+              <View style={styles.inputWrapper}>
+                <Icon name="person" size={20} color="#F9C349" style={styles.inputIcon} />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Receiver Name *"
+                  placeholderTextColor="#999"
+                  value={parcelDetails.receiverName}
+                  onChangeText={(value) => handleChange('receiverName', value)}
+                />
+              </View>
 
-              <Input
-                label="Receiver Phone *"
-                value={parcelDetails.receiverPhone}
-                onChangeText={(value) => handleChange('receiverPhone', value)}
-                placeholder="03XX-XXXXXXX"
-                icon="phone"
-                keyboardType="phone-pad"
-              />
+              <View style={styles.inputWrapper}>
+                <Icon name="phone" size={20} color="#F9C349" style={styles.inputIcon} />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Receiver Phone *"
+                  placeholderTextColor="#999"
+                  value={parcelDetails.receiverPhone}
+                  onChangeText={(value) => handleChange('receiverPhone', value)}
+                  keyboardType="phone-pad"
+                />
+              </View>
             </Animatable.View>
 
             {/* Fare Mode */}
@@ -641,41 +685,79 @@ const SendParcelScreen = () => {
               style={styles.section}
             >
               <Text style={styles.sectionTitle}>💵 Delivery Fare</Text>
-              <View style={{flexDirection: 'row', gap: 12, marginTop: 12}}>
+              <View style={styles.fareModeContainer}>
                 <TouchableOpacity
                   style={[
-                    {flex: 1, padding: 16, borderRadius: 12, backgroundColor: '#2A2A2A', alignItems: 'center'},
-                    fareMode === 'ai' && {borderWidth: 2, borderColor: '#FFD700'}
+                    styles.fareMode,
+                    fareMode === 'ai' && styles.fareModeSelected
                   ]}
                   onPress={() => setFareMode('ai')}
+                  activeOpacity={0.8}
                 >
-                  <Icon name="auto-awesome" size={24} color={fareMode === 'ai' ? '#FFD700' : '#888'} />
-                  <Text style={{color: '#FFF', marginTop: 8}}>Standard</Text>
+                  <View style={[
+                    styles.fareModeContent,
+                    fareMode === 'ai' && { backgroundColor: '#F9C349' }
+                  ]}>
+                    <View style={styles.fareModeIcon}>
+                      <Icon name="auto-awesome" size={24} color={fareMode === 'ai' ? '#000' : '#999'} />
+                    </View>
+                    <Text style={[
+                      styles.fareModeText,
+                      fareMode === 'ai' && { color: '#000' }
+                    ]}>
+                      Standard
+                    </Text>
+                    {estimatedFare && (
+                      <Text style={[
+                        styles.fareAmount,
+                        fareMode === 'ai' && { color: '#000' }
+                      ]}>
+                        ₨ {estimatedFare}
+                      </Text>
+                    )}
+                  </View>
                 </TouchableOpacity>
 
                 <TouchableOpacity
                   style={[
-                    {flex: 1, padding: 16, borderRadius: 12, backgroundColor: '#2A2A2A', alignItems: 'center'},
-                    fareMode === 'offer' && {borderWidth: 2, borderColor: '#4ECDC4'}
+                    styles.fareMode,
+                    fareMode === 'offer' && styles.fareModeSelected
                   ]}
                   onPress={() => setFareMode('offer')}
+                  activeOpacity={0.8}
                 >
-                  <Icon name="attach-money" size={24} color={fareMode === 'offer' ? '#4ECDC4' : '#888'} />
-                  <Text style={{color: '#FFF', marginTop: 8}}>Offer Price</Text>
+                  <View style={[
+                    styles.fareModeContent,
+                    fareMode === 'offer' && { backgroundColor: '#F9C349' }
+                  ]}>
+                    <View style={styles.fareModeIcon}>
+                      <Icon name="attach-money" size={24} color={fareMode === 'offer' ? '#000' : '#999'} />
+                    </View>
+                    <Text style={[
+                      styles.fareModeText,
+                      fareMode === 'offer' && { color: '#000' }
+                    ]}>
+                      Offer Price
+                    </Text>
+                    {fareMode === 'offer' && (
+                      <TextInput
+                        style={[
+                          styles.offerInput,
+                          fareMode === 'offer' && { 
+                            backgroundColor: 'rgba(255,255,255,0.3)',
+                            color: '#000'
+                          }
+                        ]}
+                        placeholder="Enter amount"
+                        placeholderTextColor={fareMode === 'offer' ? 'rgba(0,0,0,0.4)' : '#999'}
+                        keyboardType="numeric"
+                        value={offerPrice}
+                        onChangeText={setOfferPrice}
+                      />
+                    )}
+                  </View>
                 </TouchableOpacity>
               </View>
-              {fareMode === 'offer' && (
-                <View style={{marginTop: 16}}>
-                  <Input
-                    label="Your Offer (Rs.)"
-                    value={offerPrice}
-                    onChangeText={setOfferPrice}
-                    placeholder="Enter amount"
-                    keyboardType="numeric"
-                    icon="payments"
-                  />
-                </View>
-              )}
             </Animatable.View>
 
             {/* Summary Section */}
@@ -686,10 +768,7 @@ const SendParcelScreen = () => {
                 delay={400}
                 style={styles.summarySection}
               >
-                <LinearGradient
-                  colors={['#1E1E1E', '#2A2A2A']}
-                  style={styles.summaryGradient}
-                >
+                <View style={styles.summaryCard}>
                   <Text style={styles.summaryTitle}>📊 Delivery Summary</Text>
                   <View style={styles.summaryRow}>
                     <Text style={styles.summaryLabel}>Parcel Size</Text>
@@ -706,22 +785,22 @@ const SendParcelScreen = () => {
                   <View style={styles.summaryRow}>
                     <Text style={styles.summaryLabel}>COD Amount</Text>
                     <Text style={styles.summaryValue}>
-                      {parcelDetails.codAmount ? `Rs. ${parcelDetails.codAmount}` : 'Not specified'}
+                      {parcelDetails.codAmount ? `₨ ${parcelDetails.codAmount}` : 'Not specified'}
                     </Text>
                   </View>
                   <View style={styles.summaryRow}>
                     <Text style={styles.summaryLabel}>Fragile</Text>
-                    <Text style={styles.summaryValue}>
+                    <Text style={[styles.summaryValue, parcelDetails.fragile && styles.summaryValueHighlight]}>
                       {parcelDetails.fragile ? 'Yes' : 'No'}
                     </Text>
                   </View>
                   <View style={[styles.summaryRow, styles.summaryRowLast]}>
                     <Text style={styles.summaryLabel}>Urgent</Text>
-                    <Text style={styles.summaryValue}>
+                    <Text style={[styles.summaryValue, parcelDetails.urgent && styles.summaryValueHighlight]}>
                       {parcelDetails.urgent ? 'Yes' : 'No'}
                     </Text>
                   </View>
-                </LinearGradient>
+                </View>
               </Animatable.View>
             )}
 
@@ -738,26 +817,19 @@ const SendParcelScreen = () => {
                 disabled={isSubmitting || loading || searchingDriver}
                 activeOpacity={0.8}
               >
-                <LinearGradient
-                  colors={['#FFD700', '#FFC107']}
-                  style={styles.sendButtonGradient}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                >
-                  {isSubmitting || loading || searchingDriver ? (
-                    <View style={styles.loadingContainer}>
-                      <ActivityIndicator color="#121212" size="small" />
-                      <Text style={styles.loadingText}>
-                        {searchingDriver ? 'Finding Driver...' : 'Sending...'}
-                      </Text>
-                    </View>
-                  ) : (
-                    <>
-                      <Icon name="send" size={24} color="#121212" />
-                      <Text style={styles.sendButtonText}>Send Parcel</Text>
-                    </>
-                  )}
-                </LinearGradient>
+                {isSubmitting || loading || searchingDriver ? (
+                  <View style={styles.loadingContainer}>
+                    <ActivityIndicator color="#000" size="small" />
+                    <Text style={styles.loadingText}>
+                      {searchingDriver ? 'Finding Driver...' : 'Sending...'}
+                    </Text>
+                  </View>
+                ) : (
+                  <>
+                    <Icon name="send" size={24} color="#000" />
+                    <Text style={styles.sendButtonText}>Send Parcel</Text>
+                  </>
+                )}
               </TouchableOpacity>
             </Animatable.View>
 
@@ -768,8 +840,8 @@ const SendParcelScreen = () => {
           <Modal visible={showMapPicker} animationType="slide">
             <View style={styles.pickerModalContainer}>
               <View style={styles.pickerModalHeader}>
-                <TouchableOpacity onPress={() => setShowMapPicker(false)} style={styles.pickerBackBtn}>
-                  <Icon name="arrow-back" size={24} color="#121212" />
+                <TouchableOpacity onPress={() => setShowMapPicker(false)} style={styles.pickerBackBtn} activeOpacity={0.7}>
+                  <Icon name="arrow-back" size={24} color="#000" />
                 </TouchableOpacity>
                 <Text style={styles.pickerModalTitle}>Select {mapPickerType === 'pickup' ? 'Pickup' : 'Dropoff'}</Text>
                 <View style={{ width: 32 }} />
@@ -790,12 +862,12 @@ const SendParcelScreen = () => {
                 />
               )}
               <View style={styles.pickerCenterPin} pointerEvents="none">
-                <Icon name="location-on" size={40} color={mapPickerType === 'pickup' ? "#4ECDC4" : "#FF6B6B"} />
+                <Icon name="location-on" size={44} color={mapPickerType === 'pickup' ? "#4ECDC4" : "#FF6B6B"} />
               </View>
               <View style={styles.pickerBottomCard}>
                 <Text style={styles.pickerAddressLabel}>Selected Location</Text>
                 <Text style={styles.pickerAddressText}>{mapPickerAddress}</Text>
-                <TouchableOpacity style={styles.pickerConfirmBtn} onPress={confirmMapPicker}>
+                <TouchableOpacity style={styles.pickerConfirmBtn} onPress={confirmMapPicker} activeOpacity={0.8}>
                   <Text style={styles.pickerConfirmText}>Confirm Location</Text>
                 </TouchableOpacity>
               </View>
@@ -811,11 +883,11 @@ const SendParcelScreen = () => {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#121212',
+    backgroundColor: '#FFFFFF',
   },
   container: {
     flex: 1,
-    backgroundColor: '#121212',
+    backgroundColor: '#FFFFFF',
   },
   scrollContent: {
     paddingBottom: 40,
@@ -825,67 +897,115 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingTop: 10,
+    paddingTop: 50,
     paddingBottom: 15,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F5F5F5',
   },
   backButton: {
     padding: 4,
   },
   headerTitle: {
     fontSize: 20,
-    fontWeight: 'bold',
-    color: '#FFF',
+    fontWeight: '700',
+    color: '#000',
+    letterSpacing: 0.5,
   },
   historyButton: {
     padding: 4,
+    position: 'relative',
+  },
+  historyBadge: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#F9C349',
   },
   mapContainer: {
-    height: 250,
-    marginHorizontal: 16,
-    marginBottom: 20,
-    borderRadius: 20,
+    height: 200,
+    marginHorizontal: 20,
+    marginTop: 16,
+    marginBottom: 16,
+    borderRadius: 16,
     overflow: 'hidden',
+    backgroundColor: '#F5F5F5',
+    position: 'relative',
     borderWidth: 1,
-    borderColor: '#2A2A2A',
+    borderColor: '#F0F0F0',
   },
   mapLoading: {
     flex: 1,
-    backgroundColor: '#1E1E1E',
+    backgroundColor: '#F5F5F5',
     justifyContent: 'center',
     alignItems: 'center',
   },
   mapLoadingText: {
-    color: '#888',
+    color: '#999',
     marginTop: 12,
     fontSize: 14,
   },
   map: {
     flex: 1,
   },
+  mapOverlayBtn: {
+    position: 'absolute',
+    bottom: 12,
+    right: 12,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 4,
+  },
   pickupMarker: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: 'rgba(78, 205, 196, 0.3)',
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: 'rgba(78, 205, 196, 0.25)',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
     borderColor: '#4ECDC4',
   },
   markerInner: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
     backgroundColor: '#4ECDC4',
   },
+  dropoffMarker: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#FF6B6B',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#FFF',
+  },
   section: {
-    marginHorizontal: 16,
-    marginBottom: 24,
-    backgroundColor: '#1E1E1E',
-    padding: 16,
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 20,
+    marginBottom: 16,
+    padding: 20,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#2A2A2A',
+    borderColor: '#F0F0F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -894,75 +1014,114 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   sectionTitle: {
-    color: '#FFF',
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#000',
   },
   quickFillButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: '#F9C34915',
+    borderRadius: 20,
   },
   quickFillText: {
-    color: '#FFD700',
-    fontSize: 12,
+    color: '#F9C349',
+    fontSize: 13,
     fontWeight: '500',
   },
   locationInputWrapper: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
   },
   locationDot: {
-    width: 20,
+    width: 24,
     alignItems: 'center',
     marginRight: 12,
+    paddingTop: 16,
   },
   dot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+  },
+  dotLine: {
+    width: 2,
+    height: 20,
+    backgroundColor: '#E0E0E0',
+    marginTop: 4,
   },
   locationInputContainer: {
     flex: 1,
   },
-  locationTextInput: {
-    backgroundColor: '#2A2A2A',
-    color: '#FFF',
+  pickupInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8F8F8',
     borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#F0F0F0',
+  },
+  pickupTextInput: {
+    color: '#000',
+    flex: 1,
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 14,
     fontSize: 14,
+    backgroundColor: 'transparent',
+  },
+  dropoffInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8F8F8',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#F0F0F0',
+  },
+  dropoffTextInput: {
+    color: '#000',
+    flex: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 14,
+    backgroundColor: 'transparent',
   },
   autocompleteContainer: {
     flex: 1,
+    zIndex: 999,
   },
   autocompleteList: {
-    backgroundColor: '#2A2A2A',
+    backgroundColor: '#FFFFFF',
     borderRadius: 12,
-    position: 'absolute',
-    top: 50,
-    left: 0,
-    right: 0,
-    zIndex: 1000,
+    marginTop: 4,
     maxHeight: 200,
+    width: '100%',
+    borderWidth: 1,
+    borderColor: '#F0F0F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 8,
   },
   autocompleteRow: {
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#333',
+    borderBottomColor: '#F5F5F5',
   },
   autocompleteDescription: {
-    color: '#FFF',
+    color: '#000',
     fontSize: 14,
   },
   locationDivider: {
-    height: 1,
-    backgroundColor: '#2A2A2A',
-    marginVertical: 12,
+    height: 0,
+    marginVertical: 0,
   },
   sizeTitle: {
-    color: '#888',
+    color: '#999',
     fontSize: 14,
     marginBottom: 12,
     fontWeight: '500',
@@ -970,7 +1129,7 @@ const styles = StyleSheet.create({
   sizeContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    gap: 8,
+    gap: 10,
     marginBottom: 16,
   },
   sizeCard: {
@@ -979,48 +1138,60 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   sizeCardSelected: {
-    borderWidth: 2,
-    borderColor: '#FFD700',
+    transform: [{ scale: 1.02 }],
   },
-  sizeGradient: {
+  sizeCardContent: {
+    backgroundColor: '#FFFFFF',
     padding: 14,
     alignItems: 'center',
-    position: 'relative',
+    borderWidth: 2,
+    borderColor: '#F0F0F0',
+    borderRadius: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 1,
   },
   sizeIconContainer: {
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#2A2A2A',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 8,
   },
   sizeLabel: {
-    color: '#888',
+    color: '#000',
     fontSize: 14,
     fontWeight: '600',
   },
   sizeLabelSelected: {
-    color: '#FFD700',
+    color: '#F9C349',
   },
   sizePrice: {
-    color: '#666',
+    color: '#999',
     fontSize: 12,
     marginTop: 2,
   },
   sizePriceSelected: {
-    color: '#FFD700',
+    color: '#F9C349',
   },
   sizeDimensions: {
-    color: '#444',
+    color: '#999',
     fontSize: 10,
     marginTop: 2,
   },
   selectedCheck: {
     position: 'absolute',
-    top: 8,
-    right: 8,
+    top: -6,
+    right: -6,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#F9C349',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   inputGrid: {
     flexDirection: 'row',
@@ -1029,49 +1200,132 @@ const styles = StyleSheet.create({
   inputHalf: {
     flex: 1,
   },
+  inputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8F8F8',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#F0F0F0',
+    paddingHorizontal: 12,
+    marginBottom: 12,
+  },
+  inputIcon: {
+    marginRight: 10,
+  },
+  input: {
+    flex: 1,
+    color: '#000',
+    paddingVertical: 12,
+    fontSize: 14,
+  },
+  textArea: {
+    minHeight: 60,
+    textAlignVertical: 'top',
+    paddingTop: 12,
+  },
   optionsRow: {
     flexDirection: 'row',
     gap: 12,
-    marginTop: 8,
+    marginTop: 4,
   },
   optionButton: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#2A2A2A',
+    backgroundColor: '#F8F8F8',
     paddingVertical: 12,
     borderRadius: 12,
     gap: 8,
     borderWidth: 2,
-    borderColor: 'transparent',
+    borderColor: '#F0F0F0',
   },
   optionButtonActive: {
-    borderColor: '#FFD700',
-    backgroundColor: 'rgba(255, 215, 0, 0.1)',
+    borderColor: '#F9C349',
+    backgroundColor: '#F9C34915',
   },
   optionText: {
-    color: '#666',
+    color: '#999',
     fontSize: 14,
     fontWeight: '500',
   },
   optionTextActive: {
-    color: '#FFD700',
+    color: '#F9C349',
+  },
+  fareModeContainer: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 12,
+  },
+  fareMode: {
+    flex: 1,
+    borderRadius: 16,
+    overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: '#F0F0F0',
+  },
+  fareModeSelected: {
+    borderColor: '#F9C349',
+  },
+  fareModeContent: {
+    padding: 16,
+    alignItems: 'center',
+    backgroundColor: '#F8F8F8',
+  },
+  fareModeIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  fareModeText: {
+    color: '#666',
+    fontSize: 14,
+    fontWeight: '500',
+    marginBottom: 4,
+  },
+  fareAmount: {
+    color: '#F9C349',
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  offerInput: {
+    backgroundColor: '#FFFFFF',
+    color: '#000',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    marginTop: 6,
+    width: '100%',
+    fontSize: 14,
+    textAlign: 'center',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
   },
   summarySection: {
-    marginHorizontal: 16,
-    marginBottom: 24,
+    marginHorizontal: 20,
+    marginBottom: 16,
   },
-  summaryGradient: {
-    padding: 16,
-    borderRadius: 16,
+  summaryCard: {
+    backgroundColor: '#FFFFFF',
+    padding: 20,
+    borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#2A2A2A',
+    borderColor: '#F0F0F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
   },
   summaryTitle: {
-    color: '#FFF',
+    color: '#000',
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '600',
     marginBottom: 12,
   },
   summaryRow: {
@@ -1079,44 +1333,46 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 8,
     borderBottomWidth: 1,
-    borderBottomColor: '#2A2A2A',
+    borderBottomColor: '#F0F0F0',
   },
   summaryRowLast: {
     borderBottomWidth: 0,
   },
   summaryLabel: {
-    color: '#888',
+    color: '#999',
     fontSize: 14,
   },
   summaryValue: {
-    color: '#FFF',
+    color: '#000',
     fontSize: 14,
     fontWeight: '500',
+  },
+  summaryValueHighlight: {
+    color: '#F9C349',
   },
   sendButtonContainer: {
     paddingHorizontal: 20,
     marginTop: 10,
+    marginBottom: 10,
   },
   sendButton: {
+    backgroundColor: '#F9C349',
     borderRadius: 16,
-    overflow: 'hidden',
-    elevation: 5,
-    shadowColor: '#FFD700',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-  },
-  sendButtonGradient: {
+    paddingVertical: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 16,
     gap: 10,
+    shadowColor: '#F9C349',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 6,
   },
   sendButtonText: {
-    color: '#121212',
+    color: '#000',
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: '700',
   },
   loadingContainer: {
     flexDirection: 'row',
@@ -1124,94 +1380,12 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   loadingText: {
-    color: '#121212',
+    color: '#000',
     fontSize: 16,
     fontWeight: '500',
   },
   bottomSpacer: {
     height: 20,
-  },
-  modalOverlay: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalBackdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-  },
-  modalContent: {
-    width: width * 0.9,
-    borderRadius: 30,
-    overflow: 'hidden',
-  },
-  modalGradient: {
-    padding: 24,
-    alignItems: 'center',
-  },
-  modalIconContainer: {
-    marginBottom: 16,
-  },
-  modalSuccessIcon: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalTitle: {
-    color: '#FFF',
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 8,
-  },
-  modalSubtitle: {
-    color: '#888',
-    fontSize: 14,
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  modalDetails: {
-    width: '100%',
-    gap: 8,
-    marginBottom: 24,
-  },
-  modalDetail: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#2A2A2A',
-    padding: 12,
-    borderRadius: 12,
-    gap: 12,
-  },
-  modalDetailText: {
-    color: '#FFF',
-    fontSize: 14,
-  },
-  modalActions: {
-    width: '100%',
-    gap: 10,
-  },
-  modalActionButton: {
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-  modalActionGradient: {
-    paddingVertical: 14,
-    alignItems: 'center',
-  },
-  modalActionText: {
-    color: '#121212',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  modalSecondaryButton: {
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  modalSecondaryText: {
-    color: '#666',
-    fontSize: 16,
   },
   mapIconBtn: {
     justifyContent: 'center',
@@ -1221,23 +1395,25 @@ const styles = StyleSheet.create({
   },
   pickerModalContainer: {
     flex: 1,
-    backgroundColor: '#121212',
+    backgroundColor: '#FFFFFF',
   },
   pickerModalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: 16,
-    backgroundColor: '#FFF',
+    backgroundColor: '#FFFFFF',
     paddingTop: Platform.OS === 'ios' ? 50 : 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
   },
   pickerBackBtn: {
     padding: 4,
   },
   pickerModalTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: '#121212',
+    fontWeight: '600',
+    color: '#000',
   },
   pickerMap: {
     flex: 1,
@@ -1246,43 +1422,54 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: '50%',
     left: '50%',
-    marginLeft: -20,
-    marginTop: -40,
+    marginLeft: -22,
+    marginTop: -44,
     zIndex: 10,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 28,
+    padding: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
   },
   pickerBottomCard: {
-    backgroundColor: '#1E1E1E',
+    backgroundColor: '#FFFFFF',
     padding: 20,
     paddingBottom: Platform.OS === 'ios' ? 40 : 20,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.05,
     shadowRadius: 10,
-    elevation: 10,
+    elevation: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#F0F0F0',
   },
   pickerAddressLabel: {
-    color: '#888',
+    color: '#999',
     fontSize: 12,
     marginBottom: 8,
+    fontWeight: '500',
   },
   pickerAddressText: {
-    color: '#FFF',
+    color: '#000',
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 20,
   },
   pickerConfirmBtn: {
-    backgroundColor: '#FFD700',
+    backgroundColor: '#F9C349',
     padding: 16,
     borderRadius: 12,
     alignItems: 'center',
   },
   pickerConfirmText: {
-    color: '#121212',
+    color: '#000',
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '600',
   },
 });
 

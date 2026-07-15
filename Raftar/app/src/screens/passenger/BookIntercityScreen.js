@@ -16,16 +16,18 @@ import {
   Animated,
   Modal,
   FlatList,
-  Linking
+  Linking,
+  Image
 } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import IconIonic from 'react-native-vector-icons/Ionicons';
+import IconFeather from 'react-native-vector-icons/Feather';
+import IconFontAwesome from 'react-native-vector-icons/FontAwesome5';
 import CustomPlacesAutocomplete from '../../components/common/CustomPlacesAutocomplete';
 import MapView, { Marker, Polyline } from 'react-native-maps';
 import * as Location from 'expo-location';
-import { LinearGradient } from 'expo-linear-gradient';
 import * as Animatable from 'react-native-animatable';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { createRide, acceptCounterOffer } from '../../redux/slices/rideSlice';
@@ -42,9 +44,9 @@ const BookIntercityScreen = () => {
   const { user } = useSelector(state => state.auth);
   const socket = useSocket();
   
-  const [viewMode, setViewMode] = useState('list'); // 'list' or 'create' or 'mode_select'
-  const [intercityMode, setIntercityMode] = useState('private'); // 'private' or 'carpool'
-  const [activeTab, setActiveTab] = useState('pending'); // 'pending' or 'accepted'
+  const [viewMode, setViewMode] = useState('list');
+  const [intercityMode, setIntercityMode] = useState('private');
+  const [activeTab, setActiveTab] = useState('pending');
   
   const [myRides, setMyRides] = useState([]);
   const [listLoading, setListLoading] = useState(false);
@@ -72,7 +74,6 @@ const BookIntercityScreen = () => {
   const dropoffRef = useRef(null);
   const [locationLoading, setLocationLoading] = useState(true);
 
-  // Map Picker State
   const [mapPickerVisible, setMapPickerVisible] = useState(false);
   const [mapPickerType, setMapPickerType] = useState('pickup');
   const [mapPickerCoords, setMapPickerCoords] = useState(null);
@@ -268,22 +269,40 @@ const BookIntercityScreen = () => {
 
   const vehicleTypes = [
     { 
-      id: 'car', 
-      label: 'Car', 
-      icon: 'directions-car',
-      iconType: 'material',
-      price: 200,
-      capacity: '4 Persons',
-      color: '#4ECDC4'
+      id: 'bike', 
+      label: 'Bike', 
+      icon: 'motorcycle',
+      iconType: 'fontawesome',
+      basePrice: 100,
+      pricePerKm: 8,
+      capacity: '2 Persons',
+      color: '#f9c349',
+      bgColor: '#f9c34915',
+      description: 'Fast & economical'
     },
     { 
       id: 'rickshaw', 
       label: 'Rickshaw', 
-      icon: 'bicycle',
-      iconType: 'material-community',
-      price: 150,
+      icon: 'truck',
+      iconType: 'fontawesome',
+      basePrice: 150,
+      pricePerKm: 12,
       capacity: '3 Persons',
-      color: '#FFD93D'
+      color: '#f9c349',
+      bgColor: '#f9c34915',
+      description: 'Budget friendly'
+    },
+    { 
+      id: 'car', 
+      label: 'Car', 
+      icon: 'car',
+      iconType: 'fontawesome',
+      basePrice: 200,
+      pricePerKm: 15,
+      capacity: '4 Persons',
+      color: '#f9c349',
+      bgColor: '#f9c34915',
+      description: 'Comfortable ride'
     }
   ];
 
@@ -360,6 +379,8 @@ const BookIntercityScreen = () => {
     switch (iconType) {
       case 'material': return <Icon name={icon} size={size} color={color} />;
       case 'material-community': return <IconIonic name={icon} size={size} color={color} />;
+      case 'fontawesome': return <IconFontAwesome name={icon} size={size} color={color} />;
+      case 'feather': return <IconFeather name={icon} size={size} color={color} />;
       default: return <Icon name={icon} size={size} color={color} />;
     }
   };
@@ -382,51 +403,71 @@ const BookIntercityScreen = () => {
     return (
       <Animatable.View animation="fadeInUp" duration={400} style={{ marginBottom: 16 }}>
         <TouchableOpacity
-          style={[styles.recentRideCard, { borderColor: isAccepted ? '#4ECDC4' : '#FFD700', borderWidth: 1 }]}
+          style={[styles.recentRideCard, isAccepted && styles.acceptedRideCard]}
           onPress={() => navigation.navigate('RideTracking', { rideId: item._id })}
+          activeOpacity={0.8}
         >
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 }}>
-            <Text style={{ color: '#FFF', fontSize: 16, fontWeight: 'bold' }}>
-              {item.scheduledTime ? new Date(item.scheduledTime).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'No Date'}
-            </Text>
-            <View style={[styles.rideStatus, { backgroundColor: isAccepted ? '#4ECDC4' : '#FFD700' }]}>
-              <Text style={[styles.rideStatusText, !isAccepted && { color: '#000' }]}>
+          <View style={styles.rideCardHeader}>
+            <View style={styles.rideDateTime}>
+              <IconFeather name="calendar" size={14} color="#666" />
+              <Text style={styles.rideDateText}>
+                {item.scheduledTime ? new Date(item.scheduledTime).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'No Date'}
+              </Text>
+            </View>
+            <View style={[styles.rideStatus, isAccepted ? styles.acceptedStatus : styles.pendingStatus]}>
+              <View style={[styles.statusDot, isAccepted ? styles.acceptedDot : styles.pendingDot]} />
+              <Text style={[styles.rideStatusText, isAccepted ? styles.acceptedStatusText : styles.pendingStatusText]}>
                 {item.status.toUpperCase()}
               </Text>
             </View>
           </View>
           
-          <View style={{ marginBottom: 12 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
-              <Icon name="my-location" size={16} color="#4ECDC4" />
-              <Text style={{ color: '#CCC', marginLeft: 8, flex: 1 }} numberOfLines={1}>{item.pickup?.address}</Text>
+          <View style={styles.rideLocations}>
+            <View style={styles.locationRow}>
+              <View style={styles.locationIconContainer}>
+                <View style={styles.pickupDot} />
+              </View>
+              <Text style={styles.locationText} numberOfLines={1}>{item.pickup?.address}</Text>
             </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Icon name="location-on" size={16} color="#FF6B6B" />
-              <Text style={{ color: '#CCC', marginLeft: 8, flex: 1 }} numberOfLines={1}>{item.dropoff?.address}</Text>
+            <View style={styles.locationConnector} />
+            <View style={styles.locationRow}>
+              <View style={styles.locationIconContainer}>
+                <View style={styles.dropoffDot} />
+              </View>
+              <Text style={styles.locationText} numberOfLines={1}>{item.dropoff?.address}</Text>
             </View>
           </View>
 
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: '#333', paddingTop: 12, marginBottom: item.bids?.length > 0 ? 12 : 0 }}>
-             <Text style={{ color: '#FFD700', fontWeight: 'bold' }}>Rs. {item.fare?.accepted || item.fare?.offered || 0}</Text>
-             <Text style={{ color: '#888' }}>{(item.vehicleType || 'Economy').toUpperCase()}</Text>
+          <View style={styles.rideFooter}>
+            <View style={styles.priceContainer}>
+              <Text style={styles.currencySymbol}>Rs.</Text>
+              <Text style={styles.priceText}>{item.fare?.accepted || item.fare?.offered || 0}</Text>
+            </View>
+            <View style={styles.vehicleTag}>
+              <IconFontAwesome 
+                name={item.vehicleType === 'bike' ? 'motorcycle' : item.vehicleType === 'rickshaw' ? 'truck' : 'car'} 
+                size={12} 
+                color="#f9c349" 
+              />
+              <Text style={styles.vehicleTagText}>{(item.vehicleType || 'Car').toUpperCase()}</Text>
+            </View>
           </View>
 
           {item.bids && item.bids.length > 0 && !isAccepted && (
-            <View style={{ marginTop: 10 }}>
-              <Text style={{ color: '#4ECDC4', fontWeight: 'bold', marginBottom: 8 }}>Available Offers:</Text>
+            <View style={styles.bidsContainer}>
+              <Text style={styles.bidsTitle}>Available Offers</Text>
               {item.bids.map((bid, index) => (
-                <View key={index} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#2A2A2A', padding: 10, borderRadius: 8, marginBottom: 6 }}>
-                  <View>
-                    <Text style={{ color: '#FFF', fontWeight: 'bold' }}>Rs. {bid.fare}</Text>
-                    <Text style={{ color: '#888', fontSize: 12 }}>Driver Offer</Text>
+                <View key={index} style={styles.bidCard}>
+                  <View style={styles.bidInfo}>
+                    <Text style={styles.bidAmount}>Rs. {bid.fare}</Text>
+                    <Text style={styles.bidLabel}>Driver Offer</Text>
                   </View>
-                  <Button 
-                    title="Accept" 
-                    size="small" 
+                  <TouchableOpacity 
+                    style={styles.acceptBidButton}
                     onPress={() => handleAcceptOffer(item._id, bid.driverId?._id || bid.driverId, bid.fare)}
-                    style={{ paddingHorizontal: 15, paddingVertical: 5 }} 
-                  />
+                  >
+                    <Text style={styles.acceptBidText}>Accept</Text>
+                  </TouchableOpacity>
                 </View>
               ))}
             </View>
@@ -443,49 +484,67 @@ const BookIntercityScreen = () => {
     <View style={styles.listContainer}>
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <Icon name="arrow-back" size={24} color="#FFF" />
+          <IconFeather name="arrow-left" size={22} color="#1a1a1a" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Intercity Rides</Text>
-        <View style={{width: 24}} />
+        <TouchableOpacity style={styles.headerAction}>
+          <IconFeather name="search" size={22} color="#1a1a1a" />
+        </TouchableOpacity>
       </View>
       
       <View style={styles.tabContainer}>
-        <TouchableOpacity style={[styles.tab, activeTab === 'pending' && styles.activeTab]} onPress={() => setActiveTab('pending')}>
-          <Text style={[styles.tabText, activeTab === 'pending' && styles.activeTabText]}>Pending</Text>
+        <TouchableOpacity 
+          style={[styles.tab, activeTab === 'pending' && styles.activeTab]} 
+          onPress={() => setActiveTab('pending')}
+        >
+          <Text style={[styles.tabText, activeTab === 'pending' && styles.activeTabText]}>
+            Pending {pendingList.length > 0 && `(${pendingList.length})`}
+          </Text>
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.tab, activeTab === 'accepted' && styles.activeTab]} onPress={() => setActiveTab('accepted')}>
-          <Text style={[styles.tabText, activeTab === 'accepted' && styles.activeTabText]}>Accepted</Text>
+        <TouchableOpacity 
+          style={[styles.tab, activeTab === 'accepted' && styles.activeTab]} 
+          onPress={() => setActiveTab('accepted')}
+        >
+          <Text style={[styles.tabText, activeTab === 'accepted' && styles.activeTabText]}>
+            Accepted {acceptedList.length > 0 && `(${acceptedList.length})`}
+          </Text>
         </TouchableOpacity>
       </View>
 
       {listLoading ? (
-        <View style={{flex: 1, justifyContent: 'center', alignItems: 'center'}}>
-          <ActivityIndicator size="large" color="#FFD700" />
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#f9c349" />
         </View>
       ) : (
         <FlatList
           data={activeTab === 'pending' ? pendingList : acceptedList}
           renderItem={renderMyRide}
           keyExtractor={item => item._id}
-          contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
+          contentContainerStyle={styles.rideListContent}
           ListEmptyComponent={
-            <Text style={{ color: '#888', textAlign: 'center', marginTop: 40 }}>
-              No {activeTab} intercity rides right now.
-            </Text>
+            <View style={styles.emptyContainer}>
+              <IconFeather name="clock" size={60} color="#ddd" />
+              <Text style={styles.emptyTitle}>No {activeTab} rides</Text>
+              <Text style={styles.emptySubtitle}>
+                {activeTab === 'pending' 
+                  ? 'You have no pending intercity rides' 
+                  : 'You have no accepted intercity rides'}
+              </Text>
+            </View>
           }
           refreshing={listLoading}
           onRefresh={fetchMyIntercityRides}
         />
       )}
 
-      <View style={styles.floatingBtnContainer}>
-        <Button 
-          title="Book New Intercity"
-          onPress={() => setViewMode('mode_select')}
-          style={styles.createNewBtn}
-          textStyle={{fontWeight: 'bold', fontSize: 16}}
-        />
-      </View>
+      <TouchableOpacity 
+        style={styles.floatingBtn}
+        onPress={() => setViewMode('mode_select')}
+        activeOpacity={0.9}
+      >
+        <IconFeather name="plus" size={24} color="#fff" />
+        <Text style={styles.floatingBtnText}>New Ride</Text>
+      </TouchableOpacity>
     </View>
   );
 
@@ -493,29 +552,46 @@ const BookIntercityScreen = () => {
     <View style={styles.listContainer}>
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={() => setViewMode('list')}>
-          <Icon name="arrow-back" size={24} color="#FFF" />
+          <IconFeather name="arrow-left" size={22} color="#1a1a1a" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Select Mode</Text>
-        <View style={{width: 24}} />
+        <View style={{width: 40}} />
       </View>
-      <View style={{ padding: 20, gap: 20, flex: 1, justifyContent: 'center' }}>
-        <TouchableOpacity 
-          style={[styles.vehicleCardMode, { padding: 30, alignItems: 'center' }]} 
-          onPress={() => setViewMode('create')}
-        >
-          <Icon name="directions-car" size={60} color="#FFD700" />
-          <Text style={{ color: '#FFF', fontSize: 24, fontWeight: 'bold', marginTop: 10 }}>Private Ride</Text>
-          <Text style={{ color: '#888', textAlign: 'center', marginTop: 10 }}>Book a complete vehicle for your intercity travel.</Text>
-        </TouchableOpacity>
+      
+      <View style={styles.modeSelectContainer}>
+        <Animatable.View animation="fadeInUp" duration={600} delay={100}>
+          <TouchableOpacity 
+            style={styles.modeCard}
+            onPress={() => setViewMode('create')}
+            activeOpacity={0.8}
+          >
+            <View style={styles.modeCardIcon}>
+              <IconFontAwesome name="car" size={40} color="#f9c349" />
+            </View>
+            <Text style={styles.modeCardTitle}>Private Ride</Text>
+            <Text style={styles.modeCardDesc}>Book a complete vehicle for your intercity travel</Text>
+            <View style={styles.modeCardArrow}>
+              <IconFeather name="arrow-right" size={20} color="#f9c349" />
+            </View>
+          </TouchableOpacity>
+        </Animatable.View>
 
-        <TouchableOpacity 
-          style={[styles.vehicleCardMode, { padding: 30, alignItems: 'center' }]} 
-          onPress={() => navigation.navigate('BookCarpool', { isIntercity: true })}
-        >
-          <Icon name="people" size={60} color="#4ECDC4" />
-          <Text style={{ color: '#FFF', fontSize: 24, fontWeight: 'bold', marginTop: 10 }}>Carpool</Text>
-          <Text style={{ color: '#888', textAlign: 'center', marginTop: 10 }}>Share seats with others to save cost.</Text>
-        </TouchableOpacity>
+        <Animatable.View animation="fadeInUp" duration={600} delay={200}>
+          <TouchableOpacity 
+            style={styles.modeCard}
+            onPress={() => navigation.navigate('BookCarpool', { isIntercity: true })}
+            activeOpacity={0.8}
+          >
+            <View style={styles.modeCardIcon}>
+              <IconFontAwesome name="users" size={40} color="#f9c349" />
+            </View>
+            <Text style={styles.modeCardTitle}>Carpool</Text>
+            <Text style={styles.modeCardDesc}>Share seats with others to save cost</Text>
+            <View style={styles.modeCardArrow}>
+              <IconFeather name="arrow-right" size={20} color="#f9c349" />
+            </View>
+          </TouchableOpacity>
+        </Animatable.View>
       </View>
     </View>
   );
@@ -524,17 +600,21 @@ const BookIntercityScreen = () => {
     <Animated.View style={[styles.container, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={() => setViewMode('mode_select')}>
-          <Icon name="arrow-back" size={24} color="#FFF" />
+          <IconFeather name="arrow-left" size={22} color="#1a1a1a" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Private Intercity</Text>
+        <Text style={styles.headerTitle}>New Intercity Ride</Text>
         <View style={styles.headerRight} />
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+      <ScrollView 
+        showsVerticalScrollIndicator={false} 
+        contentContainerStyle={styles.scrollContent} 
+        keyboardShouldPersistTaps="handled"
+      >
         <Animatable.View animation="fadeIn" duration={600} style={styles.mapContainer}>
           {locationLoading ? (
             <View style={styles.mapLoading}>
-              <ActivityIndicator size="large" color="#FFD700" />
+              <ActivityIndicator size="large" color="#f9c349" />
             </View>
           ) : (
             <MapView
@@ -549,15 +629,26 @@ const BookIntercityScreen = () => {
             >
               {pickup?.location?.coordinates && (
                 <Marker coordinate={{ latitude: pickup.location.coordinates[1], longitude: pickup.location.coordinates[0] }}>
-                  <View style={styles.pickupMarker}><View style={styles.markerInner} /></View>
+                  <View style={styles.pickupMarker}>
+                    <View style={styles.markerInner} />
+                  </View>
                 </Marker>
               )}
               {dropoff?.location?.coordinates && (
                 <Marker coordinate={{ latitude: dropoff.location.coordinates[1], longitude: dropoff.location.coordinates[0] }}>
-                  <Icon name="flag" size={24} color="#FF6B6B" />
+                  <View style={styles.dropoffMarker}>
+                    <IconFeather name="flag" size={16} color="#f9c349" />
+                  </View>
                 </Marker>
               )}
-              {routeCoords.length > 0 && <Polyline coordinates={routeCoords} strokeWidth={4} strokeColor="#4ECDC4" />}
+              {routeCoords.length > 0 && (
+                <Polyline 
+                  coordinates={routeCoords} 
+                  strokeWidth={4} 
+                  strokeColor="#f9c349"
+                  lineDashPattern={[1, 0]}
+                />
+              )}
             </MapView>
           )}
         </Animatable.View>
@@ -566,17 +657,19 @@ const BookIntercityScreen = () => {
           <View style={styles.locationHeader}>
             <Text style={styles.locationTitle}>Where to?</Text>
             <TouchableOpacity style={styles.locationAction} onPress={getCurrentLocation}>
-              <Icon name="my-location" size={20} color="#FFD700" />
-              <Text style={styles.locationActionText}>Use Current</Text>
+              <IconFeather name="navigation" size={16} color="#f9c349" />
+              <Text style={styles.locationActionText}>Current</Text>
             </TouchableOpacity>
           </View>
 
           <View style={[styles.locationInputWrapper, { zIndex: 20, elevation: 20 }]}>
-            <View style={styles.locationDot}><View style={[styles.dot, { backgroundColor: '#4ECDC4' }]} /></View>
+            <View style={styles.locationDot}>
+              <View style={[styles.dot, { backgroundColor: '#f9c349' }]} />
+            </View>
             <View style={styles.locationInputContainer}>
               <CustomPlacesAutocomplete
                 ref={pickupRef}
-                placeholder="Pickup City/Location"
+                placeholder="Pickup location"
                 onPress={(data, details = null) => {
                   setPickup({
                     address: data.description,
@@ -584,18 +677,43 @@ const BookIntercityScreen = () => {
                     placeId: data.place_id
                   });
                 }}
-                styles={{ textInputContainer: { backgroundColor: '#2A2A2A', borderRadius: 12 }, textInput: { color: '#FFF', flex: 1, padding: 12, fontSize: 14 } }}
-                renderRightButton={() => <TouchableOpacity onPress={() => openMapPicker('pickup')}><Icon name="map" size={22} color="#4ECDC4" /></TouchableOpacity>}
+                styles={{
+                  textInputContainer: { 
+                    backgroundColor: '#f5f5f5', 
+                    borderRadius: 12,
+                    borderWidth: 1,
+                    borderColor: '#e0e0e0',
+                  },
+                  textInput: { 
+                    color: '#1a1a1a', 
+                    flex: 1, 
+                    padding: 12, 
+                    fontSize: 14,
+                    fontFamily: Platform.OS === 'ios' ? 'System' : 'Roboto',
+                  }
+                }}
+                renderRightButton={() => (
+                  <TouchableOpacity 
+                    style={styles.mapPickerBtn}
+                    onPress={() => openMapPicker('pickup')}
+                  >
+                    <IconFeather name="map-pin" size={20} color="#f9c349" />
+                  </TouchableOpacity>
+                )}
               />
             </View>
           </View>
+          
           <View style={styles.locationDivider} />
+          
           <View style={[styles.locationInputWrapper, { zIndex: 10, elevation: 10 }]}>
-            <View style={styles.locationDot}><View style={[styles.dot, { backgroundColor: '#FF6B6B' }]} /></View>
+            <View style={styles.locationDot}>
+              <View style={[styles.dot, { backgroundColor: '#ff6b6b' }]} />
+            </View>
             <View style={styles.locationInputContainer}>
               <CustomPlacesAutocomplete
                 ref={dropoffRef}
-                placeholder="Destination City/Location"
+                placeholder="Destination"
                 onPress={(data, details = null) => {
                   setDropoff({
                     address: data.description,
@@ -603,22 +721,45 @@ const BookIntercityScreen = () => {
                     placeId: data.place_id
                   });
                 }}
-                styles={{ textInputContainer: { backgroundColor: '#2A2A2A', borderRadius: 12 }, textInput: { color: '#FFF', flex: 1, padding: 12, fontSize: 14 } }}
-                renderRightButton={() => <TouchableOpacity onPress={() => openMapPicker('dropoff')}><Icon name="map" size={22} color="#FF6B6B" /></TouchableOpacity>}
+                styles={{
+                  textInputContainer: { 
+                    backgroundColor: '#f5f5f5', 
+                    borderRadius: 12,
+                    borderWidth: 1,
+                    borderColor: '#e0e0e0',
+                  },
+                  textInput: { 
+                    color: '#1a1a1a', 
+                    flex: 1, 
+                    padding: 12, 
+                    fontSize: 14,
+                    fontFamily: Platform.OS === 'ios' ? 'System' : 'Roboto',
+                  }
+                }}
+                renderRightButton={() => (
+                  <TouchableOpacity 
+                    style={styles.mapPickerBtn}
+                    onPress={() => openMapPicker('dropoff')}
+                  >
+                    <IconFeather name="map-pin" size={20} color="#ff6b6b" />
+                  </TouchableOpacity>
+                )}
               />
             </View>
           </View>
 
-          <View style={{ marginTop: 20 }}>
-            <Text style={{ color: '#888', marginBottom: 10, fontWeight: 'bold' }}>Schedule Time</Text>
-            <View style={{ flexDirection: 'row', gap: 10 }}>
-              <TouchableOpacity style={styles.datePickerBtn} onPress={() => setShowDatePicker(true)}>
-                <Icon name="calendar-today" size={20} color="#FFD700" />
-                <Text style={{ color: '#FFF', marginLeft: 10 }}>{schedule.toLocaleDateString()}</Text>
+          <View style={styles.scheduleSection}>
+            <Text style={styles.scheduleLabel}>Schedule Time</Text>
+            <View style={styles.scheduleButtons}>
+              <TouchableOpacity style={styles.scheduleBtn} onPress={() => setShowDatePicker(true)}>
+                <IconFeather name="calendar" size={18} color="#f9c349" />
+                <Text style={styles.scheduleBtnText}>{schedule.toLocaleDateString()}</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.datePickerBtn} onPress={() => setShowTimePicker(true)}>
-                <Icon name="access-time" size={20} color="#FFD700" />
-                <Text style={{ color: '#FFF', marginLeft: 10 }}>{schedule.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Text>
+              <TouchableOpacity style={styles.scheduleBtn} onPress={() => setShowTimePicker(true)}>
+                <IconFeather name="clock" size={18} color="#f9c349" />
+                <Text style={styles.scheduleBtnText}>
+                  {schedule.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </Text>
               </TouchableOpacity>
             </View>
 
@@ -627,14 +768,28 @@ const BookIntercityScreen = () => {
                 value={schedule}
                 mode="date"
                 minimumDate={new Date()}
-                onChange={(e, date) => { setShowDatePicker(false); if(date) { const newDate = new Date(schedule); newDate.setFullYear(date.getFullYear(), date.getMonth(), date.getDate()); setSchedule(newDate); } }}
+                onChange={(e, date) => { 
+                  setShowDatePicker(false); 
+                  if(date) { 
+                    const newDate = new Date(schedule); 
+                    newDate.setFullYear(date.getFullYear(), date.getMonth(), date.getDate()); 
+                    setSchedule(newDate); 
+                  } 
+                }}
               />
             )}
             {showTimePicker && (
               <DateTimePicker
                 value={schedule}
                 mode="time"
-                onChange={(e, date) => { setShowTimePicker(false); if(date) { const newDate = new Date(schedule); newDate.setHours(date.getHours(), date.getMinutes()); setSchedule(newDate); } }}
+                onChange={(e, date) => { 
+                  setShowTimePicker(false); 
+                  if(date) { 
+                    const newDate = new Date(schedule); 
+                    newDate.setHours(date.getHours(), date.getMinutes()); 
+                    setSchedule(newDate); 
+                  } 
+                }}
               />
             )}
           </View>
@@ -642,71 +797,168 @@ const BookIntercityScreen = () => {
 
         <Animatable.View animation="fadeInUp" duration={600} delay={200} style={styles.section}>
           <Text style={styles.sectionTitle}>Select Vehicle</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            {vehicleTypes.map(vehicle => (
-              <TouchableOpacity key={vehicle.id} style={[styles.vehicleCard, selectedVehicle === vehicle.id && styles.vehicleCardSelected]} onPress={() => setSelectedVehicle(vehicle.id)}>
-                <LinearGradient colors={selectedVehicle === vehicle.id ? [vehicle.color + '30', vehicle.color + '10'] : ['#2A2A2A', '#1E1E1E']} style={styles.vehicleGradient}>
-                  <View style={[styles.vehicleIconContainer, { backgroundColor: selectedVehicle === vehicle.id ? vehicle.color + '20' : '#2A2A2A' }]}>
-                    {getIcon(vehicle.icon, vehicle.iconType, 28, selectedVehicle === vehicle.id ? vehicle.color : '#666')}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.vehicleScroll}>
+            {vehicleTypes.map(vehicle => {
+              const isSelected = selectedVehicle === vehicle.id;
+              return (
+                <TouchableOpacity 
+                  key={vehicle.id} 
+                  style={[
+                    styles.vehicleCard, 
+                    isSelected && styles.vehicleCardSelected
+                  ]} 
+                  onPress={() => setSelectedVehicle(vehicle.id)}
+                  activeOpacity={0.8}
+                >
+                  <View style={[
+                    styles.vehicleIconContainer, 
+                    isSelected && styles.vehicleIconSelected,
+                    { backgroundColor: isSelected ? vehicle.bgColor : '#f5f5f5' }
+                  ]}>
+                    {getIcon(
+                      vehicle.icon, 
+                      vehicle.iconType, 
+                      32, 
+                      isSelected ? vehicle.color : '#999'
+                    )}
                   </View>
-                  <Text style={[styles.vehicleLabel, selectedVehicle === vehicle.id && { color: vehicle.color }]}>{vehicle.label}</Text>
-                  <Text style={styles.vehiclePrice}>Rs.{vehicle.price}</Text>
-                  {selectedVehicle === vehicle.id && <View style={styles.selectedBadge}><Icon name="check-circle" size={16} color={vehicle.color} /></View>}
-                </LinearGradient>
-              </TouchableOpacity>
-            ))}
+                  <Text style={[
+                    styles.vehicleLabel, 
+                    isSelected && { color: vehicle.color }
+                  ]}>
+                    {vehicle.label}
+                  </Text>
+                  <Text style={[
+                    styles.vehiclePrice,
+                    isSelected && { color: vehicle.color }
+                  ]}>
+                    From Rs.{vehicle.basePrice}
+                  </Text>
+                  <Text style={styles.vehicleCapacity}>{vehicle.capacity}</Text>
+                  <Text style={styles.vehicleDescription}>{vehicle.description}</Text>
+                  {isSelected && (
+                    <View style={styles.vehicleSelectedBadge}>
+                      <IconFeather name="check-circle" size={20} color="#f9c349" />
+                    </View>
+                  )}
+                </TouchableOpacity>
+              );
+            })}
           </ScrollView>
         </Animatable.View>
 
         <Animatable.View animation="fadeInUp" duration={600} delay={300} style={styles.section}>
-          <Text style={styles.sectionTitle}>Choose Fare Mode</Text>
+          <Text style={styles.sectionTitle}>Fare Mode</Text>
           <View style={styles.fareModeContainer}>
-            <TouchableOpacity style={[styles.fareMode, fareMode === 'ai' && styles.fareModeSelected]} onPress={() => setFareMode('ai')}>
-              <LinearGradient colors={fareMode === 'ai' ? ['#FFD700', '#FFC107'] : ['#2A2A2A', '#1E1E1E']} style={styles.fareModeGradient}>
-                <View style={styles.fareModeContent}>
-                  <Icon name="auto-awesome" size={28} color={fareMode === 'ai' ? '#121212' : '#888'} />
-                  <Text style={[styles.fareModeText, fareMode === 'ai' && { color: '#121212' }]}>AI Price</Text>
-                  {estimatedFare && <Text style={[styles.fareAmount, fareMode === 'ai' && { color: '#121212' }]}>Rs.{estimatedFare?.total ?? estimatedFare}</Text>}
+            <TouchableOpacity 
+              style={[styles.fareMode, fareMode === 'ai' && styles.fareModeSelected]} 
+              onPress={() => setFareMode('ai')}
+              activeOpacity={0.8}
+            >
+              <View style={[styles.fareModeContent, fareMode === 'ai' && styles.fareModeContentSelected]}>
+                <View style={styles.fareModeIcon}>
+                  <IconFontAwesome name="robot" size={24} color={fareMode === 'ai' ? '#f9c349' : '#999'} />
                 </View>
-              </LinearGradient>
+                <Text style={[styles.fareModeText, fareMode === 'ai' && { color: '#f9c349' }]}>AI Price</Text>
+                {estimatedFare && (
+                  <Text style={[styles.fareAmount, fareMode === 'ai' && { color: '#f9c349' }]}>
+                    Rs.{estimatedFare?.total ?? estimatedFare}
+                  </Text>
+                )}
+                {!estimatedFare && (
+                  <Text style={styles.fareSubtext}>Auto-calculated</Text>
+                )}
+              </View>
             </TouchableOpacity>
 
-            <TouchableOpacity style={[styles.fareMode, fareMode === 'offer' && styles.fareModeSelected]} onPress={() => setFareMode('offer')}>
-              <LinearGradient colors={fareMode === 'offer' ? ['#4ECDC4', '#44B39D'] : ['#2A2A2A', '#1E1E1E']} style={styles.fareModeGradient}>
-                <View style={styles.fareModeContent}>
-                  <Icon name="attach-money" size={28} color={fareMode === 'offer' ? '#121212' : '#888'} />
-                  <Text style={[styles.fareModeText, fareMode === 'offer' && { color: '#121212' }]}>Offer Price</Text>
-                  {fareMode === 'offer' && (
-                    <TextInput style={[styles.offerInput, { backgroundColor: 'rgba(255,255,255,0.2)', color: '#121212' }]} placeholder="Amount" placeholderTextColor="rgba(0,0,0,0.5)" keyboardType="numeric" value={offerPrice} onChangeText={setOfferPrice} />
-                  )}
+            <TouchableOpacity 
+              style={[styles.fareMode, fareMode === 'offer' && styles.fareModeSelected]} 
+              onPress={() => setFareMode('offer')}
+              activeOpacity={0.8}
+            >
+              <View style={[styles.fareModeContent, fareMode === 'offer' && styles.fareModeContentSelected]}>
+                <View style={styles.fareModeIcon}>
+                  <IconFeather name="tag" size={24} color={fareMode === 'offer' ? '#f9c349' : '#999'} />
                 </View>
-              </LinearGradient>
+                <Text style={[styles.fareModeText, fareMode === 'offer' && { color: '#f9c349' }]}>Offer Price</Text>
+                <TextInput 
+                  style={[styles.offerInput, fareMode === 'offer' && styles.offerInputActive]} 
+                  placeholder="Enter amount"
+                  placeholderTextColor="#999"
+                  keyboardType="numeric" 
+                  value={offerPrice} 
+                  onChangeText={setOfferPrice}
+                  editable={fareMode === 'offer'}
+                />
+              </View>
             </TouchableOpacity>
           </View>
         </Animatable.View>
 
         <Animatable.View animation="fadeInUp" duration={600} delay={400} style={styles.bookButtonContainer}>
-          <TouchableOpacity style={styles.bookButton} onPress={handleBookIntercity} disabled={loading}>
-            <LinearGradient colors={['#FFD700', '#FFC107']} style={styles.bookButtonGradient}>
-              {loading ? <ActivityIndicator color="#121212" /> : <><Text style={styles.bookButtonText}>Post Intercity Ride</Text><Icon name="arrow-forward" size={24} color="#121212" /></>}
-            </LinearGradient>
+          <TouchableOpacity 
+            style={styles.bookButton} 
+            onPress={handleBookIntercity} 
+            disabled={loading}
+            activeOpacity={0.8}
+          >
+            {loading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <>
+                <Text style={styles.bookButtonText}>Post Intercity Ride</Text>
+                <IconFeather name="arrow-right" size={20} color="#fff" />
+              </>
+            )}
           </TouchableOpacity>
         </Animatable.View>
         <View style={styles.bottomSpacer} />
       </ScrollView>
 
       {/* Map Picker Modal */}
-      <Modal visible={mapPickerVisible} animationType="slide">
-        <View style={{ flex: 1 }}>
-          <MapView ref={pickerMapRef} style={{ flex: 1 }} initialRegion={{ latitude: mapPickerCoords?.latitude || 33.6844, longitude: mapPickerCoords?.longitude || 73.0479, latitudeDelta: 0.05, longitudeDelta: 0.05 }} onRegionChangeComplete={onPickerRegionChangeComplete} />
-          <View style={{ position: 'absolute', top: '50%', left: '50%', marginTop: -24, marginLeft: -12 }}>
-            <Icon name="location-on" size={48} color={mapPickerType === 'pickup' ? '#4ECDC4' : '#FF6B6B'} />
+      <Modal visible={mapPickerVisible} animationType="slide" presentationStyle="fullScreen">
+        <View style={styles.mapPickerContainer}>
+          <View style={styles.mapPickerHeader}>
+            <TouchableOpacity onPress={() => setMapPickerVisible(false)}>
+              <IconFeather name="x" size={24} color="#1a1a1a" />
+            </TouchableOpacity>
+            <Text style={styles.mapPickerTitle}>
+              Select {mapPickerType === 'pickup' ? 'Pickup' : 'Dropoff'} Location
+            </Text>
+            <View style={{width: 24}} />
           </View>
-          <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: '#1E1E1E', padding: 20, borderTopLeftRadius: 20, borderTopRightRadius: 20 }}>
-            <Text style={{ color: '#FFF', fontSize: 16, marginBottom: 15 }}>{mapPickerAddress}</Text>
-            <View style={{ flexDirection: 'row', gap: 10 }}>
-              <Button title="Cancel" variant="outline" onPress={() => setMapPickerVisible(false)} style={{ flex: 1 }} />
-              <Button title="Confirm" onPress={confirmMapPicker} style={{ flex: 1 }} />
+          
+          <MapView 
+            ref={pickerMapRef} 
+            style={styles.mapPickerMap} 
+            initialRegion={{ 
+              latitude: mapPickerCoords?.latitude || 33.6844, 
+              longitude: mapPickerCoords?.longitude || 73.0479, 
+              latitudeDelta: 0.02, 
+              longitudeDelta: 0.02 
+            }} 
+            onRegionChangeComplete={onPickerRegionChangeComplete} 
+          />
+          
+          <View style={styles.mapPickerCenterPin}>
+            <IconFeather name="map-pin" size={36} color={mapPickerType === 'pickup' ? '#f9c349' : '#ff6b6b'} />
+          </View>
+          
+          <View style={styles.mapPickerBottom}>
+            <Text style={styles.mapPickerAddress}>{mapPickerAddress}</Text>
+            <View style={styles.mapPickerActions}>
+              <TouchableOpacity 
+                style={[styles.mapPickerActionBtn, styles.mapPickerCancelBtn]} 
+                onPress={() => setMapPickerVisible(false)}
+              >
+                <Text style={styles.mapPickerCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.mapPickerActionBtn, styles.mapPickerConfirmBtn]} 
+                onPress={confirmMapPicker}
+              >
+                <Text style={styles.mapPickerConfirmText}>Confirm</Text>
+              </TouchableOpacity>
             </View>
           </View>
         </View>
@@ -716,7 +968,7 @@ const BookIntercityScreen = () => {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor="#121212" />
+      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
       <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         {viewMode === 'list' && renderListView()}
         {viewMode === 'mode_select' && renderModeSelect()}
@@ -727,63 +979,734 @@ const BookIntercityScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#121212' },
-  container: { flex: 1, backgroundColor: '#121212' },
-  listContainer: { flex: 1 },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 10, paddingBottom: 10 },
-  backButton: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#1E1E1E', justifyContent: 'center', alignItems: 'center' },
-  headerTitle: { fontSize: 20, fontWeight: 'bold', color: '#FFF' },
+  safeArea: { flex: 1, backgroundColor: '#ffffff' },
+  container: { flex: 1, backgroundColor: '#ffffff' },
+  
+  // Header Styles
+  header: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'space-between', 
+    paddingHorizontal: 20, 
+    paddingBottom: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+    marginTop:34
+  },
+  backButton: { 
+    width: 40, 
+    height: 40, 
+    borderRadius: 20, 
+    backgroundColor: '#f5f5f5', 
+    justifyContent: 'center', 
+    alignItems: 'center' 
+  },
+  headerTitle: { 
+    fontSize: 18, 
+    fontWeight: '700', 
+    color: '#1a1a1a',
+    fontFamily: Platform.OS === 'ios' ? 'System' : 'Roboto',
+  },
   headerRight: { width: 40 },
-  tabContainer: { flexDirection: 'row', paddingHorizontal: 20, marginBottom: 10 },
-  tab: { flex: 1, paddingVertical: 12, alignItems: 'center', borderBottomWidth: 2, borderBottomColor: '#2A2A2A' },
-  activeTab: { borderBottomColor: '#FFD700' },
-  tabText: { color: '#888', fontWeight: 'bold' },
-  activeTabText: { color: '#FFD700' },
-  floatingBtnContainer: { position: 'absolute', bottom: 20, left: 20, right: 20 },
-  createNewBtn: { borderRadius: 12 },
-  recentRideCard: { backgroundColor: '#1E1E1E', borderRadius: 12, padding: 16 },
-  rideStatus: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
-  rideStatusText: { color: '#FFF', fontSize: 12, fontWeight: 'bold' },
-  scrollContent: { paddingBottom: 40 },
-  mapContainer: { height: 200, marginHorizontal: 20, marginTop: 10, borderRadius: 16, overflow: 'hidden', backgroundColor: '#1E1E1E' },
-  mapLoading: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  map: { width: '100%', height: '100%' },
-  pickupMarker: { width: 24, height: 24, borderRadius: 12, backgroundColor: 'rgba(78, 205, 196, 0.3)', justifyContent: 'center', alignItems: 'center' },
-  markerInner: { width: 12, height: 12, borderRadius: 6, backgroundColor: '#4ECDC4', borderWidth: 2, borderColor: '#FFF' },
-  locationSection: { backgroundColor: '#1E1E1E', margin: 20, borderRadius: 16, padding: 16 },
-  locationHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  locationTitle: { fontSize: 18, fontWeight: 'bold', color: '#FFF' },
-  locationAction: { flexDirection: 'row', alignItems: 'center' },
-  locationActionText: { color: '#FFD700', marginLeft: 4, fontWeight: 'bold' },
-  locationInputWrapper: { flexDirection: 'row', alignItems: 'center' },
-  locationDot: { width: 24, alignItems: 'center' },
-  dot: { width: 8, height: 8, borderRadius: 4 },
-  locationInputContainer: { flex: 1, marginLeft: 12 },
-  locationDivider: { height: 24, width: 2, backgroundColor: '#333', marginLeft: 11, marginVertical: 4 },
-  datePickerBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: '#2A2A2A', padding: 12, borderRadius: 12 },
-  section: { paddingHorizontal: 20, marginBottom: 24 },
-  sectionTitle: { fontSize: 18, fontWeight: 'bold', color: '#FFF', marginBottom: 16 },
-  vehicleCard: { width: 120, height: 150, marginRight: 12, borderRadius: 16, overflow: 'hidden', backgroundColor: '#1E1E1E' },
-  vehicleCardSelected: { transform: [{ scale: 1.05 }] },
-  vehicleGradient: { flex: 1, padding: 16, alignItems: 'center', justifyContent: 'center' },
-  vehicleIconContainer: { width: 48, height: 48, borderRadius: 24, justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
-  vehicleLabel: { color: '#FFF', fontSize: 16, fontWeight: 'bold', marginBottom: 4 },
-  vehiclePrice: { color: '#888', fontSize: 14, fontWeight: 'bold' },
-  vehicleCardMode: { backgroundColor: '#1E1E1E', borderRadius: 16, overflow: 'hidden' },
-  selectedBadge: { position: 'absolute', top: 12, right: 12 },
-  fareModeContainer: { flexDirection: 'row', gap: 12 },
-  fareMode: { flex: 1, height: 140, borderRadius: 16, overflow: 'hidden' },
-  fareModeSelected: { transform: [{ scale: 1.02 }] },
-  fareModeGradient: { flex: 1, padding: 16 },
-  fareModeContent: { flex: 1, justifyContent: 'space-between' },
-  fareModeText: { fontSize: 16, fontWeight: 'bold', color: '#888', marginTop: 8 },
-  fareAmount: { fontSize: 20, fontWeight: 'bold', color: '#888' },
-  offerInput: { borderRadius: 8, padding: 12, fontSize: 16, marginTop: 8, fontWeight: 'bold' },
-  bookButtonContainer: { paddingHorizontal: 20, marginTop: 10 },
-  bookButton: { borderRadius: 16, overflow: 'hidden' },
-  bookButtonGradient: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 16, gap: 12 },
-  bookButtonText: { color: '#121212', fontSize: 18, fontWeight: 'bold' },
-  bottomSpacer: { height: 100 }
+  headerAction: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#f5f5f5',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  // List View Styles
+  listContainer: { flex: 1, backgroundColor: '#ffffff' },
+  tabContainer: { 
+    flexDirection: 'row', 
+    paddingHorizontal: 20, 
+    paddingTop: 20,
+    marginBottom: 5,
+  },
+  tab: { 
+    flex: 1, 
+    paddingVertical: 12, 
+    alignItems: 'center',
+    borderRadius: 8,
+    marginHorizontal: 4,
+  },
+  activeTab: { 
+    backgroundColor: '#f9c349',
+  },
+  tabText: { 
+    color: '#999', 
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  activeTabText: { 
+    color: '#1a1a1a',
+    fontWeight: '700',
+  },
+  
+  loadingContainer: { 
+    flex: 1, 
+    justifyContent: 'center', 
+    alignItems: 'center' 
+  },
+  
+  rideListContent: { 
+    padding: 16, 
+    paddingBottom: 100,
+  },
+  
+  recentRideCard: { 
+    backgroundColor: '#ffffff', 
+    borderRadius: 16, 
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#f0f0f0',
+  },
+  acceptedRideCard: {
+    borderColor: '#f9c349',
+    borderWidth: 1.5,
+  },
+  rideCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  rideDateTime: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  rideDateText: {
+    color: '#666',
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  rideStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 6,
+  },
+  acceptedStatus: {
+    backgroundColor: '#f9c34920',
+  },
+  pendingStatus: {
+    backgroundColor: '#ffd70020',
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  acceptedDot: {
+    backgroundColor: '#f9c349',
+  },
+  pendingDot: {
+    backgroundColor: '#ffd700',
+  },
+  rideStatusText: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  acceptedStatusText: {
+    color: '#f9c349',
+  },
+  pendingStatusText: {
+    color: '#ffd700',
+  },
+  rideLocations: {
+    marginBottom: 12,
+  },
+  locationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
+  locationIconContainer: {
+    width: 24,
+    alignItems: 'center',
+  },
+  pickupDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#f9c349',
+  },
+  dropoffDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#ff6b6b',
+  },
+  locationConnector: {
+    width: 2,
+    height: 12,
+    backgroundColor: '#e0e0e0',
+    marginLeft: 11,
+  },
+  locationText: {
+    flex: 1,
+    color: '#1a1a1a',
+    fontSize: 14,
+    fontWeight: '500',
+    marginLeft: 12,
+  },
+  rideFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+  },
+  priceContainer: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+  },
+  currencySymbol: {
+    color: '#f9c349',
+    fontSize: 14,
+    fontWeight: '700',
+    marginRight: 2,
+  },
+  priceText: {
+    color: '#1a1a1a',
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  vehicleTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f5f5f5',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 6,
+  },
+  vehicleTagText: {
+    color: '#666',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  bidsContainer: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+  },
+  bidsTitle: {
+    color: '#1a1a1a',
+    fontSize: 13,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  bidCard: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#f8f8f8',
+    padding: 10,
+    borderRadius: 10,
+    marginBottom: 6,
+  },
+  bidInfo: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 8,
+  },
+  bidAmount: {
+    color: '#1a1a1a',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  bidLabel: {
+    color: '#999',
+    fontSize: 12,
+  },
+  acceptBidButton: {
+    backgroundColor: '#f9c349',
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  acceptBidText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 60,
+  },
+  emptyTitle: {
+    color: '#1a1a1a',
+    fontSize: 18,
+    fontWeight: '700',
+    marginTop: 16,
+  },
+  emptySubtitle: {
+    color: '#999',
+    fontSize: 14,
+    marginTop: 8,
+  },
+
+  // Floating Button
+  floatingBtn: {
+    position: 'absolute',
+    bottom: 24,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f9c349',
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    borderRadius: 30,
+    gap: 8,
+    shadowColor: '#f9c349',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  floatingBtnText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+
+  // Mode Select Styles
+  modeSelectContainer: {
+    flex: 1,
+    padding: 20,
+    justifyContent: 'center',
+    gap: 20,
+  },
+  modeCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    padding: 24,
+    borderWidth: 1,
+    borderColor: '#f0f0f0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  modeCardIcon: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#f9c34915',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  modeCardTitle: {
+    color: '#1a1a1a',
+    fontSize: 20,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  modeCardDesc: {
+    color: '#999',
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  modeCardArrow: {
+    position: 'absolute',
+    top: 24,
+    right: 24,
+  },
+
+  // Create View Styles
+  scrollContent: { 
+    paddingBottom: 40,
+  },
+  mapContainer: { 
+    height: 200, 
+    marginHorizontal: 20, 
+    marginTop: 16, 
+    borderRadius: 16, 
+    overflow: 'hidden', 
+    backgroundColor: '#f5f5f5',
+    borderWidth: 1,
+    borderColor: '#f0f0f0',
+  },
+  mapLoading: { 
+    flex: 1, 
+    justifyContent: 'center', 
+    alignItems: 'center' 
+  },
+  map: { 
+    width: '100%', 
+    height: '100%' 
+  },
+  pickupMarker: { 
+    width: 24, 
+    height: 24, 
+    borderRadius: 12, 
+    backgroundColor: 'rgba(249, 195, 73, 0.3)', 
+    justifyContent: 'center', 
+    alignItems: 'center' 
+  },
+  markerInner: { 
+    width: 12, 
+    height: 12, 
+    borderRadius: 6, 
+    backgroundColor: '#f9c349', 
+    borderWidth: 2, 
+    borderColor: '#fff' 
+  },
+  dropoffMarker: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 107, 107, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#ff6b6b',
+  },
+
+  locationSection: { 
+    backgroundColor: '#ffffff', 
+    margin: 20, 
+    borderRadius: 16, 
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#f0f0f0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  locationHeader: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center', 
+    marginBottom: 16 
+  },
+  locationTitle: { 
+    fontSize: 16, 
+    fontWeight: '700', 
+    color: '#1a1a1a' 
+  },
+  locationAction: { 
+    flexDirection: 'row', 
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#f9c34915',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  locationActionText: { 
+    color: '#f9c349', 
+    fontWeight: '600',
+    fontSize: 13,
+  },
+  locationInputWrapper: { 
+    flexDirection: 'row', 
+    alignItems: 'center' 
+  },
+  locationDot: { 
+    width: 24, 
+    alignItems: 'center' 
+  },
+  dot: { 
+    width: 8, 
+    height: 8, 
+    borderRadius: 4 
+  },
+  locationInputContainer: { 
+    flex: 1, 
+    marginLeft: 12,
+  },
+  mapPickerBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  locationDivider: { 
+    height: 20, 
+    width: 2, 
+    backgroundColor: '#e0e0e0', 
+    marginLeft: 11, 
+    marginVertical: 4 
+  },
+  scheduleSection: {
+    marginTop: 16,
+  },
+  scheduleLabel: {
+    color: '#666',
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  scheduleButtons: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  scheduleBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f5f5f5',
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    gap: 8,
+  },
+  scheduleBtnText: {
+    color: '#1a1a1a',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+
+  section: { 
+    paddingHorizontal: 20, 
+    marginBottom: 24,
+  },
+  sectionTitle: { 
+    fontSize: 16, 
+    fontWeight: '700', 
+    color: '#1a1a1a', 
+    marginBottom: 16,
+  },
+  
+  vehicleScroll: {
+    flexDirection: 'row',
+    paddingBottom: 4,
+  },
+  vehicleCard: { 
+    width: 150, 
+    backgroundColor: '#ffffff', 
+    borderRadius: 16, 
+    padding: 16, 
+    marginRight: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#f0f0f0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  vehicleCardSelected: { 
+    borderColor: '#f9c349',
+    borderWidth: 2,
+    shadowColor: '#f9c349',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  vehicleIconContainer: { 
+    width: 64, 
+    height: 64, 
+    borderRadius: 32, 
+    backgroundColor: '#f5f5f5', 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    marginBottom: 10,
+  },
+  vehicleIconSelected: {
+    backgroundColor: '#f9c34915',
+  },
+  vehicleLabel: { 
+    color: '#1a1a1a', 
+    fontSize: 16, 
+    fontWeight: '700', 
+    marginBottom: 2,
+  },
+  vehiclePrice: { 
+    color: '#999', 
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  vehicleCapacity: {
+    color: '#bbb',
+    fontSize: 11,
+    marginTop: 2,
+  },
+  vehicleDescription: {
+    color: '#ccc',
+    fontSize: 10,
+    marginTop: 2,
+    textAlign: 'center',
+  },
+  vehicleSelectedBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+  },
+
+  fareModeContainer: { 
+    flexDirection: 'row', 
+    gap: 12,
+  },
+  fareMode: { 
+    flex: 1, 
+    height: 140, 
+    borderRadius: 16, 
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#f0f0f0',
+    overflow: 'hidden',
+  },
+  fareModeSelected: { 
+    borderColor: '#f9c349',
+    borderWidth: 2,
+  },
+  fareModeContent: { 
+    flex: 1, 
+    padding: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  fareModeContentSelected: {
+    backgroundColor: '#f9c34908',
+  },
+  fareModeIcon: {
+    marginBottom: 8,
+  },
+  fareModeText: { 
+    fontSize: 14, 
+    fontWeight: '600', 
+    color: '#666',
+    marginBottom: 4,
+  },
+  fareAmount: { 
+    fontSize: 18, 
+    fontWeight: '700', 
+    color: '#1a1a1a',
+  },
+  fareSubtext: {
+    color: '#bbb',
+    fontSize: 12,
+  },
+  offerInput: { 
+    borderRadius: 8, 
+    padding: 8, 
+    fontSize: 16, 
+    width: '100%',
+    textAlign: 'center',
+    backgroundColor: '#f5f5f5',
+    color: '#1a1a1a',
+    fontWeight: '600',
+  },
+  offerInputActive: {
+    backgroundColor: '#f9c34915',
+    borderWidth: 1,
+    borderColor: '#f9c349',
+  },
+
+  bookButtonContainer: { 
+    paddingHorizontal: 20, 
+    marginTop: 10,
+  },
+  bookButton: { 
+    backgroundColor: '#f9c349', 
+    borderRadius: 16, 
+    paddingVertical: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+    shadowColor: '#f9c349',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  bookButtonText: { 
+    color: '#fff', 
+    fontSize: 16, 
+    fontWeight: '700',
+  },
+  bottomSpacer: { height: 40 },
+
+  // Map Picker Modal
+  mapPickerContainer: {
+    flex: 1,
+    backgroundColor: '#ffffff',
+  },
+  mapPickerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  mapPickerTitle: {
+    color: '#1a1a1a',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  mapPickerMap: {
+    flex: 1,
+  },
+  mapPickerCenterPin: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    marginTop: -18,
+    marginLeft: -18,
+  },
+  mapPickerBottom: {
+    backgroundColor: '#ffffff',
+    padding: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+  },
+  mapPickerAddress: {
+    color: '#1a1a1a',
+    fontSize: 15,
+    fontWeight: '500',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  mapPickerActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  mapPickerActionBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  mapPickerCancelBtn: {
+    backgroundColor: '#f5f5f5',
+  },
+  mapPickerCancelText: {
+    color: '#666',
+    fontWeight: '600',
+  },
+  mapPickerConfirmBtn: {
+    backgroundColor: '#f9c349',
+  },
+  mapPickerConfirmText: {
+    color: '#fff',
+    fontWeight: '700',
+  },
 });
 
 export default BookIntercityScreen;

@@ -13,7 +13,9 @@ import {
   RefreshControl,
   FlatList,
   ActivityIndicator,
-  Alert
+  Alert,
+  Platform,
+  TextInput,
 } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import Icon from 'react-native-vector-icons/MaterialIcons';
@@ -25,7 +27,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Animatable from 'react-native-animatable';
 import * as Location from 'expo-location';
 import api from '../../services/api';
-import CarpoolMapPreview from '../../components/common/CarpoolMapPreview';
 
 const { width, height } = Dimensions.get('window');
 
@@ -37,15 +38,30 @@ const HomeScreen = () => {
   const [errorMsg, setErrorMsg] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [activeService, setActiveService] = useState(null);
-  
-  // Animation refs
+
+  const [pickup, setPickup] = useState(null);
+  const [destination, setDestination] = useState(null);
+  const [locationLoading, setLocationLoading] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
-  const scaleAnim = useRef(new Animated.Value(0.9)).current;
+  const scaleAnim = useRef(new Animated.Value(0.95)).current;
+
+  // Modern Yellow Theme Colors
+  const YELLOW_PRIMARY = '#F9C349';
+  const YELLOW_DARK = '#F8B82A';
+  const YELLOW_LIGHT = '#FFF3D6';
+  const YELLOW_GRADIENT_START = '#F8B82A';
+  const YELLOW_GRADIENT_END = '#F9C349';
+  const BLACK_PRIMARY = '#1A1A2E';
+  const GRAY_LIGHT = '#F5F5F5';
+  const GRAY_MEDIUM = '#E0E0E0';
+  const WHITE = '#FFFFFF';
 
   useEffect(() => {
     animateEntrance();
-    getLocation();
+    getCurrentLocation();
     checkActiveRides();
   }, []);
 
@@ -53,7 +69,6 @@ const HomeScreen = () => {
     try {
       const response = await api.get('/rides/active');
       if (response.data?.success && response.data.rides?.length > 0) {
-        // Filter out ghost 'searching' rides, only auto-navigate to rides that are in progress
         const activeRide = response.data.rides.find(r => r.status === 'accepted' || r.status === 'started');
         if (activeRide) {
           console.log('[HomeScreen] Found active in-progress ride:', activeRide._id, 'Status:', activeRide.status);
@@ -70,8 +85,6 @@ const HomeScreen = () => {
     }
   };
 
-
-
   useEffect(() => {
     const socketService = require('../../services/socket').default;
     
@@ -83,8 +96,6 @@ const HomeScreen = () => {
     };
     const handleCarpoolStarted = (data) => {
       Alert.alert('Carpool Started', 'Your carpool is now in progress!');
-      // Assuming RideTracking handles carpool tracking if adapted, or create a simple fallback.
-      // navigation.navigate('RideTracking', { rideId: data.carpoolId });
     };
     const handleCarpoolCompleted = (data) => {
       Alert.alert('Carpool Completed', `Your carpool has finished. Fare: Rs. ${data.fare}`);
@@ -107,101 +118,146 @@ const HomeScreen = () => {
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
-        duration: 800,
+        duration: 1000,
         useNativeDriver: true,
       }),
       Animated.timing(slideAnim, {
         toValue: 0,
-        duration: 600,
+        duration: 800,
         useNativeDriver: true,
       }),
       Animated.spring(scaleAnim, {
         toValue: 1,
-        friction: 8,
-        tension: 40,
+        friction: 6,
+        tension: 50,
         useNativeDriver: true,
       })
     ]).start();
   };
 
-  const getLocation = async () => {
+  const getCurrentLocation = async () => {
+    setLocationLoading(true);
     try {
       let { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
         setErrorMsg('Permission to access location was denied');
+        setLocationLoading(false);
         return;
       }
 
-      let location = await Location.getCurrentPositionAsync({});
-      setLocation(location);
+      let loc = await Location.getCurrentPositionAsync({});
+      setLocation(loc);
+      
+      let addressStr = 'Current Location';
+      try {
+        let geo = await Location.reverseGeocodeAsync({
+          latitude: loc.coords.latitude,
+          longitude: loc.coords.longitude
+        });
+        if (geo.length > 0) {
+          addressStr = `${geo[0].name || geo[0].street || ''}, ${geo[0].city || ''}`.replace(/^, /, '');
+        }
+      } catch(e) {}
+
+      setPickup({
+        address: addressStr,
+        location: {
+          type: 'Point',
+          coordinates: [loc.coords.longitude, loc.coords.latitude]
+        }
+      });
     } catch (error) {
       console.error('Location error:', error);
+    } finally {
+      setLocationLoading(false);
     }
   };
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await getLocation();
+    await getCurrentLocation();
     setRefreshing(false);
+  };
+
+  const handleWhereToPress = () => {
+    navigation.navigate('BookRide', {
+      pickup: pickup,
+      destination: destination
+    });
+  };
+
+  const handlePickupPress = () => {
+    navigation.navigate('BookRide', {
+      pickup: pickup,
+      destination: destination,
+      focusField: 'pickup'
+    });
+  };
+
+  const handleDestinationPress = () => {
+    navigation.navigate('BookRide', {
+      pickup: pickup,
+      destination: destination,
+      focusField: 'destination'
+    });
+  };
+
+  const getPickupDisplay = () => {
+    if (pickup) {
+      return pickup.address.length > 30 ? pickup.address.substring(0, 30) + '...' : pickup.address;
+    }
+    return 'Select pickup location';
+  };
+
+  const getDestinationDisplay = () => {
+    if (destination) {
+      return destination.address.length > 30 ? destination.address.substring(0, 30) + '...' : destination.address;
+    }
+    return 'Where to?';
   };
 
   const serviceOptions = [
     {
       id: 'ride',
-      title: 'Book a Ride',
-      icon: 'car',
+      title: 'Ride',
+      icon: 'car-sports',
       iconType: 'material-community',
-      color: '#FF6B6B',
-      gradient: ['#FF6B6B', '#FF8E53'],
       screen: 'BookRide',
-      description: 'Get a ride instantly',
-      badge: 'Popular'
+      description: 'Go anywhere',
+      iconBg: YELLOW_LIGHT,
+      iconColor: YELLOW_PRIMARY,
     },
     {
       id: 'carpool',
-      title: 'Book a Carpool',
+      title: 'Carpool',
       icon: 'people',
       iconType: 'ionicon',
-      color: '#4ECDC4',
-      gradient: ['#4ECDC4', '#44B39D'],
       screen: 'BookCarpool',
-      description: 'Share ride with others',
-      badge: 'Save'
+      description: 'Share & save',
+      iconBg: '#E8F5E9',
+      iconColor: '#4CAF50',
     },
     {
       id: 'parcel',
-      title: 'Send a Parcel',
-      icon: 'local-shipping',
-      iconType: 'material',
-      color: '#A8E6CF',
-      gradient: ['#A8E6CF', '#88D8B0'],
+      title: 'Parcel',
+      icon: 'package-variant-closed',
+      iconType: 'material-community',
       screen: 'SendParcel',
-      description: 'Fast delivery service',
-      badge: 'New'
+      description: 'Send items',
+      iconBg: '#FFF3E0',
+      iconColor: '#FF9800',
     },
     {
       id: 'intercity',
       title: 'Intercity',
-      icon: 'map-marker-distance',
+      icon: 'bus',
       iconType: 'material-community',
-      color: '#B39DDB',
-      gradient: ['#B39DDB', '#9575CD'],
       screen: 'BookIntercity',
-      description: 'Travel to other cities',
-      badge: 'New'
+      description: 'City to city',
+      iconBg: '#F3E5F5',
+      iconColor: '#9C27B0',
     }
   ];
-
-  const quickActions = [
-    { id: 'history', icon: 'history', iconType: 'material', label: 'History', color: '#FF6B6B', screen: 'RideHistory' },
-    { id: 'spending', icon: 'attach-money', iconType: 'material', label: 'Spending', color: '#FFD700', screen: 'Spending' },
-    { id: 'wallet', icon: 'wallet', iconType: 'material', label: 'Wallet', color: '#4ECDC4', screen: 'Wallet' },
-    { id: 'support', icon: 'headset', iconType: 'material-community', label: 'Support', color: '#A8E6CF', screen: 'Support' },
-    { id: 'promo', icon: 'gift', iconType: 'material-community', label: 'Offers', color: '#FF8A80', screen: 'Offers' },
-    { id: 'settings', icon: 'settings', iconType: 'ionicon', label: 'Settings', color: '#B39DDB', screen: 'Settings' }
-  ];
-
-  // recentRides replaced by state hook at the top
 
   const getIcon = (icon, iconType, size, color) => {
     switch (iconType) {
@@ -221,62 +277,36 @@ const HomeScreen = () => {
   const renderServiceCard = ({ item, index }) => (
     <Animatable.View 
       animation="fadeInUp" 
-      duration={600} 
+      duration={500} 
       delay={index * 100}
       style={styles.serviceCardWrapper}
     >
       <TouchableOpacity
-        activeOpacity={0.9}
+        activeOpacity={0.85}
         style={styles.serviceCard}
         onPress={() => {
           setActiveService(item.id);
           navigation.navigate(item.screen);
         }}
       >
-        <LinearGradient
-          colors={item.gradient}
-          style={styles.serviceGradient}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-        >
-          {item.badge && (
-            <View style={[styles.badge, { backgroundColor: item.color }]}>
-              <Text style={styles.badgeText}>{item.badge}</Text>
-            </View>
-          )}
-          <View style={[styles.serviceIconContainer, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
-            {getIcon(item.icon, item.iconType, 32, '#FFF')}
+        <View style={styles.serviceCardContent}>
+          <View style={[styles.serviceIconContainer, { backgroundColor: item.iconBg }]}>
+            {getIcon(item.icon, item.iconType, 28, item.iconColor)}
           </View>
           <Text style={styles.serviceTitle}>{item.title}</Text>
           <Text style={styles.serviceDescription}>{item.description}</Text>
-        </LinearGradient>
+        </View>
       </TouchableOpacity>
     </Animatable.View>
   );
 
-  const renderQuickAction = ({ item }) => (
-    <TouchableOpacity 
-      style={styles.quickActionItem} 
-      activeOpacity={0.7}
-      onPress={() => item.screen ? navigation.navigate(item.screen) : null}
-    >
-      <LinearGradient
-        colors={[item.color + '30', item.color + '10']}
-        style={[styles.quickActionIcon, { borderColor: item.color + '40' }]}
-      >
-        {getIcon(item.icon, item.iconType, 24, item.color)}
-      </LinearGradient>
-      <Text style={styles.quickActionLabel}>{item.label}</Text>
-    </TouchableOpacity>
-  );
-
-
-
-
+  const handleNotificationPress = () => {
+    navigation.navigate('Notifications');
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor="#121212" />
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
       
       <Animated.View style={[
         styles.container,
@@ -294,85 +324,125 @@ const HomeScreen = () => {
             <RefreshControl 
               refreshing={refreshing} 
               onRefresh={onRefresh} 
-              tintColor="#FFD700"
-              colors={['#FFD700']}
+              tintColor={YELLOW_PRIMARY}
+              colors={[YELLOW_PRIMARY]}
             />
           }
         >
-          {/* Header */}
-          <View style={styles.header}>
-            <View style={styles.headerLeft}>
-              <View style={styles.greetingContainer}>
-                <Text style={styles.greeting}>Good Morning 👋</Text>
-                <Text style={styles.userName}>{user?.name || 'Guest User'}</Text>
+          {/* Modern Yellow Header */}
+          <LinearGradient
+            colors={[YELLOW_GRADIENT_START, YELLOW_GRADIENT_END]}
+            style={styles.headerGradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+          >
+            <View style={styles.headerContainer}>
+              <View style={styles.headerLeft}>
+                <View style={styles.logoContainer}>
+                  <IconMCI name="car-sports" size={28} color="#FFFFFF" />
+                  <Text style={styles.headerTitle}>Raftar</Text>
+                </View>
+                
               </View>
-              <View style={styles.locationContainer}>
-                <Icon name="location-on" size={16} color="#FFD700" />
+              <View style={styles.headerRight}>
+                <TouchableOpacity 
+                  style={styles.headerIconButton}
+                  onPress={handleNotificationPress}
+                  activeOpacity={0.7}
+                >
+                  <IconIonic name="notifications-outline" size={24} color="#FFFFFF" />
+                  <View style={styles.notificationDot} />
+                </TouchableOpacity>
+               
+              </View>
+            </View>
+
+            
+
+           
+          </LinearGradient>
+
+          
+
+          {/* Location Card - Modern Design */}
+          <View style={styles.locationCard}>
+            <View style={styles.locationCardHeader}>
+              <Text style={styles.locationCardTitle}>Your Trip</Text>
+              <TouchableOpacity onPress={getCurrentLocation}>
+                <Text style={styles.locationCardAction}>Use Current</Text>
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity 
+              style={styles.locationItem}
+              onPress={handlePickupPress}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.locationDot, { backgroundColor: YELLOW_PRIMARY }]} />
+              <View style={styles.locationContent}>
+                <Text style={styles.locationLabel}>Pickup</Text>
                 <Text style={styles.locationText} numberOfLines={1}>
-                  {location ? 
-                    `${location.coords.latitude.toFixed(4)}, ${location.coords.longitude.toFixed(4)}` :
-                    'Fetching location...'
-                  }
+                  {locationLoading ? 'Loading...' : getPickupDisplay()}
                 </Text>
               </View>
-            </View>
-            <View style={styles.headerRight}>
-              <TouchableOpacity 
-                style={styles.notificationButton}
-                onPress={() => navigation.navigate('Notifications')}
-              >
-                <Icon name="notifications" size={24} color="#FFF" />
-                <View style={styles.notificationBadge}>
-                  <Text style={styles.badgeText}>3</Text>
-                </View>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={styles.profileButton}
-                onPress={() => navigation.navigate('Profile')}
-              >
-                <Image
-                  source={{ 
-                    uri: user?.profilePhoto || 
-                         'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&h=100&fit=crop&crop=face'
-                  }}
-                  style={styles.profileImage}
-                />
-                <View style={styles.onlineDot} />
-              </TouchableOpacity>
-            </View>
-          </View>
+              {pickup && (
+                <TouchableOpacity 
+                  style={styles.clearButton}
+                  onPress={() => setPickup(null)}
+                >
+                  <IconIonic name="close-circle" size={20} color="#999" />
+                </TouchableOpacity>
+              )}
+            </TouchableOpacity>
 
-          {/* Search Bar */}
-          <TouchableOpacity 
-            style={styles.searchBar}
-            onPress={() => navigation.navigate('BookRide')}
-            activeOpacity={0.8}
-          >
-            <Icon name="search" size={22} color="#666" />
-            <Text style={styles.searchText}>Where are you going?</Text>
-            <View style={styles.searchRight}>
-              <Icon name="mic" size={20} color="#666" />
-            </View>
-          </TouchableOpacity>
+            <View style={styles.locationDivider} />
 
-          {/* Quick Actions */}
-          <View style={styles.quickActionsContainer}>
-            <FlatList
-              data={quickActions}
-              renderItem={renderQuickAction}
-              keyExtractor={item => item.id}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.quickActionsList}
-            />
+            <TouchableOpacity 
+              style={styles.locationItem}
+              onPress={handleDestinationPress}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.locationDot, { backgroundColor: '#FF6B6B' }]} />
+              <View style={styles.locationContent}>
+                <Text style={styles.locationLabel}>Destination</Text>
+                <Text style={[styles.locationText, !destination && styles.locationPlaceholder]}>
+                  {getDestinationDisplay()}
+                </Text>
+              </View>
+              {destination && (
+                <TouchableOpacity 
+                  style={styles.clearButton}
+                  onPress={() => setDestination(null)}
+                >
+                  <IconIonic name="close-circle" size={20} color="#999" />
+                </TouchableOpacity>
+              )}
+            </TouchableOpacity>
+
+            {pickup && destination && (
+              <TouchableOpacity 
+                style={styles.bookNowButton}
+                onPress={handleWhereToPress}
+              >
+                <LinearGradient
+                  colors={[YELLOW_GRADIENT_START, YELLOW_GRADIENT_END]}
+                  style={styles.bookNowGradient}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                >
+                  <Text style={styles.bookNowText}>Find a Ride</Text>
+                  <Icon name="arrow-forward" size={20} color="#FFFFFF" />
+                </LinearGradient>
+              </TouchableOpacity>
+            )}
           </View>
 
           {/* Services Section */}
           <View style={styles.sectionContainer}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>🚗 Our Services</Text>
+              <Text style={styles.sectionTitle}>Our Services</Text>
               <TouchableOpacity>
-                <Text style={styles.seeAll}>See All</Text>
+                <Text style={styles.sectionSeeAll}>See All</Text>
               </TouchableOpacity>
             </View>
             <View style={styles.servicesGrid}>
@@ -384,81 +454,32 @@ const HomeScreen = () => {
             </View>
           </View>
 
-          {/* Promo Banner */}
-          <Animatable.View animation="fadeInUp" duration={600} delay={400}>
+          {/* Promo Banner - Yellow Theme */}
+          <View style={styles.promoContainer}>
             <LinearGradient
-              colors={['#FF6B6B', '#FF8E53']}
+              colors={[YELLOW_GRADIENT_START, YELLOW_GRADIENT_END]}
               style={styles.promoBanner}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
             >
               <View style={styles.promoContent}>
-                <View style={styles.promoLeft}>
-                  <Text style={styles.promoTitle}>🎉 Ride Smarter,</Text>
-                  <Text style={styles.promoTitle}>Save More</Text>
-                  <Text style={styles.promoText}>
-                    Get up to 20% off on your first 5 rides
-                  </Text>
+                <View style={styles.promoTextContainer}>
+                  <Text style={styles.promoTitle}>🚗 First Ride Free</Text>
+                  <Text style={styles.promoDescription}>Get your first ride absolutely free. Use code FIRSTFREE</Text>
                   <TouchableOpacity style={styles.promoButton}>
-                    <LinearGradient
-                      colors={['#FFF', '#F5F5F5']}
-                      style={styles.promoButtonGradient}
-                    >
-                      <Text style={styles.promoButtonText}>Claim Now</Text>
-                      <Icon name="arrow-forward" size={18} color="#FF6B6B" />
-                    </LinearGradient>
+                    <Text style={styles.promoButtonText}>Claim Offer</Text>
+                    <Icon name="arrow-forward" size={16} color={YELLOW_PRIMARY} />
                   </TouchableOpacity>
                 </View>
-                <View style={styles.promoRight}>
-                  <View style={styles.promoIconContainer}>
-                    <Icon name="local-offer" size={50} color="#FFF" />
-                  </View>
+                <View style={styles.promoIconContainer}>
+                  <IconMCI name="rocket-launch" size={48} color="#FFFFFF" />
                 </View>
               </View>
             </LinearGradient>
-          </Animatable.View>
+          </View>
 
-          {/* Current Location */}
-          <Animatable.View animation="fadeInUp" duration={600} delay={500} style={styles.locationCard}>
-            <LinearGradient
-              colors={['#1E1E1E', '#2A2A2A']}
-              style={styles.locationGradient}
-            >
-              <View style={styles.locationHeader}>
-                <View style={styles.locationIconContainer}>
-                  <Icon name="my-location" size={22} color="#FFD700" />
-                </View>
-                <Text style={styles.locationTitle}>Current Location</Text>
-                <TouchableOpacity style={styles.refreshLocation} onPress={getLocation}>
-                  <Icon name="refresh" size={20} color="#FFD700" />
-                </TouchableOpacity>
-              </View>
-              <Text style={styles.locationText}>
-                {location ? 
-                  `${location.coords.latitude.toFixed(6)}, ${location.coords.longitude.toFixed(6)}` :
-                  'Fetching location...'
-                }
-              </Text>
-            </LinearGradient>
-          </Animatable.View>
-
-
-
-
-
-          {/* Bottom Spacer */}
           <View style={styles.bottomSpacer} />
         </ScrollView>
-
-        {/* Floating Action Button */}
-        <TouchableOpacity style={styles.fab} activeOpacity={0.9}>
-          <LinearGradient
-            colors={['#FFD700', '#FFC107']}
-            style={styles.fabGradient}
-          >
-            <Icon name="add" size={30} color="#121212" />
-          </LinearGradient>
-        </TouchableOpacity>
       </Animated.View>
     </SafeAreaView>
   );
@@ -467,163 +488,176 @@ const HomeScreen = () => {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#121212',
+    backgroundColor: '#F8F9FA',
   },
   container: {
     flex: 1,
-    backgroundColor: '#121212',
+    backgroundColor: '#F8F9FA',
+    marginTop:34
   },
-  header: {
+  headerGradient: {
+    paddingTop: 12,
+    paddingBottom: 24,
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
+  },
+  headerContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingTop: 10,
-    paddingBottom: 15,
+    paddingTop: 8,
+    paddingBottom:30
   },
   headerLeft: {
-    flex: 1,
-  },
-  greetingContainer: {
-    marginBottom: 4,
-  },
-  greeting: {
-    fontSize: 14,
-    color: '#888',
-    fontWeight: '500',
-  },
-  userName: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#FFF',
-    marginTop: 2,
-  },
-  locationContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 4,
+    gap: 12,
   },
-  locationText: {
-    color: '#888',
-    fontSize: 12,
-    marginLeft: 4,
-    maxWidth: width * 0.4,
-  },
-  headerRight: {
+  logoContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 8,
   },
-  notificationButton: {
-    position: 'relative',
-    padding: 8,
-    marginRight: 8,
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
   },
-  notificationBadge: {
-    position: 'absolute',
-    top: 2,
-    right: 2,
-    backgroundColor: '#FF6B6B',
-    borderRadius: 10,
-    minWidth: 18,
-    height: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#121212',
-  },
-  badgeText: {
-    color: '#FFF',
-    fontSize: 10,
-    fontWeight: 'bold',
-  },
-  profileButton: {
+ 
+  
+  
+  headerIconButton: {
+    padding: 6,
     position: 'relative',
   },
-  profileImage: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    borderWidth: 2,
-    borderColor: '#FFD700',
-  },
-  onlineDot: {
+  notificationDot: {
     position: 'absolute',
-    bottom: 0,
-    right: 0,
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: '#4ECDC4',
-    borderWidth: 2,
-    borderColor: '#121212',
+    top: 4,
+    right: 4,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#FF4444',
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
   },
-  searchBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#1E1E1E',
+ 
+  
+ 
+  locationCard: {
+    backgroundColor: '#FFFFFF',
     marginHorizontal: 20,
+    marginTop: -27,
+    marginBottom: 20,
+    borderRadius: 20,
+    paddingHorizontal: 4,
+    paddingVertical: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  locationCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 8,
+  },
+  locationCardTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1A1A2E',
+  },
+  locationCardAction: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#FFB800',
+  },
+  locationItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    borderRadius: 25,
-    borderWidth: 1,
-    borderColor: '#2A2A2A',
-    marginBottom: 20,
   },
-  searchText: {
+  locationDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginRight: 14,
+    borderWidth: 2,
+    borderColor: '#FFF',
+  },
+  locationContent: {
     flex: 1,
-    color: '#666',
-    fontSize: 15,
-    marginLeft: 12,
   },
-  searchRight: {
-    paddingLeft: 12,
-    borderLeftWidth: 1,
-    borderLeftColor: '#2A2A2A',
-  },
-  quickActionsContainer: {
-    marginBottom: 24,
-  },
-  quickActionsList: {
-    paddingHorizontal: 16,
-  },
-  quickActionItem: {
-    alignItems: 'center',
-    marginHorizontal: 10,
-    width: 64,
-  },
-  quickActionIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 6,
-    borderWidth: 1,
-  },
-  quickActionLabel: {
-    color: '#FFF',
+  locationLabel: {
     fontSize: 11,
-    textAlign: 'center',
+    fontWeight: '600',
+    color: '#999',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 2,
+  },
+  locationText: {
+    fontSize: 15,
+    color: '#1A1A2E',
+    fontWeight: '500',
+  },
+  locationPlaceholder: {
+    color: '#999',
+    fontWeight: '400',
+  },
+  locationDivider: {
+    height: 1,
+    backgroundColor: '#F0F0F0',
+    marginHorizontal: 16,
+  },
+  clearButton: {
+    padding: 2,
+    marginLeft: 8,
+  },
+  bookNowButton: {
+    marginHorizontal: 16,
+    marginVertical: 12,
+    borderRadius: 14,
+    overflow: 'hidden',
+  },
+  bookNowGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    gap: 8,
+  },
+  bookNowText: {
+    fontSize: 16,
+    color: '#FFFFFF',
+    fontWeight: '700',
   },
   sectionContainer: {
-    marginBottom: 24,
     paddingHorizontal: 20,
+    marginBottom: 12,
   },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 14,
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: '#FFF',
+    fontWeight: '700',
+    color: '#1A1A2E',
   },
-  seeAll: {
-    color: '#FFD700',
-    fontSize: 14,
+  sectionSeeAll: {
+    fontSize: 13,
     fontWeight: '600',
+    color: '#FFB800',
   },
   servicesGrid: {
     flexDirection: 'row',
@@ -632,235 +666,106 @@ const styles = StyleSheet.create({
   },
   serviceGridItem: {
     width: '48%',
-    marginBottom: 12,
+    marginBottom: 14,
   },
   serviceCardWrapper: {
     flex: 1,
   },
   serviceCard: {
     flex: 1,
-    borderRadius: 20,
+    borderRadius: 16,
     overflow: 'hidden',
-    elevation: 5,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#F0F0F0',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
   },
-  serviceGradient: {
+  serviceCardContent: {
     padding: 20,
     alignItems: 'center',
-    minHeight: 180,
-    position: 'relative',
+    minHeight: 130,
+    justifyContent: 'center',
   },
   serviceIconContainer: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 8,
   },
   serviceTitle: {
-    color: '#FFF',
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 4,
+    fontSize: 15,
+    fontWeight: '600',
+    marginBottom: 1,
     textAlign: 'center',
+    color: '#1A1A2E',
   },
   serviceDescription: {
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: 12,
+    fontSize: 11,
     textAlign: 'center',
+    fontWeight: '400',
+    color: '#888',
   },
-  badge: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-    borderRadius: 12,
-  },
-  badgeText: {
-    color: '#FFF',
-    fontSize: 10,
-    fontWeight: 'bold',
+  promoContainer: {
+    paddingHorizontal: 20,
+    marginBottom: 20,
   },
   promoBanner: {
-    marginHorizontal: 20,
-    marginBottom: 24,
     borderRadius: 20,
     padding: 20,
     overflow: 'hidden',
   },
   promoContent: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'space-between',
   },
-  promoLeft: {
+  promoTextContainer: {
     flex: 1,
+    marginRight: 12,
   },
   promoTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#FFF',
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    marginBottom: 4,
   },
-  promoText: {
+  promoDescription: {
+    fontSize: 12,
     color: 'rgba(255,255,255,0.9)',
-    fontSize: 14,
-    marginTop: 4,
-    marginBottom: 12,
+    marginBottom: 10,
+    lineHeight: 16,
   },
   promoButton: {
-    borderRadius: 25,
-    overflow: 'hidden',
-    alignSelf: 'flex-start',
-  },
-  promoButtonGradient: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    gap: 8,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 20,
+    alignSelf: 'flex-start',
+    gap: 4,
   },
   promoButtonText: {
-    color: '#FF6B6B',
-    fontWeight: 'bold',
-    fontSize: 14,
-  },
-  promoRight: {
-    marginLeft: 20,
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#FFB800',
   },
   promoIconContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     backgroundColor: 'rgba(255,255,255,0.2)',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  locationCard: {
-    marginHorizontal: 20,
-    marginBottom: 24,
-    borderRadius: 16,
-    overflow: 'hidden',
-  },
-  locationGradient: {
-    padding: 16,
-  },
-  locationHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  locationIconContainer: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255, 215, 0, 0.15)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 10,
-  },
-  locationTitle: {
-    color: '#FFF',
-    fontSize: 15,
-    fontWeight: 'bold',
-    flex: 1,
-  },
-  refreshLocation: {
-    padding: 4,
-  },
-  locationText: {
-    color: '#888',
-    fontSize: 13,
-    marginLeft: 46,
-  },
-  recentRideCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#1E1E1E',
-    padding: 14,
-    borderRadius: 16,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: '#2A2A2A',
-  },
-  rideIconContainer: {
-    marginRight: 14,
-  },
-  rideIconGradient: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  rideInfo: {
-    flex: 1,
-  },
-  rideRoute: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
-    gap: 6,
-  },
-  rideFrom: {
-    color: '#FFF',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  rideTo: {
-    color: '#FFF',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  rideTime: {
-    color: '#666',
-    fontSize: 12,
-  },
-  ridePriceContainer: {
-    alignItems: 'flex-end',
-  },
-  ridePrice: {
-    color: '#FFF',
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 4,
-  },
-  rideStatus: {
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-    borderRadius: 12,
-  },
-  rideStatusText: {
-    color: '#FFF',
-    fontSize: 10,
-    fontWeight: '600',
-  },
   bottomSpacer: {
-    height: 80,
-  },
-  fab: {
-    position: 'absolute',
-    bottom: 30,
-    right: 30,
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    elevation: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-  },
-  fabGradient: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    justifyContent: 'center',
-    alignItems: 'center',
+    height: 30,
   },
 });
 

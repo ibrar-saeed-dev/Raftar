@@ -14,13 +14,15 @@ import {
   Modal,
   Animated,
   KeyboardAvoidingView,
-  Platform
+  Platform,
+  Image
 } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import IconIonic from 'react-native-vector-icons/Ionicons';
 import IconFA from 'react-native-vector-icons/FontAwesome5';
+import IconMC from 'react-native-vector-icons/MaterialCommunityIcons';
 import CustomPlacesAutocomplete from '../../components/common/CustomPlacesAutocomplete';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import MapView, { Marker, Polyline } from 'react-native-maps';
@@ -364,9 +366,7 @@ const BookCarpoolScreen = () => {
     }
   };
 
-
-
-  const renderCarpoolItem = ({ item }) => {
+  const renderCarpoolItem = ({ item, index }) => {
     const isFull = item.carpool.seatsAvailable === 0;
     const isExpired = new Date(item.timeWindow.start) < new Date();
     
@@ -374,7 +374,7 @@ const BookCarpoolScreen = () => {
       <Animatable.View 
         animation="fadeInUp" 
         duration={400} 
-        delay={item.index * 100}
+        delay={index * 100}
       >
         <TouchableOpacity
           style={[styles.carpoolCard, isFull && styles.carpoolCardFull]}
@@ -382,41 +382,36 @@ const BookCarpoolScreen = () => {
           disabled={isFull || isExpired}
           activeOpacity={0.8}
         >
-          <LinearGradient
-            colors={isFull ? ['#2A2A2A', '#1E1E1E'] : ['#1E1E1E', '#2A2A2A']}
-            style={styles.carpoolGradient}
-          >
+          <View style={[
+            styles.carpoolCardContent,
+            isFull && styles.carpoolCardFullContent
+          ]}>
             <View style={styles.carpoolHeader}>
               <View style={styles.carpoolUser}>
-                <LinearGradient
-                  colors={['#FFD700', '#FFC107']}
-                  style={styles.userAvatar}
-                >
+                <View style={styles.userAvatar}>
                   <Text style={styles.userInitial}>
                     {item.driverId?.userId?.name?.charAt(0) || 'U'}
                   </Text>
-                </LinearGradient>
+                </View>
                 <View>
                   <Text style={styles.carpoolName}>{item.driverId?.userId?.name || 'Driver'}</Text>
                   <View style={styles.ratingContainer}>
-                    <Icon name="star" size={12} color="#FFD700" />
+                    <Icon name="star" size={12} color="#F9C349" />
                     <Text style={styles.ratingText}>{item.driverId?.stats?.rating || 0}</Text>
                   </View>
                 </View>
               </View>
               <View style={[styles.seatsBadge, isFull && styles.seatsBadgeFull]}>
-                <Icon name="people" size={16} color={isFull ? '#666' : '#FFF'} />
+                <IconMC name="account-group" size={16} color={isFull ? '#999' : '#F9C349'} />
                 <Text style={[styles.seatsText, isFull && styles.seatsTextFull]}>
-                  {item.carpool.seatsAvailable} seats
+                  {item.carpool.seatsAvailable}
                 </Text>
               </View>
             </View>
             
             <View style={styles.carpoolRoute}>
               <View style={styles.routePoint}>
-                <View style={styles.routeDot}>
-                  <View style={[styles.dot, { backgroundColor: '#4ECDC4' }]} />
-                </View>
+                <View style={[styles.routeDot, { backgroundColor: '#4ECDC4' }]} />
                 <Text style={styles.routeText} numberOfLines={1}>
                   {item.pickup.address}
                 </Text>
@@ -424,6 +419,7 @@ const BookCarpoolScreen = () => {
               <View style={styles.routeLineContainer}>
                 <View style={styles.routeLine} />
                 <View style={styles.routeTime}>
+                  <Icon name="access-time" size={12} color="#999" />
                   <Text style={styles.routeTimeText}>
                     {item.timeWindow?.start ? new Date(item.timeWindow.start).toLocaleTimeString([], { 
                       hour: '2-digit', 
@@ -433,9 +429,7 @@ const BookCarpoolScreen = () => {
                 </View>
               </View>
               <View style={styles.routePoint}>
-                <View style={styles.routeDot}>
-                  <View style={[styles.dot, { backgroundColor: '#FF6B6B' }]} />
-                </View>
+                <View style={[styles.routeDot, { backgroundColor: '#FF6B6B' }]} />
                 <Text style={styles.routeText} numberOfLines={1}>
                   {item.dropoff.address}
                 </Text>
@@ -445,20 +439,20 @@ const BookCarpoolScreen = () => {
             <View style={styles.carpoolFooter}>
               <View style={styles.carpoolMeta}>
                 <View style={styles.metaItem}>
-                  <Icon name="access-time" size={14} color="#666" />
+                  <Icon name="event" size={14} color="#999" />
                   <Text style={styles.metaText}>
                     {item.timeWindow?.start ? new Date(item.timeWindow.start).toLocaleDateString() : 'N/A'}
                   </Text>
                 </View>
                 <View style={styles.metaItem}>
-                  <Icon name="person" size={14} color="#666" />
+                  <Icon name="person" size={14} color="#999" />
                   <Text style={styles.metaText}>
                     {item.passengers?.length || 0} riders
                   </Text>
                 </View>
               </View>
               <Text style={[styles.carpoolPrice, isFull && styles.carpoolPriceFull]}>
-                Rs. {item.carpool?.pricePerSeat || 'N/A'}
+                ₨ {item.carpool?.pricePerSeat || 'N/A'}
               </Text>
             </View>
 
@@ -472,7 +466,7 @@ const BookCarpoolScreen = () => {
                 <Text style={styles.expiredBadgeText}>EXPIRED</Text>
               </View>
             )}
-          </LinearGradient>
+          </View>
         </TouchableOpacity>
       </Animatable.View>
     );
@@ -528,21 +522,31 @@ const BookCarpoolScreen = () => {
     );
   };
 
-  const renderMyCarpool = ({ item }) => {
+  const renderMyCarpool = ({ item, index }) => {
     const isAccepted = item.status === 'accepted' || item.status === 'confirmed' || item.status === 'in-progress';
     const driver = item.driverId?.userId || item.driverId;
 
     return (
-      <Animatable.View animation="fadeInUp" duration={400} style={{ marginBottom: 16 }}>
-        <View style={[styles.recentRideCard, { borderColor: '#4ECDC4', borderWidth: 1, flexDirection: 'column', alignItems: 'stretch' }]}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 }}>
-            <Text style={{ color: '#FFF', fontSize: 16, fontWeight: 'bold' }}>
-              {item.carpool?.departureTime ? new Date(item.carpool.departureTime).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 
-               item.timeWindow?.start ? new Date(item.timeWindow.start).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Invalid Date'}
+      <Animatable.View animation="fadeInUp" duration={400} delay={index * 100}>
+        <View style={[styles.recentRideCard, isAccepted && styles.acceptedRideCard]}>
+          <View style={styles.recentRideHeader}>
+            <Text style={styles.recentRideTime}>
+              {item.carpool?.departureTime ? new Date(item.carpool.departureTime).toLocaleString([], { 
+                month: 'short', 
+                day: 'numeric', 
+                hour: '2-digit', 
+                minute: '2-digit' 
+              }) : 
+              item.timeWindow?.start ? new Date(item.timeWindow.start).toLocaleString([], { 
+                month: 'short', 
+                day: 'numeric', 
+                hour: '2-digit', 
+                minute: '2-digit' 
+              }) : 'Invalid Date'}
             </Text>
             <View style={[
               styles.rideStatus,
-              { backgroundColor: item.status === 'searching' ? '#FFD700' : '#4ECDC4' }
+              { backgroundColor: item.status === 'searching' ? '#F9C349' : '#4ECDC4' }
             ]}>
               <Text style={[styles.rideStatusText, item.status === 'searching' && { color: '#000' }]}>
                 {item.status.toUpperCase()}
@@ -551,45 +555,41 @@ const BookCarpoolScreen = () => {
           </View>
 
           {driver && isAccepted && (
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: '#333' }}>
-              {driver.profileImage ? (
-                <Image source={{ uri: driver.profileImage }} style={{ width: 30, height: 30, borderRadius: 15 }} />
-              ) : (
-                <View style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: '#444', justifyContent: 'center', alignItems: 'center' }}>
-                  <Icon name="person" size={18} color="#FFF" />
-                </View>
-              )}
-              <View style={{ marginLeft: 10 }}>
-                <Text style={{ color: '#FFF', fontWeight: 'bold' }}>Driver: {driver.name || 'Unknown'}</Text>
-                {driver.phoneNumber && <Text style={{ color: '#CCC', fontSize: 12 }}>{driver.phoneNumber}</Text>}
+            <View style={styles.driverInfo}>
+              <View style={styles.driverAvatar}>
+                <Icon name="person" size={18} color="#FFF" />
+              </View>
+              <View style={styles.driverInfoText}>
+                <Text style={styles.driverName}>Driver: {driver.name || 'Unknown'}</Text>
+                {driver.phoneNumber && <Text style={styles.driverPhone}>{driver.phoneNumber}</Text>}
               </View>
             </View>
           )}
 
-          <View style={{ marginBottom: 12 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+          <View style={styles.routeInfo}>
+            <View style={styles.routeInfoItem}>
               <Icon name="my-location" size={16} color="#4ECDC4" />
-              <Text style={{ color: '#CCC', marginLeft: 8, flex: 1 }} numberOfLines={1}>{item.pickup?.address || 'Pickup'}</Text>
+              <Text style={styles.routeInfoText} numberOfLines={1}>{item.pickup?.address || 'Pickup'}</Text>
             </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <View style={styles.routeInfoItem}>
               <Icon name="location-on" size={16} color="#FF6B6B" />
-              <Text style={{ color: '#CCC', marginLeft: 8, flex: 1 }} numberOfLines={1}>{item.dropoff?.address || 'Dropoff'}</Text>
+              <Text style={styles.routeInfoText} numberOfLines={1}>{item.dropoff?.address || 'Dropoff'}</Text>
             </View>
           </View>
 
           <CarpoolMapPreview 
             pickup={item.pickup} 
             dropoff={item.dropoff} 
-            style={{ height: 160, marginBottom: 12 }} 
+            style={styles.previewMap} 
           />
 
           {(item.status !== 'completed' && item.status !== 'cancelled') && (
-            <View style={{ alignItems: 'flex-end' }}>
+            <View style={styles.recentRideActions}>
               <TouchableOpacity 
                 onPress={() => item.driverId && !item.passengerId ? handleLeaveCarpool(item._id) : handleCancelCarpool(item._id)} 
-                style={{ padding: 8 }}
+                style={styles.cancelButton}
               >
-                <Text style={{ color: '#FF6B6B', fontSize: 14, fontWeight: 'bold' }}>
+                <Text style={styles.cancelButtonText}>
                   {item.driverId && !item.passengerId ? 'Leave Carpool' : 'Cancel Request'}
                 </Text>
               </TouchableOpacity>
@@ -602,12 +602,15 @@ const BookCarpoolScreen = () => {
 
   const renderListView = () => (
     <View style={styles.listContainer}>
-      <View style={styles.header}>
+      <View style={styles.listHeader}>
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <Icon name="arrow-back" size={24} color="#FFF" />
+          <Icon name="arrow-back" size={24} color="#000" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{isIntercity ? 'Intercity Carpools' : 'My Carpools'}</Text>
-        <View style={{width: 24}} />
+        <Text style={styles.listHeaderTitle}>{isIntercity ? 'Intercity Carpools' : 'My Carpools'}</Text>
+        <TouchableOpacity style={styles.notificationButton}>
+          <Icon name="notifications-none" size={24} color="#000" />
+          <View style={styles.notificationDot} />
+        </TouchableOpacity>
       </View>
       
       <View style={styles.tabContainer}>
@@ -616,29 +619,45 @@ const BookCarpoolScreen = () => {
           onPress={() => setActiveTab('pending')}
         >
           <Text style={[styles.tabText, activeTab === 'pending' && styles.activeTabText]}>Pending</Text>
+          {pendingRequests.length > 0 && (
+            <View style={styles.tabBadge}>
+              <Text style={styles.tabBadgeText}>{pendingRequests.length}</Text>
+            </View>
+          )}
         </TouchableOpacity>
         <TouchableOpacity 
           style={[styles.tab, activeTab === 'accepted' && styles.activeTab]} 
           onPress={() => setActiveTab('accepted')}
         >
           <Text style={[styles.tabText, activeTab === 'accepted' && styles.activeTabText]}>Accepted</Text>
+          {acceptedCarpools.length > 0 && (
+            <View style={[styles.tabBadge, styles.tabBadgeGreen]}>
+              <Text style={styles.tabBadgeText}>{acceptedCarpools.length}</Text>
+            </View>
+          )}
         </TouchableOpacity>
       </View>
 
       {listLoading ? (
-        <View style={{flex: 1, justifyContent: 'center', alignItems: 'center'}}>
-          <ActivityIndicator size="large" color="#FFD700" />
+        <View style={styles.loadingCenter}>
+          <ActivityIndicator size="large" color="#F9C349" />
         </View>
       ) : (
         <FlatList
           data={activeTab === 'pending' ? pendingRequests : acceptedCarpools}
           renderItem={renderMyCarpool}
           keyExtractor={item => item._id}
-          contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
+          contentContainerStyle={styles.listContent}
           ListEmptyComponent={
-            <Text style={{ color: '#888', textAlign: 'center', marginTop: 40 }}>
-              No {activeTab} carpools right now.
-            </Text>
+            <View style={styles.emptyState}>
+              <IconMC name="car-parking" size={80} color="#E0E0E0" />
+              <Text style={styles.emptyStateTitle}>No {activeTab} carpools</Text>
+              <Text style={styles.emptyStateSubtext}>
+                {activeTab === 'pending' 
+                  ? 'You haven\'t posted any carpool requests yet.' 
+                  : 'No accepted carpools yet.'}
+              </Text>
+            </View>
           }
           refreshing={listLoading}
           onRefresh={fetchMyCarpools}
@@ -646,19 +665,26 @@ const BookCarpoolScreen = () => {
       )}
 
       <View style={styles.floatingBtnContainer}>
-        <Button 
-          title="Create New Carpool"
-          onPress={() => setViewMode('create')}
+        <TouchableOpacity 
           style={styles.createNewBtn}
-          textStyle={{fontWeight: 'bold', fontSize: 16}}
-        />
+          onPress={() => setViewMode('create')}
+          activeOpacity={0.8}
+        >
+          <LinearGradient
+            colors={['#F9C349', '#F5A623']}
+            style={styles.createNewGradient}
+          >
+            <Icon name="add" size={24} color="#000" />
+            <Text style={styles.createNewText}>Create New Carpool</Text>
+          </LinearGradient>
+        </TouchableOpacity>
       </View>
     </View>
   );
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor="#121212" />
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
       
       <KeyboardAvoidingView 
         style={styles.container}
@@ -667,445 +693,500 @@ const BookCarpoolScreen = () => {
       >
         {viewMode === 'list' ? renderListView() : (
           <Animated.View style={[
-          styles.container,
-          {
-            opacity: fadeAnim,
-            transform: [{ translateY: slideAnim }]
-          }
-        ]}>
-          {/* Header */}
-          <View style={styles.header}>
-            <TouchableOpacity 
-              style={styles.backButton}
-              onPress={() => setViewMode('list')}
+            styles.container,
+            {
+              opacity: fadeAnim,
+              transform: [{ translateY: slideAnim }]
+            }
+          ]}>
+            {/* Header */}
+            <View style={styles.createHeader}>
+              <TouchableOpacity 
+                style={styles.backButton}
+                onPress={() => setViewMode('list')}
+              >
+                <Icon name="arrow-back" size={24} color="#000" />
+              </TouchableOpacity>
+              <Text style={styles.createHeaderTitle}>{isIntercity ? 'Intercity Carpool' : 'Create Request'}</Text>
+              <View style={{ width: 32 }} />
+            </View>
+
+            <ScrollView 
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.scrollContent}
+              keyboardShouldPersistTaps="handled"
             >
-              <Icon name="arrow-back" size={24} color="#FFF" />
-            </TouchableOpacity>
-            <Text style={styles.headerTitle}>{isIntercity ? 'Intercity Carpool' : 'Create Request'}</Text>
-            <TouchableOpacity style={styles.helpButton}>
-              <Icon name="help-outline" size={24} color="#FFF" />
-            </TouchableOpacity>
-          </View>
-
-          <ScrollView 
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.scrollContent}
-            keyboardShouldPersistTaps="handled"
-          >
-            {/* Map Section */}
-            <Animatable.View animation="fadeIn" duration={600} style={styles.mapContainer}>
-              {locationLoading ? (
-                <View style={styles.mapLoading}>
-                  <ActivityIndicator size="large" color="#FFD700" />
-                  <Text style={styles.mapLoadingText}>Finding your location...</Text>
-                </View>
-              ) : (
-                <MapView
-                  ref={mapRef}
-                  style={styles.map}
-                  initialRegion={{
-                    latitude: pickup?.location?.coordinates[1] || 33.6844,
-                    longitude: pickup?.location?.coordinates[0] || 73.0479,
-                    latitudeDelta: 0.05,
-                    longitudeDelta: 0.05,
-                  }}
-                >
-                  {pickup?.location?.coordinates && (
-                    <Marker
-                      coordinate={{
-                        latitude: pickup.location.coordinates[1],
-                        longitude: pickup.location.coordinates[0],
-                      }}
-                      title="Pickup"
-                    >
-                      <View style={styles.pickupMarker}>
-                        <View style={styles.markerInner} />
-                      </View>
-                    </Marker>
-                  )}
-                  {dropoff?.location?.coordinates && (
-                    <Marker
-                      coordinate={{
-                        latitude: dropoff.location.coordinates[1],
-                        longitude: dropoff.location.coordinates[0],
-                      }}
-                      title="Dropoff"
-                    >
-                      <Icon name="flag" size={24} color="#FF6B6B" />
-                    </Marker>
-                  )}
-                  {routeCoords.length > 0 && (
-                    <Polyline
-                      coordinates={routeCoords}
-                      strokeWidth={4}
-                      strokeColor="#4ECDC4"
-                    />
-                  )}
-                </MapView>
-              )}
-            </Animatable.View>
-
-            {/* Location Section */}
-            <Animatable.View 
-              animation="fadeInUp" 
-              duration={600} 
-              delay={100}
-              style={styles.locationSection}
-            >
-              <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>📍 Where are you going?</Text>
-                <TouchableOpacity 
-                  style={styles.useCurrentButton}
-                  onPress={getCurrentLocation}
-                >
-                  <Icon name="my-location" size={16} color="#FFD700" />
-                  <Text style={styles.useCurrentText}>Current</Text>
-                </TouchableOpacity>
-              </View>
-              
-              <View style={[styles.locationInputWrapper, { zIndex: 20, elevation: 20 }]}>
-                <View style={styles.locationDot}>
-                  <View style={[styles.dot, { backgroundColor: '#4ECDC4' }]} />
-                </View>
-                <View style={styles.locationInputContainer}>
-                  <CustomPlacesAutocomplete
-                    ref={pickupRef}
-                    placeholder="Pickup Location"
-                    onPress={(data, details = null) => {
-                      setPickup({
-                        address: data.description,
-                        location: {
-                          type: 'Point',
-                          coordinates: [
-                            details.geometry.location.lng,
-                            details.geometry.location.lat
-                          ]
-                        },
-                        placeId: data.place_id
-                      });
-                    }}
-                    styles={{
-                      textInputContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#2A2A2A', borderRadius: 12 },
-                      textInput: { color: '#FFF', flex: 1, paddingHorizontal: 16, paddingVertical: 12, fontSize: 14, backgroundColor: 'transparent' },
-                      container: styles.autocompleteContainer,
-                      listView: styles.autocompleteList,
-                      row: styles.autocompleteRow,
-                      description: styles.autocompleteDescription
-                    }}
-                    placeholderTextColor="#666"
-                    renderRightButton={() => (
-                      <TouchableOpacity onPress={() => openMapPicker('pickup')} style={styles.mapIconBtn}>
-                        <Icon name="map" size={22} color="#4ECDC4" />
-                      </TouchableOpacity>
-                    )}
-                  />
-                </View>
-              </View>
-
-              <View style={styles.locationDivider} />
-
-              <View style={[styles.locationInputWrapper, { zIndex: 10, elevation: 10 }]}>
-                <View style={styles.locationDot}>
-                  <View style={[styles.dot, { backgroundColor: '#FF6B6B' }]} />
-                </View>
-                <View style={styles.locationInputContainer}>
-                  <CustomPlacesAutocomplete
-                    ref={dropoffRef}
-                    placeholder="Destination"
-                    onPress={(data, details = null) => {
-                      setDropoff({
-                        address: data.description,
-                        location: {
-                          type: 'Point',
-                          coordinates: [
-                            details.geometry.location.lng,
-                            details.geometry.location.lat
-                          ]
-                        },
-                        placeId: data.place_id
-                      });
-                    }}
-                    styles={{
-                      textInputContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#2A2A2A', borderRadius: 12 },
-                      textInput: { color: '#FFF', flex: 1, paddingHorizontal: 16, paddingVertical: 12, fontSize: 14, backgroundColor: 'transparent' },
-                      container: styles.autocompleteContainer,
-                      listView: styles.autocompleteList,
-                      row: styles.autocompleteRow,
-                      description: styles.autocompleteDescription
-                    }}
-                    placeholderTextColor="#666"
-                    renderRightButton={() => (
-                      <TouchableOpacity onPress={() => openMapPicker('dropoff')} style={styles.mapIconBtn}>
-                        <Icon name="map" size={22} color="#FF6B6B" />
-                      </TouchableOpacity>
-                    )}
-                  />
-                </View>
-              </View>
-              
-              <View style={styles.locationDivider} />
-              
-              <View style={styles.detailRow}>
-                <View style={styles.detailLeft}>
-                  <View style={styles.detailIcon}>
-                    <Icon name="event" size={20} color="#FFD700" />
+              {/* Map Section */}
+              <Animatable.View animation="fadeIn" duration={600} style={styles.mapContainer}>
+                {locationLoading ? (
+                  <View style={styles.mapLoading}>
+                    <ActivityIndicator size="large" color="#F9C349" />
+                    <Text style={styles.mapLoadingText}>Finding your location...</Text>
                   </View>
-                  <Text style={styles.detailLabel}>Schedule</Text>
-                </View>
-                <TouchableOpacity 
-                  style={styles.dateTimeButton}
-                  onPress={() => setShowDatePicker(true)}
-                >
-                  <Text style={styles.dateTimeText}>
-                    {schedule.toLocaleString([], {
-                      month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
-                    })}
-                  </Text>
-                  <Icon name="edit" size={16} color="#FFD700" />
+                ) : (
+                  <MapView
+                    ref={mapRef}
+                    style={styles.map}
+                    initialRegion={{
+                      latitude: pickup?.location?.coordinates[1] || 33.6844,
+                      longitude: pickup?.location?.coordinates[0] || 73.0479,
+                      latitudeDelta: 0.02,
+                      longitudeDelta: 0.02,
+                    }}
+                  >
+                    {pickup?.location?.coordinates && (
+                      <Marker
+                        coordinate={{
+                          latitude: pickup.location.coordinates[1],
+                          longitude: pickup.location.coordinates[0],
+                        }}
+                        title="Pickup"
+                      >
+                        <View style={styles.pickupMarker}>
+                          <View style={styles.markerInner} />
+                        </View>
+                      </Marker>
+                    )}
+                    {dropoff?.location?.coordinates && (
+                      <Marker
+                        coordinate={{
+                          latitude: dropoff.location.coordinates[1],
+                          longitude: dropoff.location.coordinates[0],
+                        }}
+                        title="Dropoff"
+                      >
+                        <View style={styles.dropoffMarker}>
+                          <Icon name="flag" size={18} color="#FFF" />
+                        </View>
+                      </Marker>
+                    )}
+                    {routeCoords.length > 0 && (
+                      <Polyline
+                        coordinates={routeCoords}
+                        strokeWidth={4}
+                        strokeColor="#F9C349"
+                      />
+                    )}
+                  </MapView>
+                )}
+                <TouchableOpacity style={styles.mapOverlayBtn} onPress={() => openMapPicker('pickup')}>
+                  <Icon name="edit-location" size={20} color="#F9C349" />
                 </TouchableOpacity>
-              </View>
+              </Animatable.View>
 
-              {showDatePicker && (
-                <DateTimePicker
-                  value={schedule}
-                  mode="date"
-                  display="default"
-                  onChange={(event, selectedDate) => {
-                    setShowDatePicker(false);
-                    if (selectedDate) {
-                      const newDate = new Date(schedule);
-                      newDate.setFullYear(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate());
-                      setSchedule(newDate);
-                      setShowTimePicker(true);
-                    }
-                  }}
-                />
-              )}
-              {showTimePicker && (
-                <DateTimePicker
-                  value={schedule}
-                  mode="time"
-                  display="default"
-                  onChange={(event, selectedDate) => {
-                    setShowTimePicker(false);
-                    if (selectedDate) {
-                      const newDate = new Date(schedule);
-                      newDate.setHours(selectedDate.getHours(), selectedDate.getMinutes());
-                      setSchedule(newDate);
-                    }
-                  }}
-                />
-              )}
-            </Animatable.View>
-
-
-
-            {/* Available Carpools */}
-            {showCarpools && (
+              {/* Location Section */}
               <Animatable.View 
                 animation="fadeInUp" 
                 duration={600} 
-                delay={300}
-                style={styles.section}
+                delay={100}
+                style={styles.locationSection}
               >
-                <View style={styles.sectionHeader}>
-                  <Text style={styles.sectionTitle}>🚗 Available Carpools</Text>
-                  <Text style={styles.carpoolCount}>
-                    {availableCarpools.length} found
-                  </Text>
+                <View style={styles.locationHeader}>
+                  <Text style={styles.locationTitle}>📍 Where are you going?</Text>
+                  <TouchableOpacity 
+                    style={styles.useCurrentButton}
+                    onPress={getCurrentLocation}
+                  >
+                    <Icon name="my-location" size={18} color="#F9C349" />
+                    <Text style={styles.useCurrentText}>Current</Text>
+                  </TouchableOpacity>
                 </View>
                 
-                {searching ? (
-                  <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="large" color="#FFD700" />
-                    <Text style={styles.loadingText}>Searching for carpools...</Text>
+                <View style={styles.locationInputWrapper}>
+                  <View style={styles.locationDot}>
+                    <View style={[styles.dot, { backgroundColor: '#4ECDC4' }]} />
+                    <View style={styles.dotLine} />
                   </View>
-                ) : availableCarpools.length > 0 ? (
-                  <FlatList
-                    data={availableCarpools}
-                    renderItem={renderCarpoolItem}
-                    keyExtractor={item => item._id}
-                    scrollEnabled={false}
-                    contentContainerStyle={styles.carpoolsList}
-                  />
-                ) : (
-                  <View style={styles.noCarpools}>
-                    <Icon name="search-off" size={60} color="#444" />
-                    <Text style={styles.noCarpoolsText}>No carpools found</Text>
-                    <Text style={styles.noCarpoolsSubtext}>
-                      We couldn't find a driver going that way right now.
-                    </Text>
-                  </View>
-                )}
-
-              </Animatable.View>
-            )}
-
-            {/* Always allow posting a request */}
-            <Animatable.View animation="fadeInUp" duration={600} delay={400}>
-              <TouchableOpacity
-                style={[styles.requestButton, { marginHorizontal: 16, marginBottom: 20, opacity: (!pickup || !dropoff || searching) ? 0.6 : 1 }]}
-                onPress={handlePostRequest}
-                disabled={!pickup || !dropoff || searching}
-              >
-                <LinearGradient
-                  colors={(!pickup || !dropoff) ? ['#555', '#444'] : ['#FFD700', '#FFC107']}
-                  style={styles.requestButtonGradient}
-                >
-                  <Icon name="add-circle" size={20} color={(!pickup || !dropoff) ? '#999' : '#121212'} />
-                  <Text style={[styles.requestButtonText, (!pickup || !dropoff) && { color: '#999' }]}>Post Carpool Request</Text>
-                </LinearGradient>
-              </TouchableOpacity>
-            </Animatable.View>
-
-            <View style={styles.bottomSpacer} />
-          </ScrollView>
-
-          {/* Map Picker Modal */}
-          <Modal
-            visible={mapPickerVisible}
-            animationType="slide"
-            transparent={false}
-          >
-            <View style={styles.mapPickerContainer}>
-              <View style={styles.mapPickerHeader}>
-                <TouchableOpacity onPress={() => setMapPickerVisible(false)} style={styles.mapPickerClose}>
-                  <Icon name="close" size={24} color="#FFF" />
-                </TouchableOpacity>
-                <Text style={styles.mapPickerTitle}>
-                  Select {mapPickerType === 'pickup' ? 'Pickup' : 'Destination'}
-                </Text>
-                <View style={{ width: 40 }} />
-              </View>
-              {mapPickerCoords && (
-                <View style={styles.mapWrapper}>
-                  <MapView
-                    ref={pickerMapRef}
-                    style={styles.pickerMap}
-                    initialRegion={{
-                      latitude: mapPickerCoords.latitude,
-                      longitude: mapPickerCoords.longitude,
-                      latitudeDelta: 0.01,
-                      longitudeDelta: 0.01,
-                    }}
-                    onRegionChangeComplete={onPickerRegionChangeComplete}
-                  />
-                  <View style={styles.mapMarkerFixed}>
-                    <Icon name="location-on" size={40} color={mapPickerType === 'pickup' ? '#4ECDC4' : '#FF6B6B'} />
+                  <View style={styles.locationInputContainer}>
+                    <CustomPlacesAutocomplete
+                      ref={pickupRef}
+                      placeholder="Pickup Location"
+                      onPress={(data, details = null) => {
+                        setPickup({
+                          address: data.description,
+                          location: {
+                            type: 'Point',
+                            coordinates: [
+                              details.geometry.location.lng,
+                              details.geometry.location.lat
+                            ]
+                          },
+                          placeId: data.place_id
+                        });
+                      }}
+                      styles={{
+                        textInputContainer: styles.pickupInputContainer,
+                        textInput: styles.pickupTextInput,
+                        container: styles.autocompleteContainer,
+                        listView: styles.autocompleteList,
+                        row: styles.autocompleteRow,
+                        description: styles.autocompleteDescription
+                      }}
+                      placeholderTextColor="#999"
+                      renderRightButton={() => (
+                        <TouchableOpacity onPress={() => openMapPicker('pickup')} style={styles.mapIconBtn}>
+                          <Icon name="map" size={22} color="#4ECDC4" />
+                        </TouchableOpacity>
+                      )}
+                    />
                   </View>
                 </View>
-              )}
-              <View style={styles.mapPickerFooter}>
-                <Text style={styles.mapPickerAddressText}>{mapPickerAddress}</Text>
-                <TouchableOpacity style={styles.mapPickerConfirmBtn} onPress={confirmMapPicker}>
-                  <Text style={styles.mapPickerConfirmText}>Confirm Location</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </Modal>
 
-          {/* Join Carpool Modal */}
-          <Modal
-            visible={showJoinModal}
-            animationType="slide"
-            transparent
-            onRequestClose={() => setShowJoinModal(false)}
-          >
-            <View style={styles.modalOverlay}>
-              <TouchableOpacity 
-                style={styles.modalBackdrop}
-                activeOpacity={1}
-                onPress={() => setShowJoinModal(false)}
-              />
-              <Animatable.View 
-                animation="slideInUp" 
-                duration={400}
-                style={styles.modalContent}
-              >
-                <LinearGradient
-                  colors={['#1E1E1E', '#2A2A2A']}
-                  style={styles.modalGradient}
-                >
-                  <View style={styles.modalHeader}>
-                    <View style={styles.modalHeaderLeft}>
-                      <LinearGradient
-                        colors={['#FFD700', '#FFC107']}
-                        style={styles.modalIcon}
-                      >
-                        <Icon name="people" size={24} color="#121212" />
-                      </LinearGradient>
-                      <View>
-                        <Text style={styles.modalTitle}>Join Carpool</Text>
-                        <Text style={styles.modalSubtitle}>
-                          with {selectedCarpool?.driverId?.userId?.name || 'Driver'}
-                        </Text>
+                <View style={styles.locationDivider} />
+
+                <View style={styles.locationInputWrapper}>
+                  <View style={styles.locationDot}>
+                    <View style={[styles.dot, { backgroundColor: '#FF6B6B' }]} />
+                  </View>
+                  <View style={styles.locationInputContainer}>
+                    <CustomPlacesAutocomplete
+                      ref={dropoffRef}
+                      placeholder="Destination"
+                      onPress={(data, details = null) => {
+                        setDropoff({
+                          address: data.description,
+                          location: {
+                            type: 'Point',
+                            coordinates: [
+                              details.geometry.location.lng,
+                              details.geometry.location.lat
+                            ]
+                          },
+                          placeId: data.place_id
+                        });
+                      }}
+                      styles={{
+                        textInputContainer: styles.dropoffInputContainer,
+                        textInput: styles.dropoffTextInput,
+                        container: styles.autocompleteContainer,
+                        listView: styles.autocompleteList,
+                        row: styles.autocompleteRow,
+                        description: styles.autocompleteDescription
+                      }}
+                      placeholderTextColor="#999"
+                      renderRightButton={() => (
+                        <TouchableOpacity onPress={() => openMapPicker('dropoff')} style={styles.mapIconBtn}>
+                          <Icon name="map" size={22} color="#FF6B6B" />
+                        </TouchableOpacity>
+                      )}
+                    />
+                  </View>
+                </View>
+                
+                <View style={styles.locationDivider} />
+                
+                {/* Schedule Section - Attractive Design */}
+                <Animatable.View animation="fadeIn" duration={500} style={styles.scheduleSection}>
+                  <View style={styles.scheduleHeader}>
+                    <View style={styles.scheduleHeaderLeft}>
+                      <View style={styles.scheduleIcon}>
+                        <Icon name="event" size={20} color="#F9C349" />
                       </View>
+                      <Text style={styles.scheduleTitle}>Schedule</Text>
                     </View>
+                    <View style={styles.scheduleBadge}>
+                      <Text style={styles.scheduleBadgeText}>Set Time</Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.scheduleCard}>
                     <TouchableOpacity 
-                      onPress={() => setShowJoinModal(false)}
-                      style={styles.modalClose}
+                      style={styles.schedulePicker}
+                      onPress={() => setShowDatePicker(true)}
+                      activeOpacity={0.7}
                     >
-                      <Icon name="close" size={24} color="#666" />
+                      <View style={styles.schedulePickerLeft}>
+                        <Icon name="calendar-today" size={22} color="#F9C349" />
+                        <Text style={styles.schedulePickerLabel}>Date</Text>
+                      </View>
+                      <View style={styles.schedulePickerValue}>
+                        <Text style={styles.schedulePickerText}>
+                          {schedule.toLocaleDateString([], { 
+                            weekday: 'short', 
+                            month: 'short', 
+                            day: 'numeric', 
+                            year: 'numeric' 
+                          })}
+                        </Text>
+                        <Icon name="chevron-right" size={20} color="#999" />
+                      </View>
+                    </TouchableOpacity>
+
+                    <View style={styles.scheduleDivider} />
+
+                    <TouchableOpacity 
+                      style={styles.schedulePicker}
+                      onPress={() => setShowTimePicker(true)}
+                      activeOpacity={0.7}
+                    >
+                      <View style={styles.schedulePickerLeft}>
+                        <Icon name="access-time" size={22} color="#F9C349" />
+                        <Text style={styles.schedulePickerLabel}>Time</Text>
+                      </View>
+                      <View style={styles.schedulePickerValue}>
+                        <Text style={styles.schedulePickerText}>
+                          {schedule.toLocaleTimeString([], { 
+                            hour: '2-digit', 
+                            minute: '2-digit',
+                            hour12: true 
+                          })}
+                        </Text>
+                        <Icon name="chevron-right" size={20} color="#999" />
+                      </View>
                     </TouchableOpacity>
                   </View>
 
-                  <View style={styles.modalBody}>
-                    <View style={styles.modalRoute}>
-                      <View style={styles.modalRoutePoint}>
-                        <View style={[styles.modalDot, { backgroundColor: '#4ECDC4' }]} />
-                        <Text style={styles.modalRouteText}>
-                          {selectedCarpool?.pickup?.address}
-                        </Text>
-                      </View>
-                      <View style={styles.modalRouteLine} />
-                      <View style={styles.modalRoutePoint}>
-                        <View style={[styles.modalDot, { backgroundColor: '#FF6B6B' }]} />
-                        <Text style={styles.modalRouteText}>
-                          {selectedCarpool?.dropoff?.address}
-                        </Text>
-                      </View>
-                    </View>
-
-                    <View style={styles.modalDetails}>
-                      <View style={styles.modalDetailItem}>
-                        <Icon name="access-time" size={18} color="#666" />
-                        <Text style={styles.modalDetailText}>
-                          {selectedCarpool?.timeWindow?.start ? new Date(selectedCarpool.timeWindow.start).toLocaleString() : 'N/A'}
-                        </Text>
-                      </View>
-                      <View style={styles.modalDetailItem}>
-                        <Icon name="people" size={18} color="#666" />
-                        <Text style={styles.modalDetailText}>
-                          {selectedCarpool?.carpool?.seatsAvailable} seats available
-                        </Text>
-                      </View>
-                      <View style={styles.modalDetailItem}>
-                        <Icon name="attach-money" size={18} color="#666" />
-                        <Text style={styles.modalDetailText}>
-                          Rs. {selectedCarpool?.carpool?.pricePerSeat || 'N/A'} per person
-                        </Text>
-                      </View>
-                    </View>
-
-                    <TouchableOpacity
-                      style={styles.modalJoinButton}
-                      onPress={confirmJoinCarpool}
-                      activeOpacity={0.8}
-                    >
-                      <LinearGradient
-                        colors={['#FFD700', '#FFC107']}
-                        style={styles.modalJoinGradient}
-                      >
-                        <Icon name="check" size={20} color="#121212" />
-                        <Text style={styles.modalJoinText}>Confirm Join</Text>
-                      </LinearGradient>
-                    </TouchableOpacity>
+                  <View style={styles.scheduleNote}>
+                    <Icon name="info-outline" size={16} color="#999" />
+                    <Text style={styles.scheduleNoteText}>
+                      Select a future date and time for your carpool
+                    </Text>
                   </View>
-                </LinearGradient>
+                </Animatable.View>
+
+                {showDatePicker && (
+                  <DateTimePicker
+                    value={schedule}
+                    mode="date"
+                    display="default"
+                    onChange={(event, selectedDate) => {
+                      setShowDatePicker(false);
+                      if (selectedDate) {
+                        const newDate = new Date(schedule);
+                        newDate.setFullYear(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate());
+                        setSchedule(newDate);
+                        setShowTimePicker(true);
+                      }
+                    }}
+                  />
+                )}
+                {showTimePicker && (
+                  <DateTimePicker
+                    value={schedule}
+                    mode="time"
+                    display="default"
+                    onChange={(event, selectedDate) => {
+                      setShowTimePicker(false);
+                      if (selectedDate) {
+                        const newDate = new Date(schedule);
+                        newDate.setHours(selectedDate.getHours(), selectedDate.getMinutes());
+                        setSchedule(newDate);
+                      }
+                    }}
+                  />
+                )}
               </Animatable.View>
-            </View>
-          </Modal>
-        </Animated.View>
+
+              {/* Available Carpools */}
+              {showCarpools && (
+                <Animatable.View 
+                  animation="fadeInUp" 
+                  duration={600} 
+                  delay={300}
+                  style={styles.section}
+                >
+                  <View style={styles.sectionHeader}>
+                    <Text style={styles.sectionTitle}>🚗 Available Carpools</Text>
+                    <View style={styles.carpoolCountBadge}>
+                      <Text style={styles.carpoolCount}>
+                        {availableCarpools.length}
+                      </Text>
+                    </View>
+                  </View>
+                  
+                  {searching ? (
+                    <View style={styles.loadingContainer}>
+                      <ActivityIndicator size="large" color="#F9C349" />
+                      <Text style={styles.loadingText}>Searching for carpools...</Text>
+                    </View>
+                  ) : availableCarpools.length > 0 ? (
+                    <FlatList
+                      data={availableCarpools}
+                      renderItem={renderCarpoolItem}
+                      keyExtractor={item => item._id}
+                      scrollEnabled={false}
+                      contentContainerStyle={styles.carpoolsList}
+                    />
+                  ) : (
+                    <View style={styles.noCarpools}>
+                      <IconMC name="car-off" size={60} color="#D0D0D0" />
+                      <Text style={styles.noCarpoolsText}>No carpools found</Text>
+                      <Text style={styles.noCarpoolsSubtext}>
+                        We couldn't find a driver going that way right now.
+                      </Text>
+                    </View>
+                  )}
+                </Animatable.View>
+              )}
+
+              {/* Post Request Button */}
+              <Animatable.View animation="fadeInUp" duration={600} delay={400}>
+                <TouchableOpacity
+                  style={[
+                    styles.requestButton,
+                    (!pickup || !dropoff || searching) && styles.requestButtonDisabled
+                  ]}
+                  onPress={handlePostRequest}
+                  disabled={!pickup || !dropoff || searching}
+                  activeOpacity={0.8}
+                >
+                  <LinearGradient
+                    colors={(!pickup || !dropoff) ? ['#E0E0E0', '#D0D0D0'] : ['#F9C349', '#F5A623']}
+                    style={styles.requestButtonGradient}
+                  >
+                    <Icon name="add-circle" size={22} color={(!pickup || !dropoff) ? '#999' : '#000'} />
+                    <Text style={[
+                      styles.requestButtonText,
+                      (!pickup || !dropoff) && { color: '#999' }
+                    ]}>
+                      Post Carpool Request
+                    </Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+              </Animatable.View>
+
+              <View style={styles.bottomSpacer} />
+            </ScrollView>
+
+            {/* Map Picker Modal */}
+            <Modal
+              visible={mapPickerVisible}
+              animationType="slide"
+              transparent={false}
+            >
+              <View style={styles.mapPickerContainer}>
+                <View style={styles.mapPickerHeader}>
+                  <TouchableOpacity onPress={() => setMapPickerVisible(false)} style={styles.mapPickerClose}>
+                    <Icon name="close" size={24} color="#000" />
+                  </TouchableOpacity>
+                  <Text style={styles.mapPickerTitle}>
+                    Select {mapPickerType === 'pickup' ? 'Pickup' : 'Destination'}
+                  </Text>
+                  <View style={{ width: 40 }} />
+                </View>
+                {mapPickerCoords && (
+                  <View style={styles.mapWrapper}>
+                    <MapView
+                      ref={pickerMapRef}
+                      style={styles.pickerMap}
+                      initialRegion={{
+                        latitude: mapPickerCoords.latitude,
+                        longitude: mapPickerCoords.longitude,
+                        latitudeDelta: 0.01,
+                        longitudeDelta: 0.01,
+                      }}
+                      onRegionChangeComplete={onPickerRegionChangeComplete}
+                    />
+                    <View style={styles.mapMarkerFixed}>
+                      <Icon name="location-on" size={44} color={mapPickerType === 'pickup' ? '#4ECDC4' : '#FF6B6B'} />
+                    </View>
+                  </View>
+                )}
+                <View style={styles.mapPickerFooter}>
+                  <Text style={styles.mapPickerAddressText}>{mapPickerAddress}</Text>
+                  <TouchableOpacity style={styles.mapPickerConfirmBtn} onPress={confirmMapPicker}>
+                    <Text style={styles.mapPickerConfirmText}>Confirm Location</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </Modal>
+
+            {/* Join Carpool Modal */}
+            <Modal
+              visible={showJoinModal}
+              animationType="slide"
+              transparent
+              onRequestClose={() => setShowJoinModal(false)}
+            >
+              <View style={styles.modalOverlay}>
+                <TouchableOpacity 
+                  style={styles.modalBackdrop}
+                  activeOpacity={1}
+                  onPress={() => setShowJoinModal(false)}
+                />
+                <Animatable.View 
+                  animation="slideInUp" 
+                  duration={400}
+                  style={styles.modalContent}
+                >
+                  <View style={styles.modalCard}>
+                    <View style={styles.modalHeader}>
+                      <View style={styles.modalHeaderLeft}>
+                        <View style={styles.modalIcon}>
+                          <IconMC name="account-group" size={24} color="#000" />
+                        </View>
+                        <View>
+                          <Text style={styles.modalTitle}>Join Carpool</Text>
+                          <Text style={styles.modalSubtitle}>
+                            with {selectedCarpool?.driverId?.userId?.name || 'Driver'}
+                          </Text>
+                        </View>
+                      </View>
+                      <TouchableOpacity 
+                        onPress={() => setShowJoinModal(false)}
+                        style={styles.modalClose}
+                      >
+                        <Icon name="close" size={24} color="#000" />
+                      </TouchableOpacity>
+                    </View>
+
+                    <View style={styles.modalBody}>
+                      <View style={styles.modalRoute}>
+                        <View style={styles.modalRoutePoint}>
+                          <View style={[styles.modalDot, { backgroundColor: '#4ECDC4' }]} />
+                          <Text style={styles.modalRouteText}>
+                            {selectedCarpool?.pickup?.address}
+                          </Text>
+                        </View>
+                        <View style={styles.modalRouteLine} />
+                        <View style={styles.modalRoutePoint}>
+                          <View style={[styles.modalDot, { backgroundColor: '#FF6B6B' }]} />
+                          <Text style={styles.modalRouteText}>
+                            {selectedCarpool?.dropoff?.address}
+                          </Text>
+                        </View>
+                      </View>
+
+                      <View style={styles.modalDetails}>
+                        <View style={styles.modalDetailItem}>
+                          <Icon name="access-time" size={18} color="#999" />
+                          <Text style={styles.modalDetailText}>
+                            {selectedCarpool?.timeWindow?.start ? new Date(selectedCarpool.timeWindow.start).toLocaleString() : 'N/A'}
+                          </Text>
+                        </View>
+                        <View style={styles.modalDetailItem}>
+                          <IconMC name="account-group" size={18} color="#999" />
+                          <Text style={styles.modalDetailText}>
+                            {selectedCarpool?.carpool?.seatsAvailable} seats available
+                          </Text>
+                        </View>
+                        <View style={styles.modalDetailItem}>
+                          <Icon name="attach-money" size={18} color="#999" />
+                          <Text style={styles.modalDetailText}>
+                            ₨ {selectedCarpool?.carpool?.pricePerSeat || 'N/A'} per person
+                          </Text>
+                        </View>
+                      </View>
+
+                      <TouchableOpacity
+                        style={styles.modalJoinButton}
+                        onPress={confirmJoinCarpool}
+                        activeOpacity={0.8}
+                      >
+                        <LinearGradient
+                          colors={['#F9C349', '#F5A623']}
+                          style={styles.modalJoinGradient}
+                        >
+                          <Icon name="check" size={20} color="#000" />
+                          <Text style={styles.modalJoinText}>Confirm Join</Text>
+                        </LinearGradient>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </Animatable.View>
+              </View>
+            </Modal>
+          </Animated.View>
         )}
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -1115,128 +1196,412 @@ const BookCarpoolScreen = () => {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#121212',
-  },
-  listContainer: {
-    flex: 1,
-    backgroundColor: '#121212',
-  },
-  tabContainer: { 
-    flexDirection: 'row', 
-    borderBottomWidth: 1, 
-    borderBottomColor: '#333', 
-    backgroundColor: '#1E1E1E' 
-  },
-  tab: { 
-    flex: 1, 
-    paddingVertical: 16, 
-    alignItems: 'center' 
-  },
-  activeTab: { 
-    borderBottomWidth: 2, 
-    borderBottomColor: '#FFD700' 
-  },
-  tabText: { 
-    color: '#888', 
-    fontWeight: 'bold' 
-  },
-  activeTabText: { 
-    color: '#FFD700' 
-  },
-  floatingBtnContainer: {
-    position: 'absolute',
-    bottom: 20,
-    left: 20,
-    right: 20,
-  },
-  createNewBtn: {
-    backgroundColor: '#FFD700',
-    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
   },
   container: {
     flex: 1,
-    backgroundColor: '#121212',
+    backgroundColor: '#FFFFFF',
   },
-  scrollContent: {
-    paddingBottom: 40,
+  // List View Styles
+  listContainer: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
   },
-  header: {
+  listHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingTop: 10,
+    paddingTop: 50,
     paddingBottom: 15,
+    backgroundColor: '#FFFFFF',
+  },
+  listHeaderTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#000',
+    letterSpacing: 0.5,
+  },
+  notificationButton: {
+    padding: 4,
+    position: 'relative',
+  },
+  notificationDot: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#F9C349',
+  },
+  tabContainer: { 
+    flexDirection: 'row', 
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  tab: { 
+    flex: 1, 
+    paddingVertical: 12, 
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    borderRadius: 12,
+    marginHorizontal: 4,
+    position: 'relative',
+  },
+  activeTab: { 
+    backgroundColor: '#F9C34915',
+  },
+  tabText: { 
+    color: '#999', 
+    fontSize: 15,
+    fontWeight: '500',
+  },
+  activeTabText: { 
+    color: '#000',
+    fontWeight: '600',
+  },
+  tabBadge: {
+    marginLeft: 8,
+    backgroundColor: '#F9C349',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    minWidth: 20,
+    alignItems: 'center',
+  },
+  tabBadgeGreen: {
+    backgroundColor: '#4ECDC4',
+  },
+  tabBadgeText: {
+    color: '#000',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  loadingCenter: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  listContent: {
+    padding: 16,
+    paddingBottom: 100,
+  },
+  // Create View Styles
+  createHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 50,
+    paddingBottom: 15,
+    backgroundColor: '#FFFFFF',
+  },
+  createHeaderTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#000',
+    letterSpacing: 0.5,
   },
   backButton: {
     padding: 4,
   },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#FFF',
-  },
-  helpButton: {
-    padding: 4,
+  scrollContent: {
+    paddingBottom: 40,
   },
   mapContainer: {
-    height: 250,
-    marginHorizontal: 16,
-    marginBottom: 20,
-    borderRadius: 20,
+    height: 200,
+    marginHorizontal: 20,
+    marginBottom: 16,
+    borderRadius: 16,
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: '#2A2A2A',
+    backgroundColor: '#F5F5F5',
+    position: 'relative',
   },
   mapLoading: {
     flex: 1,
-    backgroundColor: '#1E1E1E',
+    backgroundColor: '#F5F5F5',
     justifyContent: 'center',
     alignItems: 'center',
   },
   mapLoadingText: {
-    color: '#888',
+    color: '#999',
     marginTop: 12,
     fontSize: 14,
   },
   map: {
     flex: 1,
   },
+  mapOverlayBtn: {
+    position: 'absolute',
+    bottom: 12,
+    right: 12,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 4,
+  },
   pickupMarker: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: 'rgba(78, 205, 196, 0.3)',
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: 'rgba(78, 205, 196, 0.25)',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
     borderColor: '#4ECDC4',
   },
   markerInner: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
     backgroundColor: '#4ECDC4',
   },
+  dropoffMarker: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#FF6B6B',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#FFF',
+  },
   locationSection: {
-    backgroundColor: '#1E1E1E',
-    marginHorizontal: 16,
-    marginBottom: 24,
-    padding: 16,
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 20,
+    marginBottom: 20,
+    padding: 20,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#2A2A2A',
-    zIndex: 100,
-    elevation: 100,
+    borderColor: '#F0F0F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  locationHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  locationTitle: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#000',
+  },
+  useCurrentButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: '#F9C34915',
+    borderRadius: 20,
+  },
+  useCurrentText: {
+    color: '#F9C349',
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  locationInputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  locationDot: {
+    width: 24,
+    alignItems: 'center',
+    marginRight: 12,
+    paddingTop: 16,
+  },
+  dot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+  },
+  dotLine: {
+    width: 2,
+    height: 20,
+    backgroundColor: '#E0E0E0',
+    marginTop: 4,
+  },
+  locationInputContainer: {
+    flex: 1,
+  },
+  pickupInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8F8F8',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#F0F0F0',
+  },
+  pickupTextInput: {
+    color: '#000',
+    flex: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 14,
+    backgroundColor: 'transparent',
+  },
+  dropoffInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8F8F8',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#F0F0F0',
+  },
+  dropoffTextInput: {
+    color: '#000',
+    flex: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 14,
+    backgroundColor: 'transparent',
+  },
+  autocompleteContainer: {
+    flex: 1,
+    zIndex: 999,
+  },
+  autocompleteList: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    marginTop: 4,
+    maxHeight: 200,
+    width: '100%',
+    borderWidth: 1,
+    borderColor: '#F0F0F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  autocompleteRow: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F5F5F5',
+  },
+  autocompleteDescription: {
+    color: '#000',
+    fontSize: 14,
+  },
+  locationDivider: {
+    height: 0,
+    marginVertical: 0,
+  },
+  // Schedule Section Styles
+  scheduleSection: {
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  scheduleHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  scheduleHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  scheduleIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#F9C34915',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  scheduleTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#000',
+  },
+  scheduleBadge: {
+    backgroundColor: '#F9C34915',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  scheduleBadgeText: {
+    color: '#F9C349',
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  scheduleCard: {
+    backgroundColor: '#F8F8F8',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#F0F0F0',
+    overflow: 'hidden',
+  },
+  schedulePicker: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    backgroundColor: '#FFFFFF',
+  },
+  schedulePickerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  schedulePickerLabel: {
+    color: '#000',
+    fontSize: 15,
+    fontWeight: '500',
+  },
+  schedulePickerValue: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  schedulePickerText: {
+    color: '#000',
+    fontSize: 14,
+  },
+  scheduleDivider: {
+    height: 1,
+    backgroundColor: '#F0F0F0',
+  },
+  scheduleNote: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 12,
+    paddingHorizontal: 4,
+  },
+  scheduleNoteText: {
+    color: '#999',
+    fontSize: 13,
+    flex: 1,
   },
   section: {
-    marginHorizontal: 16,
-    marginBottom: 24,
-    backgroundColor: '#1E1E1E',
+    marginHorizontal: 20,
+    marginBottom: 20,
+    backgroundColor: '#FFFFFF',
     padding: 16,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#2A2A2A',
+    borderColor: '#F0F0F0',
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -1245,139 +1610,20 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   sectionTitle: {
-    color: '#FFF',
-    fontSize: 18,
-    fontWeight: 'bold',
+    color: '#000',
+    fontSize: 17,
+    fontWeight: '600',
   },
-  useCurrentButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  useCurrentText: {
-    color: '#FFD700',
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  locationInputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  locationDot: {
-    width: 20,
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  dot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-  },
-  locationInputContainer: {
-    flex: 1,
-  },
-  locationTextInput: {
-    backgroundColor: '#2A2A2A',
-    color: '#FFF',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 14,
-  },
-  autocompleteContainer: {
-    flex: 1,
-  },
-  autocompleteList: {
-    backgroundColor: '#2A2A2A',
-    borderRadius: 12,
-    position: 'absolute',
-    top: 50,
-    left: 0,
-    right: 0,
-    zIndex: 1000,
-    maxHeight: 200,
-  },
-  autocompleteRow: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#333',
-  },
-  autocompleteDescription: {
-    color: '#FFF',
-    fontSize: 14,
-  },
-  locationDivider: {
-    height: 1,
-    backgroundColor: '#2A2A2A',
-    marginVertical: 12,
-  },
-  detailRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#2A2A2A',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 12,
-  },
-  detailLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  detailIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255, 215, 0, 0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  detailLabel: {
-    color: '#FFF',
-    fontSize: 16,
-  },
-  seatSelector: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#1E1E1E',
-    borderRadius: 25,
-    paddingHorizontal: 4,
+  carpoolCountBadge: {
+    backgroundColor: '#F9C34915',
+    paddingHorizontal: 12,
     paddingVertical: 4,
-  },
-  seatButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#333',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  seatCount: {
-    color: '#FFF',
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginHorizontal: 16,
-    minWidth: 24,
-    textAlign: 'center',
-  },
-  dateTimeButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#2A2A2A',
-    padding: 16,
     borderRadius: 12,
-    gap: 12,
-  },
-  dateTimeText: {
-    color: '#FFF',
-    fontSize: 14,
-    flex: 1,
   },
   carpoolCount: {
-    color: '#888',
+    color: '#F9C349',
     fontSize: 14,
+    fontWeight: '600',
   },
   loadingContainer: {
     alignItems: 'center',
@@ -1385,7 +1631,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   loadingText: {
-    color: '#888',
+    color: '#999',
     fontSize: 14,
   },
   carpoolsList: {
@@ -1394,16 +1640,22 @@ const styles = StyleSheet.create({
   carpoolCard: {
     borderRadius: 16,
     overflow: 'hidden',
-    elevation: 3,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#F0F0F0',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.04,
     shadowRadius: 4,
+    elevation: 1,
   },
   carpoolCardFull: {
-    opacity: 0.6,
+    opacity: 0.7,
   },
-  carpoolGradient: {
+  carpoolCardFullContent: {
+    backgroundColor: '#F8F8F8',
+  },
+  carpoolCardContent: {
     padding: 16,
   },
   carpoolHeader: {
@@ -1421,16 +1673,17 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
+    backgroundColor: '#F9C34915',
     justifyContent: 'center',
     alignItems: 'center',
   },
   userInitial: {
-    color: '#121212',
+    color: '#F9C349',
     fontSize: 18,
     fontWeight: 'bold',
   },
   carpoolName: {
-    color: '#FFF',
+    color: '#000',
     fontSize: 14,
     fontWeight: '600',
   },
@@ -1440,27 +1693,28 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   ratingText: {
-    color: '#888',
+    color: '#999',
     fontSize: 12,
   },
   seatsBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 215, 0, 0.15)',
+    backgroundColor: '#F9C34915',
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
     gap: 4,
   },
   seatsBadgeFull: {
-    backgroundColor: '#2A2A2A',
+    backgroundColor: '#F0F0F0',
   },
   seatsText: {
-    color: '#FFF',
-    fontSize: 12,
+    color: '#F9C349',
+    fontSize: 14,
+    fontWeight: '600',
   },
   seatsTextFull: {
-    color: '#666',
+    color: '#999',
   },
   carpoolRoute: {
     marginBottom: 12,
@@ -1472,32 +1726,37 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   routeDot: {
-    width: 16,
-    alignItems: 'center',
+    width: 10,
+    height: 10,
+    borderRadius: 5,
   },
   routeLineContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingLeft: 8,
+    paddingLeft: 4,
+    paddingVertical: 4,
   },
   routeLine: {
     width: 2,
     height: 16,
-    backgroundColor: '#333',
+    backgroundColor: '#E0E0E0',
   },
   routeTime: {
-    backgroundColor: '#2A2A2A',
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8F8F8',
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 8,
     marginLeft: 4,
+    gap: 4,
   },
   routeTimeText: {
-    color: '#888',
+    color: '#999',
     fontSize: 10,
   },
   routeText: {
-    color: '#AAA',
+    color: '#666',
     fontSize: 13,
     flex: 1,
   },
@@ -1506,7 +1765,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     borderTopWidth: 1,
-    borderTopColor: '#2A2A2A',
+    borderTopColor: '#F0F0F0',
     paddingTop: 12,
   },
   carpoolMeta: {
@@ -1519,16 +1778,16 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   metaText: {
-    color: '#666',
+    color: '#999',
     fontSize: 12,
   },
   carpoolPrice: {
-    color: '#FFD700',
+    color: '#F9C349',
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: '700',
   },
   carpoolPriceFull: {
-    color: '#666',
+    color: '#999',
   },
   fullBadge: {
     position: 'absolute',
@@ -1548,7 +1807,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 8,
     right: 8,
-    backgroundColor: '#666',
+    backgroundColor: '#999',
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 8,
@@ -1564,50 +1823,196 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   noCarpoolsText: {
-    color: '#FFF',
+    color: '#000',
     fontSize: 18,
     fontWeight: '600',
   },
   noCarpoolsSubtext: {
-    color: '#666',
+    color: '#999',
     fontSize: 14,
     textAlign: 'center',
   },
-  createButtonContainer: {
-    paddingHorizontal: 20,
-    marginTop: 10,
-  },
-  createButton: {
+  requestButton: {
+    marginHorizontal: 20,
+    marginBottom: 20,
     borderRadius: 16,
     overflow: 'hidden',
-    elevation: 5,
-    shadowColor: '#FFD700',
+    shadowColor: '#F9C349',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.2,
     shadowRadius: 8,
+    elevation: 4,
   },
-  createButtonGradient: {
+  requestButtonDisabled: {
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  requestButtonGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 16,
-    gap: 10,
+    gap: 8,
   },
-  createButtonText: {
-    color: '#121212',
-    fontSize: 18,
-    fontWeight: 'bold',
+  requestButtonText: {
+    color: '#000',
+    fontSize: 16,
+    fontWeight: '600',
   },
   bottomSpacer: {
     height: 20,
   },
+  // Recent Ride Card Styles
+  recentRideCard: {
+    backgroundColor: '#FFFFFF',
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#F0F0F0',
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  acceptedRideCard: {
+    borderColor: '#4ECDC4',
+    borderWidth: 2,
+  },
+  recentRideHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  recentRideTime: {
+    color: '#000',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  rideStatus: {
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  rideStatusText: {
+    color: '#FFF',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  driverInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  driverAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#F9C34915',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  driverInfoText: {
+    marginLeft: 10,
+  },
+  driverName: {
+    color: '#000',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  driverPhone: {
+    color: '#999',
+    fontSize: 12,
+  },
+  routeInfo: {
+    marginBottom: 12,
+    gap: 6,
+  },
+  routeInfoItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  routeInfoText: {
+    color: '#666',
+    fontSize: 13,
+    flex: 1,
+  },
+  previewMap: {
+    height: 160,
+    marginBottom: 12,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  recentRideActions: {
+    alignItems: 'flex-end',
+    borderTopWidth: 1,
+    borderTopColor: '#F0F0F0',
+    paddingTop: 12,
+  },
+  cancelButton: {
+    padding: 8,
+  },
+  cancelButtonText: {
+    color: '#FF6B6B',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  floatingBtnContainer: {
+    position: 'absolute',
+    bottom: 20,
+    left: 20,
+    right: 20,
+  },
+  createNewBtn: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: '#F9C349',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  createNewGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    gap: 8,
+  },
+  createNewText: {
+    color: '#000',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  emptyState: {
+    alignItems: 'center',
+    paddingVertical: 60,
+    gap: 12,
+  },
+  emptyStateTitle: {
+    color: '#000',
+    fontSize: 20,
+    fontWeight: '600',
+  },
+  emptyStateSubtext: {
+    color: '#999',
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  // Modal Styles
   modalOverlay: {
     flex: 1,
     justifyContent: 'flex-end',
   },
   modalBackdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    backgroundColor: 'rgba(0,0,0,0.4)',
   },
   modalContent: {
     borderTopLeftRadius: 30,
@@ -1615,7 +2020,8 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     maxHeight: height * 0.8,
   },
-  modalGradient: {
+  modalCard: {
+    backgroundColor: '#FFFFFF',
     padding: 20,
   },
   modalHeader: {
@@ -1633,16 +2039,17 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
+    backgroundColor: '#F9C34915',
     justifyContent: 'center',
     alignItems: 'center',
   },
   modalTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: '#FFF',
+    fontWeight: '700',
+    color: '#000',
   },
   modalSubtitle: {
-    color: '#888',
+    color: '#999',
     fontSize: 14,
   },
   modalClose: {
@@ -1652,7 +2059,7 @@ const styles = StyleSheet.create({
     gap: 20,
   },
   modalRoute: {
-    backgroundColor: '#2A2A2A',
+    backgroundColor: '#F8F8F8',
     padding: 16,
     borderRadius: 12,
     gap: 8,
@@ -1670,11 +2077,11 @@ const styles = StyleSheet.create({
   modalRouteLine: {
     width: 2,
     height: 12,
-    backgroundColor: '#444',
+    backgroundColor: '#E0E0E0',
     marginLeft: 3,
   },
   modalRouteText: {
-    color: '#FFF',
+    color: '#000',
     fontSize: 14,
     flex: 1,
   },
@@ -1685,12 +2092,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    backgroundColor: '#2A2A2A',
+    backgroundColor: '#F8F8F8',
     padding: 12,
     borderRadius: 10,
   },
   modalDetailText: {
-    color: '#FFF',
+    color: '#000',
     fontSize: 14,
   },
   modalJoinButton: {
@@ -1706,37 +2113,32 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   modalJoinText: {
-    color: '#121212',
+    color: '#000',
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '700',
   },
-  mapIconBtn: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    height: 48,
-  },
+  // Map Picker Styles
   mapPickerContainer: {
     flex: 1,
-    backgroundColor: '#121212',
+    backgroundColor: '#FFFFFF',
   },
   mapPickerHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: 16,
-    backgroundColor: '#1E1E1E',
+    backgroundColor: '#FFFFFF',
     paddingTop: Platform.OS === 'ios' ? 50 : 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#2A2A2A',
+    borderBottomColor: '#F0F0F0',
   },
   mapPickerClose: {
     padding: 4,
   },
   mapPickerTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: '#FFF',
+    fontWeight: '600',
+    color: '#000',
   },
   mapWrapper: {
     flex: 1,
@@ -1748,48 +2150,47 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: '50%',
     left: '50%',
-    marginLeft: -20,
-    marginTop: -40,
+    marginLeft: -22,
+    marginTop: -44,
     zIndex: 10,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 28,
+    padding: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
   },
   mapPickerFooter: {
-    backgroundColor: '#1E1E1E',
+    backgroundColor: '#FFFFFF',
     padding: 20,
     paddingBottom: Platform.OS === 'ios' ? 40 : 20,
+    borderTopWidth: 1,
+    borderTopColor: '#F0F0F0',
   },
   mapPickerAddressText: {
-    color: '#FFF',
+    color: '#000',
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 20,
   },
   mapPickerConfirmBtn: {
-    backgroundColor: '#FFD700',
+    backgroundColor: '#F9C349',
     padding: 16,
     borderRadius: 12,
     alignItems: 'center',
   },
   mapPickerConfirmText: {
-    color: '#121212',
+    color: '#000',
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '600',
   },
-  requestButton: {
-    marginTop: 16,
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-  requestButtonGradient: {
-    flexDirection: 'row',
+  mapIconBtn: {
+    justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    gap: 8,
-  },
-  requestButtonText: {
-    color: '#121212',
-    fontSize: 16,
-    fontWeight: 'bold',
+    paddingHorizontal: 16,
+    height: 48,
   },
 });
 

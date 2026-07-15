@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -7,27 +7,38 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
-  FlatList,
   SafeAreaView,
   StatusBar,
   Dimensions,
   Modal,
   Platform,
-  KeyboardAvoidingView
+  KeyboardAvoidingView,
+  TextInput,
 } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import CustomPlacesAutocomplete from '../../components/common/CustomPlacesAutocomplete';
-import DateTimePicker from '@react-native-community/datetimepicker';
+import IconIonic from 'react-native-vector-icons/Ionicons';
+import IconMC from 'react-native-vector-icons/MaterialCommunityIcons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Animatable from 'react-native-animatable';
-import MapView, { Marker } from 'react-native-maps';
+import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import * as Location from 'expo-location';
-import { createCarpoolBooking, acceptCarpoolRequest, rejectCarpoolRequest, startCarpool, completeCarpool } from '../../redux/slices/bookingSlice';
+import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
+import { createCarpoolBooking } from '../../redux/slices/bookingSlice';
 import { GOOGLE_MAPS_API_KEY } from '../../config/constants';
 
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
+
+// Yellow Theme Colors
+const YELLOW_PRIMARY = '#F8B82A';
+const YELLOW_SECONDARY = '#F9C349';
+const WHITE = '#FFFFFF';
+const BLACK = '#000000';
+const GRAY_DARK = '#333333';
+const GRAY_MEDIUM = '#666666';
+const GRAY_LIGHT = '#F5F5F5';
+const GRAY_BG = '#F8F9FA';
 
 const CreateCarpoolScreen = () => {
   const navigation = useNavigation();
@@ -43,75 +54,12 @@ const CreateCarpoolScreen = () => {
   const [pricePerSeat, setPricePerSeat] = useState(100);
   const [date, setDate] = useState(new Date());
   const [time, setTime] = useState(new Date());
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [showTimePicker, setShowTimePicker] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+  const [pickupText, setPickupText] = useState('');
+  const [dropoffText, setDropoffText] = useState('');
 
-  // Map Picker State
-  const [mapPickerVisible, setMapPickerVisible] = useState(false);
-  const [mapPickerType, setMapPickerType] = useState('pickup');
-  const [mapPickerCoords, setMapPickerCoords] = useState(null);
-  const [mapPickerAddress, setMapPickerAddress] = useState('');
-
-  const pickupRef = React.useRef(null);
-  const dropoffRef = React.useRef(null);
-  const pickerMapRef = React.useRef(null);
-
-  const openMapPicker = async (type) => {
-    setMapPickerType(type);
-    setMapPickerVisible(true);
-    let coords = type === 'pickup' && pickup ? 
-      { latitude: pickup.location.coordinates[1], longitude: pickup.location.coordinates[0] } :
-      type === 'dropoff' && dropoff ? 
-      { latitude: dropoff.location.coordinates[1], longitude: dropoff.location.coordinates[0] } : null;
-
-    if (!coords) {
-       try {
-         let loc = await Location.getCurrentPositionAsync({});
-         coords = loc.coords;
-       } catch (e) {
-         coords = { latitude: 33.6844, longitude: 73.0479 };
-       }
-    }
-    setMapPickerCoords(coords);
-    setMapPickerAddress('Loading address...');
-  };
-
-  const onPickerRegionChangeComplete = async (region) => {
-    setMapPickerCoords(region);
-    try {
-      let geo = await Location.reverseGeocodeAsync({
-        latitude: region.latitude,
-        longitude: region.longitude
-      });
-      if (geo.length > 0) {
-        setMapPickerAddress(`${geo[0].name || geo[0].street || ''}, ${geo[0].city || ''}`.replace(/^, /, ''));
-      } else {
-        setMapPickerAddress('Unknown Location');
-      }
-    } catch(e) {
-      setMapPickerAddress('Unknown Location');
-    }
-  };
-
-  const confirmMapPicker = () => {
-    if (!mapPickerCoords) return;
-    const data = {
-      address: mapPickerAddress,
-      location: {
-        type: 'Point',
-        coordinates: [mapPickerCoords.longitude, mapPickerCoords.latitude]
-      }
-    };
-    if (mapPickerType === 'pickup') {
-      setPickup(data);
-      pickupRef.current?.setAddressText(data.address);
-    } else {
-      setDropoff(data);
-      dropoffRef.current?.setAddressText(data.address);
-    }
-    setMapPickerVisible(false);
-  };
+  const pickupRef = useRef(null);
+  const dropoffRef = useRef(null);
 
   const handleCreateCarpool = async () => {
     if (!pickup || !dropoff) {
@@ -154,7 +102,7 @@ const CreateCarpoolScreen = () => {
       if (result.success) {
         Alert.alert(
           'Success! 🚗',
-          `Your ${isIntercity ? 'intercity ' : ''}carpool has been created successfully and is now visible to passengers!`,
+          `Your ${isIntercity ? 'intercity ' : ''}carpool has been created successfully!`,
           [
             {
               text: 'OK',
@@ -170,261 +118,637 @@ const CreateCarpoolScreen = () => {
     }
   };
 
+  const formatDate = (date) => {
+    return date.toLocaleDateString('en-US', { 
+      weekday: 'short', 
+      month: 'short', 
+      day: 'numeric' 
+    });
+  };
+
+  const formatTime = (date) => {
+    return date.toLocaleTimeString('en-US', { 
+      hour: '2-digit', 
+      minute: '2-digit' 
+    });
+  };
+
+  const incrementSeats = () => {
+    if (seats < 6) setSeats(seats + 1);
+  };
+
+  const decrementSeats = () => {
+    if (seats > 1) setSeats(seats - 1);
+  };
+
+  const incrementPrice = () => {
+    setPricePerSeat(pricePerSeat + 50);
+  };
+
+  const decrementPrice = () => {
+    if (pricePerSeat > 50) setPricePerSeat(pricePerSeat - 50);
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor="#121212" />
+      <StatusBar barStyle="dark-content" backgroundColor={WHITE} />
+      
       <KeyboardAvoidingView 
         style={styles.container}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
       >
+        {/* Header */}
+        <View style={styles.header}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+            activeOpacity={0.7}
+          >
+            <IconIonic 
+              name={Platform.OS === 'ios' ? 'chevron-back' : 'arrow-back'} 
+              size={24} 
+              color={BLACK} 
+            />
+          </TouchableOpacity>
+          <View style={styles.headerTitleContainer}>
+            <Text style={styles.headerTitle}>Create Carpool</Text>
+            <Text style={styles.headerSubtitle}>
+              {isIntercity ? 'Intercity Trip' : 'Share your ride'}
+            </Text>
+          </View>
+          <View style={styles.headerRightPlaceholder} />
+        </View>
+
         <ScrollView 
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scrollContent}
         >
           {/* Location Section */}
           <Animatable.View animation="fadeInUp" duration={600} delay={100} style={styles.section}>
-            <Text style={styles.sectionTitle}>📍 Carpool Route</Text>
+            <View style={styles.sectionHeader}>
+              <Icon name="route" size={20} color={YELLOW_PRIMARY} />
+              <Text style={styles.sectionTitle}>Route Details</Text>
+            </View>
             
             <View style={styles.locationInputWrapper}>
-              <View style={styles.locationDot}>
-                <View style={[styles.dot, { backgroundColor: '#4ECDC4' }]} />
+              <View style={styles.locationDotContainer}>
+                <View style={[styles.locationDot, styles.pickupDot]} />
+                <View style={styles.locationLine} />
               </View>
               <View style={styles.locationInputContainer}>
-                <CustomPlacesAutocomplete
+                <GooglePlacesAutocomplete
                   ref={pickupRef}
-                  placeholder="Pickup Location"
+                  placeholder="Enter pickup location"
                   onPress={(data, details = null) => {
                     setPickup({
                       address: data.description,
-                      location: { coordinates: [details.geometry.location.lng, details.geometry.location.lat] },
+                      location: { 
+                        coordinates: [details.geometry.location.lng, details.geometry.location.lat] 
+                      },
                       placeId: data.place_id
                     });
+                    setPickupText(data.description);
+                  }}
+                  query={{
+                    key: GOOGLE_MAPS_API_KEY,
+                    language: 'en',
+                    components: 'country:pk',
                   }}
                   styles={{
                     textInput: styles.locationTextInput,
                     container: styles.autocompleteContainer,
                     listView: styles.autocompleteList,
                     row: styles.autocompleteRow,
-                    description: styles.autocompleteDescription
+                    description: styles.autocompleteDescription,
                   }}
-                  placeholderTextColor="#666"
-                  renderRightButton={() => (
-                    <TouchableOpacity onPress={() => openMapPicker('pickup')} style={styles.mapIconBtn}>
-                      <Icon name="map" size={22} color="#4ECDC4" />
-                    </TouchableOpacity>
-                  )}
+                  placeholderTextColor={GRAY_MEDIUM}
+                  textInputProps={{
+                    placeholderTextColor: GRAY_MEDIUM,
+                    value: pickupText,
+                    onChangeText: setPickupText,
+                  }}
+                  fetchDetails={true}
+                  enablePoweredByContainer={false}
                 />
               </View>
             </View>
 
-            <View style={styles.locationDivider} />
-
             <View style={styles.locationInputWrapper}>
-              <View style={styles.locationDot}>
-                <View style={[styles.dot, { backgroundColor: '#FF6B6B' }]} />
+              <View style={styles.locationDotContainer}>
+                <View style={[styles.locationDot, styles.dropoffDot]} />
               </View>
               <View style={styles.locationInputContainer}>
-                <CustomPlacesAutocomplete
+                <GooglePlacesAutocomplete
                   ref={dropoffRef}
-                  placeholder="Destination"
+                  placeholder="Enter destination"
                   onPress={(data, details = null) => {
                     setDropoff({
                       address: data.description,
-                      location: { coordinates: [details.geometry.location.lng, details.geometry.location.lat] },
+                      location: { 
+                        coordinates: [details.geometry.location.lng, details.geometry.location.lat] 
+                      },
                       placeId: data.place_id
                     });
+                    setDropoffText(data.description);
+                  }}
+                  query={{
+                    key: GOOGLE_MAPS_API_KEY,
+                    language: 'en',
+                    components: 'country:pk',
                   }}
                   styles={{
                     textInput: styles.locationTextInput,
                     container: styles.autocompleteContainer,
                     listView: styles.autocompleteList,
                     row: styles.autocompleteRow,
-                    description: styles.autocompleteDescription
+                    description: styles.autocompleteDescription,
                   }}
-                  placeholderTextColor="#666"
-                  renderRightButton={() => (
-                    <TouchableOpacity onPress={() => openMapPicker('dropoff')} style={styles.mapIconBtn}>
-                      <Icon name="map" size={22} color="#FF6B6B" />
-                    </TouchableOpacity>
-                  )}
+                  placeholderTextColor={GRAY_MEDIUM}
+                  textInputProps={{
+                    placeholderTextColor: GRAY_MEDIUM,
+                    value: dropoffText,
+                    onChangeText: setDropoffText,
+                  }}
+                  fetchDetails={true}
+                  enablePoweredByContainer={false}
                 />
               </View>
             </View>
           </Animatable.View>
 
-          {/* Details Section */}
+          {/* Ride Details Section */}
           <Animatable.View animation="fadeInUp" duration={600} delay={200} style={styles.section}>
-            <Text style={styles.sectionTitle}>📋 Ride Details</Text>
+            <View style={styles.sectionHeader}>
+              <Icon name="settings" size={20} color={YELLOW_PRIMARY} />
+              <Text style={styles.sectionTitle}>Ride Settings</Text>
+            </View>
             
             <View style={styles.detailRow}>
               <View style={styles.detailLeft}>
-                <Icon name="people" size={20} color="#FFD700" />
+                <View style={[styles.detailIcon, { backgroundColor: '#4ECDC4' + '15' }]}>
+                  <Icon name="people" size={20} color="#4ECDC4" />
+                </View>
                 <Text style={styles.detailLabel}>Available Seats</Text>
               </View>
               <View style={styles.selector}>
-                <TouchableOpacity onPress={() => setSeats(Math.max(1, seats - 1))}>
-                  <Icon name="remove-circle-outline" size={24} color="#FFF" />
+                <TouchableOpacity 
+                  onPress={decrementSeats} 
+                  style={styles.selectorButton}
+                  activeOpacity={0.7}
+                >
+                  <Icon name="remove" size={20} color={WHITE} />
                 </TouchableOpacity>
                 <Text style={styles.selectorText}>{seats}</Text>
-                <TouchableOpacity onPress={() => setSeats(Math.min(4, seats + 1))}>
-                  <Icon name="add-circle-outline" size={24} color="#FFF" />
+                <TouchableOpacity 
+                  onPress={incrementSeats} 
+                  style={styles.selectorButton}
+                  activeOpacity={0.7}
+                >
+                  <Icon name="add" size={20} color={WHITE} />
                 </TouchableOpacity>
               </View>
             </View>
 
             <View style={styles.detailRow}>
               <View style={styles.detailLeft}>
-                <Icon name="attach-money" size={20} color="#FFD700" />
-                <Text style={styles.detailLabel}>Price Per Seat (Rs.)</Text>
+                <View style={[styles.detailIcon, { backgroundColor: YELLOW_PRIMARY + '15' }]}>
+                  <Icon name="attach-money" size={20} color={YELLOW_PRIMARY} />
+                </View>
+                <Text style={styles.detailLabel}>Price Per Seat</Text>
               </View>
               <View style={styles.selector}>
-                <TouchableOpacity onPress={() => setPricePerSeat(Math.max(0, pricePerSeat - 50))}>
-                  <Icon name="remove-circle-outline" size={24} color="#FFF" />
+                <TouchableOpacity 
+                  onPress={decrementPrice} 
+                  style={styles.selectorButton}
+                  activeOpacity={0.7}
+                >
+                  <Icon name="remove" size={20} color={WHITE} />
                 </TouchableOpacity>
-                <Text style={styles.selectorText}>{pricePerSeat}</Text>
-                <TouchableOpacity onPress={() => setPricePerSeat(pricePerSeat + 50)}>
-                  <Icon name="add-circle-outline" size={24} color="#FFF" />
+                <Text style={styles.selectorText}>Rs. {pricePerSeat}</Text>
+                <TouchableOpacity 
+                  onPress={incrementPrice} 
+                  style={styles.selectorButton}
+                  activeOpacity={0.7}
+                >
+                  <Icon name="add" size={20} color={WHITE} />
                 </TouchableOpacity>
               </View>
             </View>
 
-            <TouchableOpacity style={styles.dateTimeButton} onPress={() => setShowDatePicker(true)}>
-              <Icon name="calendar-today" size={20} color="#FFD700" />
-              <Text style={styles.dateTimeText}>
-                {date.toLocaleDateString()} at {time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-              </Text>
-              <Icon name="edit" size={20} color="#666" />
-            </TouchableOpacity>
+            <View style={styles.detailRow}>
+              <View style={styles.detailLeft}>
+                <View style={[styles.detailIcon, { backgroundColor: '#FF6B6B' + '15' }]}>
+                  <Icon name="calendar-today" size={20} color="#FF6B6B" />
+                </View>
+                <Text style={styles.detailLabel}>Departure</Text>
+              </View>
+              <View style={styles.dateTimeDisplay}>
+                <Text style={styles.dateText}>{formatDate(date)}</Text>
+                <Text style={styles.timeText}>{formatTime(time)}</Text>
+              </View>
+            </View>
 
-            {showDatePicker && (
-              <DateTimePicker
-                value={date}
-                mode="date"
-                display="default"
-                onChange={(event, selectedDate) => {
-                  setShowDatePicker(false);
-                  if (selectedDate) setDate(selectedDate);
-                }}
-                minimumDate={new Date()}
-              />
-            )}
-            {/* Would need a time picker too in a real app, keeping simple for now by just setting time to now + 1 hour or similar, or showing another picker */}
+            <View style={styles.intercityToggle}>
+              <View style={styles.toggleLabel}>
+                <IconMC name="bus" size={20} color={isIntercity ? YELLOW_PRIMARY : GRAY_MEDIUM} />
+                <Text style={[styles.toggleText, isIntercity && styles.toggleTextActive]}>
+                  Intercity Trip
+                </Text>
+              </View>
+              <View style={[styles.toggleBadge, isIntercity && styles.toggleBadgeActive]}>
+                <Text style={[styles.toggleBadgeText, isIntercity && styles.toggleBadgeTextActive]}>
+                  {isIntercity ? 'Yes' : 'No'}
+                </Text>
+              </View>
+            </View>
+          </Animatable.View>
+
+          {/* Summary Section */}
+          <Animatable.View animation="fadeInUp" duration={600} delay={300} style={styles.summarySection}>
+            <Text style={styles.summaryTitle}>Trip Summary</Text>
+            <View style={styles.summaryCard}>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Total Earnings</Text>
+                <Text style={styles.summaryValue}>Rs. {seats * pricePerSeat}</Text>
+              </View>
+              <View style={styles.summaryDivider} />
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Seats Available</Text>
+                <Text style={styles.summaryValue}>{seats}</Text>
+              </View>
+              <View style={styles.summaryDivider} />
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Price per Seat</Text>
+                <Text style={styles.summaryValue}>Rs. {pricePerSeat}</Text>
+              </View>
+            </View>
           </Animatable.View>
 
           {/* Create Button */}
-          <Animatable.View animation="fadeInUp" duration={600} delay={300} style={styles.createButtonContainer}>
-            <TouchableOpacity style={styles.createButton} onPress={handleCreateCarpool} disabled={isCreating}>
-              <LinearGradient colors={['#FFD700', '#FFC107']} style={styles.createButtonGradient}>
+          <Animatable.View animation="fadeInUp" duration={600} delay={400} style={styles.createButtonContainer}>
+            <TouchableOpacity 
+              style={styles.createButton} 
+              onPress={handleCreateCarpool} 
+              disabled={isCreating}
+              activeOpacity={0.8}
+            >
+              <LinearGradient
+                colors={[YELLOW_PRIMARY, YELLOW_SECONDARY]}
+                style={styles.createButtonGradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+              >
                 {isCreating ? (
-                  <ActivityIndicator color="#121212" size="small" />
+                  <ActivityIndicator color={WHITE} size="small" />
                 ) : (
                   <>
-                    <Icon name="directions-car" size={24} color="#121212" />
+                    <Icon name="directions-car" size={24} color={WHITE} />
                     <Text style={styles.createButtonText}>Publish Carpool</Text>
                   </>
                 )}
               </LinearGradient>
             </TouchableOpacity>
           </Animatable.View>
+
           <View style={styles.bottomSpacer} />
         </ScrollView>
-        
-        {/* Map Picker Modal */}
-        <Modal
-          visible={mapPickerVisible}
-          animationType="slide"
-          transparent={false}
-        >
-          <View style={styles.mapPickerContainer}>
-            <View style={styles.mapPickerHeader}>
-              <TouchableOpacity onPress={() => setMapPickerVisible(false)} style={styles.mapPickerClose}>
-                <Icon name="close" size={24} color="#FFF" />
-              </TouchableOpacity>
-              <Text style={styles.mapPickerTitle}>
-                Select {mapPickerType === 'pickup' ? 'Pickup' : 'Destination'}
-              </Text>
-              <View style={{ width: 40 }} />
-            </View>
-            {mapPickerCoords && (
-              <View style={styles.mapWrapper}>
-                <MapView
-                  ref={pickerMapRef}
-                  style={styles.pickerMap}
-                  initialRegion={{
-                    latitude: mapPickerCoords.latitude,
-                    longitude: mapPickerCoords.longitude,
-                    latitudeDelta: 0.01,
-                    longitudeDelta: 0.01,
-                  }}
-                  onRegionChangeComplete={onPickerRegionChangeComplete}
-                />
-                <View style={styles.mapMarkerFixed}>
-                  <Icon name="location-on" size={40} color={mapPickerType === 'pickup' ? '#4ECDC4' : '#FF6B6B'} />
-                </View>
-              </View>
-            )}
-            <View style={styles.mapPickerFooter}>
-              <Text style={styles.mapPickerAddressText}>{mapPickerAddress}</Text>
-              <TouchableOpacity style={styles.mapPickerConfirmBtn} onPress={confirmMapPicker}>
-                <Text style={styles.mapPickerConfirmText}>Confirm Location</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </Modal>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#121212' },
-  container: { flex: 1 },
-  scrollContent: { paddingBottom: 40, paddingTop: 20 },
+  safeArea: {
+    flex: 1,
+    backgroundColor: WHITE,
+  },
+  container: {
+    flex: 1,
+    backgroundColor: GRAY_BG,
+    marginTop:23
+  },
+  scrollContent: {
+    paddingBottom: 40,
+    paddingTop: 16,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingTop: Platform.OS === 'ios' ? 8 : 12,
+    paddingBottom: 16,
+    backgroundColor: WHITE,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 4,
+  },
+  headerTitleContainer: {
+    flex: 1,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: BLACK,
+  },
+  headerSubtitle: {
+    fontSize: 13,
+    color: GRAY_MEDIUM,
+    marginTop: 1,
+  },
+  headerRightPlaceholder: {
+    width: 40,
+  },
   section: {
     marginHorizontal: 16,
-    marginBottom: 24,
-    backgroundColor: '#1E1E1E',
+    marginBottom: 16,
+    backgroundColor: WHITE,
     padding: 16,
-    borderRadius: 20,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#2A2A2A',
+    borderColor: '#F0F0F0',
+    shadowColor: BLACK,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
   },
-  sectionTitle: { color: '#FFF', fontSize: 18, fontWeight: 'bold', marginBottom: 16 },
-  locationInputWrapper: { flexDirection: 'row', alignItems: 'center' },
-  locationDot: { width: 20, alignItems: 'center', marginRight: 12 },
-  dot: { width: 10, height: 10, borderRadius: 5 },
-  locationInputContainer: { flex: 1 },
-  locationTextInput: { backgroundColor: '#2A2A2A', color: '#FFF', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12, fontSize: 14 },
-  autocompleteContainer: { flex: 1 },
-  autocompleteList: { backgroundColor: '#2A2A2A', borderRadius: 12, position: 'absolute', top: 50, left: 0, right: 0, zIndex: 1000, maxHeight: 200 },
-  autocompleteRow: { paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#333' },
-  autocompleteDescription: { color: '#FFF', fontSize: 14 },
-  locationDivider: { height: 1, backgroundColor: '#2A2A2A', marginVertical: 12 },
-  detailRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#2A2A2A', padding: 16, borderRadius: 12, marginBottom: 12 },
-  detailLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  detailLabel: { color: '#FFF', fontSize: 16, fontWeight: '500' },
-  selector: { flexDirection: 'row', alignItems: 'center', gap: 16 },
-  selectorText: { color: '#FFF', fontSize: 18, fontWeight: 'bold', width: 30, textAlign: 'center' },
-  dateTimeButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#2A2A2A', padding: 16, borderRadius: 12 },
-  dateTimeText: { color: '#FFF', fontSize: 16, flex: 1, marginLeft: 12 },
-  createButtonContainer: { marginHorizontal: 16, marginTop: 10 },
-  createButton: { borderRadius: 16, overflow: 'hidden' },
-  createButtonGradient: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 16, gap: 8 },
-  createButtonText: { color: '#121212', fontSize: 18, fontWeight: 'bold' },
-  bottomSpacer: { height: 100 },
-  mapIconBtn: { padding: 10, position: 'absolute', right: 0 },
-  mapPickerContainer: { flex: 1, backgroundColor: '#121212' },
-  mapPickerHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, backgroundColor: '#1E1E1E' },
-  mapPickerTitle: { color: '#FFF', fontSize: 18, fontWeight: 'bold' },
-  mapPickerClose: { padding: 8 },
-  mapWrapper: { flex: 1 },
-  pickerMap: { flex: 1 },
-  mapMarkerFixed: { left: '50%', marginLeft: -20, marginTop: -40, position: 'absolute', top: '50%' },
-  mapPickerFooter: { backgroundColor: '#1E1E1E', padding: 20, paddingBottom: Platform.OS === 'ios' ? 40 : 20 },
-  mapPickerAddressText: { color: '#FFF', fontSize: 16, marginBottom: 16 },
-  mapPickerConfirmBtn: { backgroundColor: '#FFD700', padding: 16, borderRadius: 12, alignItems: 'center' },
-  mapPickerConfirmText: { color: '#121212', fontSize: 18, fontWeight: 'bold' }
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: BLACK,
+  },
+  locationInputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  locationDotContainer: {
+    width: 24,
+    alignItems: 'center',
+    marginRight: 12,
+    paddingTop: 14,
+  },
+  locationDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: WHITE,
+  },
+  pickupDot: {
+    backgroundColor: '#4ECDC4',
+  },
+  dropoffDot: {
+    backgroundColor: '#FF6B6B',
+  },
+  locationLine: {
+    width: 2,
+    height: 24,
+    backgroundColor: '#E0E0E0',
+    marginTop: 4,
+  },
+  locationInputContainer: {
+    flex: 1,
+  },
+  locationTextInput: {
+    backgroundColor: GRAY_LIGHT,
+    color: BLACK,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 14,
+    borderWidth: 1,
+    borderColor: '#F0F0F0',
+  },
+  autocompleteContainer: {
+    flex: 1,
+  },
+  autocompleteList: {
+    backgroundColor: WHITE,
+    borderRadius: 12,
+    position: 'absolute',
+    top: 50,
+    left: 0,
+    right: 0,
+    zIndex: 1000,
+    maxHeight: 200,
+    borderWidth: 1,
+    borderColor: '#F0F0F0',
+    shadowColor: BLACK,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  autocompleteRow: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  autocompleteDescription: {
+    color: BLACK,
+    fontSize: 14,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: GRAY_LIGHT,
+    padding: 14,
+    borderRadius: 12,
+    marginBottom: 10,
+  },
+  detailLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  detailIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  detailLabel: {
+    color: GRAY_DARK,
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  selector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  selectorButton: {
+    width: 26,
+    height: 26,
+    borderRadius: 16,
+    backgroundColor: 'black',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: BLACK,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  selectorText: {
+    color: BLACK,
+    fontSize: 16,
+    fontWeight: '600',
+    minWidth: 40,
+    textAlign: 'center',
+  },
+  dateTimeDisplay: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  dateText: {
+    color: BLACK,
+    fontSize: 14,
+    fontWeight: '500',
+    backgroundColor: WHITE,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  timeText: {
+    color: BLACK,
+    fontSize: 14,
+    fontWeight: '500',
+    backgroundColor: WHITE,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  intercityToggle: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: GRAY_LIGHT,
+    padding: 14,
+    borderRadius: 12,
+    marginTop: 2,
+  },
+  toggleLabel: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  toggleText: {
+    fontSize: 14,
+    color: GRAY_MEDIUM,
+    fontWeight: '500',
+  },
+  toggleTextActive: {
+    color: BLACK,
+  },
+  toggleBadge: {
+    backgroundColor: WHITE,
+    paddingHorizontal: 14,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  toggleBadgeActive: {
+    backgroundColor: YELLOW_PRIMARY,
+    borderColor: YELLOW_PRIMARY,
+  },
+  toggleBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: GRAY_MEDIUM,
+  },
+  toggleBadgeTextActive: {
+    color: WHITE,
+  },
+  summarySection: {
+    marginHorizontal: 16,
+    marginBottom: 16,
+  },
+  summaryTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: BLACK,
+    marginBottom: 10,
+  },
+  summaryCard: {
+    backgroundColor: WHITE,
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#F0F0F0',
+    shadowColor: BLACK,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 6,
+  },
+  summaryLabel: {
+    fontSize: 14,
+    color: GRAY_MEDIUM,
+  },
+  summaryValue: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: BLACK,
+  },
+  summaryDivider: {
+    height: 1,
+    backgroundColor: '#F0F0F0',
+    marginVertical: 6,
+  },
+  createButtonContainer: {
+    marginHorizontal: 16,
+    marginTop: 4,
+  },
+  createButton: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: YELLOW_PRIMARY,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  createButtonGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    gap: 10,
+  },
+  createButtonText: {
+    color: WHITE,
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  bottomSpacer: {
+    height: 40,
+  },
 });
 
 export default CreateCarpoolScreen;

@@ -6,23 +6,41 @@ import {
   ScrollView,
   TouchableOpacity,
   RefreshControl,
-  ActivityIndicator
+  ActivityIndicator,
+  SafeAreaView,
+  StatusBar,
+  Platform,
+  Dimensions,
 } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
+import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import IconIonic from 'react-native-vector-icons/Ionicons';
+import IconMC from 'react-native-vector-icons/MaterialCommunityIcons';
+import { LinearGradient } from 'expo-linear-gradient';
+import * as Animatable from 'react-native-animatable';
 import { LineChart } from 'react-native-chart-kit';
-import { Dimensions } from 'react-native';
 import api from '../../services/api';
 
 const { width } = Dimensions.get('window');
 
+// Yellow Theme Colors
+const YELLOW_PRIMARY = '#F8B82A';
+const YELLOW_SECONDARY = '#F9C349';
+const WHITE = '#FFFFFF';
+const BLACK = '#000000';
+const GRAY_DARK = '#333333';
+const GRAY_MEDIUM = '#666666';
+const GRAY_LIGHT = '#F5F5F5';
+const GRAY_BG = '#F8F9FA';
+
 const EarningsScreen = () => {
+  const navigation = useNavigation();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedPeriod, setSelectedPeriod] = useState('weekly');
   const [earnings, setEarnings] = useState(null);
   const [chartData, setChartData] = useState(null);
-
 
   useEffect(() => {
     fetchStats();
@@ -59,7 +77,7 @@ const EarningsScreen = () => {
         datasets: [
           {
             data: chartData.data,
-            color: (opacity = 1) => `rgba(255, 215, 0, ${opacity})`,
+            color: (opacity = 1) => `rgba(248, 184, 42, ${opacity})`,
             strokeWidth: 2
           }
         ]
@@ -70,7 +88,7 @@ const EarningsScreen = () => {
       datasets: [
         {
           data: [0, 0, 0, 0, 0, 0, 0],
-          color: (opacity = 1) => `rgba(255, 215, 0, ${opacity})`,
+          color: (opacity = 1) => `rgba(248, 184, 42, ${opacity})`,
           strokeWidth: 2
         }
       ]
@@ -79,323 +97,596 @@ const EarningsScreen = () => {
 
   if (loading && !refreshing) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#FFD700" />
-      </View>
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={YELLOW_PRIMARY} />
+          <Text style={styles.loadingText}>Loading earnings...</Text>
+        </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <ScrollView
-      style={styles.container}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#FFD700" />
-      }
-    >
-      <View style={styles.header}>
-        <Text style={styles.title}>Earnings</Text>
-        <Text style={styles.subtitle}>Your earning summary</Text>
-      </View>
-
-      {/* Total Earnings */}
-      <View style={styles.totalCard}>
-        <Text style={styles.totalLabel}>Total Lifetime Earnings</Text>
-        <Text style={styles.totalAmount}>{formatCurrency(earnings?.total || 0)}</Text>
-        <Text style={styles.totalRides}>{earnings?.rides?.total || 0} lifetime trips completed</Text>
-      </View>
-
-      {/* Period Selector */}
-      <View style={styles.periodSelector}>
-        {['daily', 'weekly', 'monthly'].map((period) => (
-          <TouchableOpacity
-            key={period}
-            style={[
-              styles.periodButton,
-              selectedPeriod === period && styles.periodButtonActive
-            ]}
-            onPress={() => setSelectedPeriod(period)}
-          >
-            <Text style={[
-              styles.periodText,
-              selectedPeriod === period && styles.periodTextActive
-            ]}>
-              {period.charAt(0).toUpperCase() + period.slice(1)}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      {/* Chart */}
-      <View style={styles.chartContainer}>
-        <LineChart
-          data={getChartData()}
-          width={width - 40}
-          height={200}
-          chartConfig={{
-            backgroundColor: '#1E1E1E',
-            backgroundGradientFrom: '#1E1E1E',
-            backgroundGradientTo: '#1E1E1E',
-            decimalPlaces: 0,
-            color: (opacity = 1) => `rgba(255, 215, 0, ${opacity})`,
-            labelColor: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
-            style: {
-              borderRadius: 16,
-            },
-            propsForDots: {
-              r: '6',
-              strokeWidth: '2',
-              stroke: '#FFD700',
-            },
-          }}
-          bezier
-          style={styles.chart}
-          withDots={true}
-          withShadow={false}
-          withInnerLines={false}
-          withOuterLines={true}
-          withVerticalLabels={true}
-          withHorizontalLabels={true}
-        />
-      </View>
-
-      {/* Earnings Breakdown */}
-      <View style={styles.breakdownSection}>
-        <Text style={styles.sectionTitle}>Earnings Summary</Text>
-        
-        <View style={styles.breakdownCard}>
-          <View style={styles.breakdownRow}>
-            <View style={styles.breakdownItem}>
-              <Text style={styles.breakdownLabel}>Today</Text>
-              <Text style={styles.breakdownValue}>{formatCurrency(earnings?.today || 0)}</Text>
-              <Text style={{color: '#666', fontSize: 12, marginTop: 4}}>{earnings?.rides?.today || 0} trips</Text>
-            </View>
-            <View style={styles.breakdownItem}>
-              <Text style={styles.breakdownLabel}>This Week</Text>
-              <Text style={styles.breakdownValue}>{formatCurrency(earnings?.weekly || 0)}</Text>
-              <Text style={{color: '#666', fontSize: 12, marginTop: 4}}>{earnings?.rides?.weekly || 0} trips</Text>
-            </View>
-          </View>
-          <View style={styles.breakdownRow}>
-            <View style={styles.breakdownItem}>
-              <Text style={styles.breakdownLabel}>This Month</Text>
-              <Text style={styles.breakdownValue}>{formatCurrency(earnings?.monthly || 0)}</Text>
-              <Text style={{color: '#666', fontSize: 12, marginTop: 4}}>{earnings?.rides?.monthly || 0} trips</Text>
-            </View>
-            <View style={styles.breakdownItem}>
-              <Text style={styles.breakdownLabel}>Total Rides</Text>
-              <Text style={styles.breakdownValue}>{earnings?.rides?.total || 0}</Text>
-            </View>
-          </View>
-        </View>
-      </View>
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar barStyle="dark-content" backgroundColor={WHITE} />
       
-      {/* Earnings By Category */}
-      <View style={styles.breakdownSection}>
-        <Text style={styles.sectionTitle}>By Trip Type</Text>
-        
-        <View style={styles.breakdownCard}>
-          <View style={styles.breakdownRow}>
-            <View style={styles.breakdownItem}>
-              <Text style={styles.breakdownLabel}>Rides</Text>
-              <Text style={styles.breakdownValue}>{formatCurrency(earnings?.breakdown?.ride || 0)}</Text>
-            </View>
-            <View style={styles.breakdownItem}>
-              <Text style={styles.breakdownLabel}>Carpools</Text>
-              <Text style={styles.breakdownValue}>{formatCurrency(earnings?.breakdown?.carpool || 0)}</Text>
-            </View>
+      <View style={styles.container}>
+        {/* Header with Back Arrow */}
+        <View style={styles.header}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+            activeOpacity={0.7}
+          >
+            <IconIonic 
+              name={Platform.OS === 'ios' ? 'chevron-back' : 'arrow-back'} 
+              size={24} 
+              color={BLACK} 
+            />
+          </TouchableOpacity>
+          <View style={styles.headerTitleContainer}>
+            <Text style={styles.headerTitle}>Earnings</Text>
+            <Text style={styles.headerSubtitle}>Your earning summary</Text>
           </View>
-          <View style={[styles.breakdownRow, {marginBottom: 0}]}>
-            <View style={styles.breakdownItem}>
-              <Text style={styles.breakdownLabel}>Parcels</Text>
-              <Text style={styles.breakdownValue}>{formatCurrency(earnings?.breakdown?.parcel || 0)}</Text>
-            </View>
-          </View>
+          <TouchableOpacity style={styles.filterButton}>
+            <Icon name="more-vert" size={24} color={GRAY_DARK} />
+          </TouchableOpacity>
         </View>
+
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl 
+              refreshing={refreshing} 
+              onRefresh={onRefresh} 
+              tintColor={YELLOW_PRIMARY}
+              colors={[YELLOW_PRIMARY]}
+            />
+          }
+        >
+          {/* Total Earnings Card */}
+          <Animatable.View animation="fadeInUp" duration={600} style={styles.totalCard}>
+            <LinearGradient
+              colors={[YELLOW_PRIMARY, YELLOW_SECONDARY]}
+              style={styles.totalGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            >
+              <View style={styles.totalContent}>
+                <Text style={styles.totalLabel}>Total Lifetime Earnings</Text>
+                <Text style={styles.totalAmount}>{formatCurrency(earnings?.total || 0)}</Text>
+                <View style={styles.totalRidesContainer}>
+                  <IconMC name="car-multiple" size={16} color={WHITE} />
+                  <Text style={styles.totalRides}>{earnings?.rides?.total || 0} lifetime trips</Text>
+                </View>
+              </View>
+              <View style={styles.totalIconContainer}>
+                <Icon name="account-balance-wallet" size={40} color={WHITE} opacity={0.3} />
+              </View>
+            </LinearGradient>
+          </Animatable.View>
+
+          {/* Period Selector */}
+          <View style={styles.periodSelector}>
+            {['daily', 'weekly', 'monthly'].map((period) => (
+              <TouchableOpacity
+                key={period}
+                style={[
+                  styles.periodButton,
+                  selectedPeriod === period && styles.periodButtonActive
+                ]}
+                onPress={() => setSelectedPeriod(period)}
+                activeOpacity={0.7}
+              >
+                <Text style={[
+                  styles.periodText,
+                  selectedPeriod === period && styles.periodTextActive
+                ]}>
+                  {period.charAt(0).toUpperCase() + period.slice(1)}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {/* Chart */}
+          <Animatable.View animation="fadeInUp" duration={600} delay={200} style={styles.chartContainer}>
+            <View style={styles.chartHeader}>
+              <Text style={styles.chartTitle}>Earnings Overview</Text>
+              <Text style={styles.chartPeriod}>
+                {selectedPeriod === 'daily' ? 'Last 7 Days' : 
+                 selectedPeriod === 'weekly' ? 'This Week' : 'This Month'}
+              </Text>
+            </View>
+            <LineChart
+              data={getChartData()}
+              width={width - 48}
+              height={200}
+              chartConfig={{
+                backgroundColor: WHITE,
+                backgroundGradientFrom: WHITE,
+                backgroundGradientTo: WHITE,
+                decimalPlaces: 0,
+                color: (opacity = 1) => `rgba(248, 184, 42, ${opacity})`,
+                labelColor: (opacity = 1) => `rgba(51, 51, 51, ${opacity})`,
+                style: {
+                  borderRadius: 16,
+                },
+                propsForDots: {
+                  r: '5',
+                  strokeWidth: '2',
+                  stroke: YELLOW_PRIMARY,
+                },
+                propsForBackgroundLines: {
+                  strokeDasharray: '',
+                  stroke: '#F0F0F0',
+                  strokeWidth: 1,
+                },
+              }}
+              bezier
+              style={styles.chart}
+              withDots={true}
+              withShadow={false}
+              withInnerLines={true}
+              withOuterLines={true}
+              withVerticalLabels={true}
+              withHorizontalLabels={true}
+              formatYLabel={(value) => `Rs.${value}`}
+            />
+          </Animatable.View>
+
+          {/* Earnings Summary */}
+          <Animatable.View animation="fadeInUp" duration={600} delay={300}>
+            <View style={styles.breakdownSection}>
+              <Text style={styles.sectionTitle}>Earnings Summary</Text>
+              
+              <View style={styles.breakdownCard}>
+                <View style={styles.breakdownRow}>
+                  <View style={styles.breakdownItem}>
+                    <View style={[styles.breakdownIconContainer, { backgroundColor: '#4ECDC4' + '15' }]}>
+                      <Icon name="today" size={18} color="#4ECDC4" />
+                    </View>
+                    <Text style={styles.breakdownLabel}>Today</Text>
+                    <Text style={styles.breakdownValue}>{formatCurrency(earnings?.today || 0)}</Text>
+                    <Text style={styles.breakdownSubtext}>{earnings?.rides?.today || 0} trips</Text>
+                  </View>
+                  <View style={styles.breakdownDivider} />
+                  <View style={styles.breakdownItem}>
+                    <View style={[styles.breakdownIconContainer, { backgroundColor: YELLOW_PRIMARY + '15' }]}>
+                      <Icon name="date-range" size={18} color={YELLOW_PRIMARY} />
+                    </View>
+                    <Text style={styles.breakdownLabel}>This Week</Text>
+                    <Text style={styles.breakdownValue}>{formatCurrency(earnings?.weekly || 0)}</Text>
+                    <Text style={styles.breakdownSubtext}>{earnings?.rides?.weekly || 0} trips</Text>
+                  </View>
+                </View>
+                <View style={styles.breakdownDividerFull} />
+                <View style={styles.breakdownRow}>
+                  <View style={styles.breakdownItem}>
+                    <View style={[styles.breakdownIconContainer, { backgroundColor: '#45B7D1' + '15' }]}>
+                      <Icon name="calendar-today" size={18} color="#45B7D1" />
+                    </View>
+                    <Text style={styles.breakdownLabel}>This Month</Text>
+                    <Text style={styles.breakdownValue}>{formatCurrency(earnings?.monthly || 0)}</Text>
+                    <Text style={styles.breakdownSubtext}>{earnings?.rides?.monthly || 0} trips</Text>
+                  </View>
+                  <View style={styles.breakdownDivider} />
+                  <View style={styles.breakdownItem}>
+                    <View style={[styles.breakdownIconContainer, { backgroundColor: '#FF6B6B' + '15' }]}>
+                      <IconMC name="counter" size={18} color="#FF6B6B" />
+                    </View>
+                    <Text style={styles.breakdownLabel}>Total Rides</Text>
+                    <Text style={styles.breakdownValue}>{earnings?.rides?.total || 0}</Text>
+                    <Text style={styles.breakdownSubtext}>all time</Text>
+                  </View>
+                </View>
+              </View>
+            </View>
+          </Animatable.View>
+          
+          {/* Earnings By Category */}
+          <Animatable.View animation="fadeInUp" duration={600} delay={400}>
+            <View style={styles.breakdownSection}>
+              <Text style={styles.sectionTitle}>By Trip Type</Text>
+              
+              <View style={styles.categoryCard}>
+                <View style={styles.categoryRow}>
+                  <View style={styles.categoryItem}>
+                    <View style={[styles.categoryIcon, { backgroundColor: '#4ECDC4' + '15' }]}>
+                      <Icon name="directions-car" size={20} color="#4ECDC4" />
+                    </View>
+                    <View style={styles.categoryInfo}>
+                      <Text style={styles.categoryLabel}>Rides</Text>
+                      <Text style={styles.categoryValue}>{formatCurrency(earnings?.breakdown?.ride || 0)}</Text>
+                    </View>
+                    <View style={styles.categoryPercentage}>
+                      <Text style={styles.percentageText}>
+                        {earnings?.total ? Math.round((earnings?.breakdown?.ride || 0) / earnings.total * 100) : 0}%
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+                <View style={styles.categoryDivider} />
+                <View style={styles.categoryRow}>
+                  <View style={styles.categoryItem}>
+                    <View style={[styles.categoryIcon, { backgroundColor: YELLOW_PRIMARY + '15' }]}>
+                      <IconMC name="car-multiple" size={20} color={YELLOW_PRIMARY} />
+                    </View>
+                    <View style={styles.categoryInfo}>
+                      <Text style={styles.categoryLabel}>Carpools</Text>
+                      <Text style={styles.categoryValue}>{formatCurrency(earnings?.breakdown?.carpool || 0)}</Text>
+                    </View>
+                    <View style={styles.categoryPercentage}>
+                      <Text style={styles.percentageText}>
+                        {earnings?.total ? Math.round((earnings?.breakdown?.carpool || 0) / earnings.total * 100) : 0}%
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+                <View style={styles.categoryDivider} />
+                <View style={[styles.categoryRow, { marginBottom: 0 }]}>
+                  <View style={styles.categoryItem}>
+                    <View style={[styles.categoryIcon, { backgroundColor: '#FF6B6B' + '15' }]}>
+                      <IconMC name="package-variant" size={20} color="#FF6B6B" />
+                    </View>
+                    <View style={styles.categoryInfo}>
+                      <Text style={styles.categoryLabel}>Parcels</Text>
+                      <Text style={styles.categoryValue}>{formatCurrency(earnings?.breakdown?.parcel || 0)}</Text>
+                    </View>
+                    <View style={styles.categoryPercentage}>
+                      <Text style={styles.percentageText}>
+                        {earnings?.total ? Math.round((earnings?.breakdown?.parcel || 0) / earnings.total * 100) : 0}%
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              </View>
+            </View>
+          </Animatable.View>
+
+          {/* Withdrawal Button */}
+          <Animatable.View animation="fadeInUp" duration={600} delay={500}>
+            <TouchableOpacity style={styles.withdrawButton} activeOpacity={0.8}>
+              <LinearGradient
+                colors={[YELLOW_PRIMARY, YELLOW_SECONDARY]}
+                style={styles.withdrawGradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+              >
+                <Icon name="account-balance-wallet" size={22} color={WHITE} />
+                <Text style={styles.withdrawButtonText}>Withdraw Earnings</Text>
+                <Icon name="chevron-right" size={22} color={WHITE} />
+              </LinearGradient>
+            </TouchableOpacity>
+          </Animatable.View>
+
+          <View style={styles.bottomSpacer} />
+        </ScrollView>
       </View>
-
-      {/* Withdrawal Button */}
-      <TouchableOpacity style={styles.withdrawButton}>
-        <Icon name="account-balance-wallet" size={24} color="#121212" />
-        <Text style={styles.withdrawButtonText}>Withdraw Earnings</Text>
-      </TouchableOpacity>
-
-
-    </ScrollView>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: WHITE,
+  },
   container: {
     flex: 1,
-    backgroundColor: '#121212',
-    paddingHorizontal: 20,
-    paddingTop: 20,
+    backgroundColor: WHITE,
+    marginTop:24,
+    paddingBottom:30
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#121212',
+    backgroundColor: WHITE,
+  },
+  loadingText: {
+    color: GRAY_MEDIUM,
+    fontSize: 14,
+    marginTop: 12,
+    fontWeight: '500',
   },
   header: {
-    marginBottom: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingTop: Platform.OS === 'ios' ? 8 : 12,
+    paddingBottom: 16,
+    backgroundColor: WHITE,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
   },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#FFF',
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 4,
   },
-  subtitle: {
-    color: '#888',
-    fontSize: 14,
-    marginTop: 4,
+  headerTitleContainer: {
+    flex: 1,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: BLACK,
+  },
+  headerSubtitle: {
+    fontSize: 13,
+    color: GRAY_MEDIUM,
+    marginTop: 1,
+  },
+  filterButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: GRAY_LIGHT,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   totalCard: {
-    backgroundColor: '#1E1E1E',
-    padding: 20,
-    borderRadius: 16,
-    alignItems: 'center',
+    marginHorizontal: 16,
+    marginTop: 16,
     marginBottom: 20,
-    borderWidth: 1,
-    borderColor: '#2A2A2A',
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: BLACK,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  totalGradient: {
+    padding: 20,
+    position: 'relative',
+  },
+  totalContent: {
+    position: 'relative',
+    zIndex: 1,
+  },
+  totalIconContainer: {
+    position: 'absolute',
+    right: 10,
+    top: 10,
   },
   totalLabel: {
-    color: '#888',
+    color: WHITE,
     fontSize: 14,
+    fontWeight: '500',
+    opacity: 0.9,
   },
   totalAmount: {
-    color: '#FFD700',
+    color: WHITE,
     fontSize: 36,
-    fontWeight: 'bold',
-    marginVertical: 8,
+    fontWeight: '700',
+    marginVertical: 6,
+  },
+  totalRidesContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   totalRides: {
-    color: '#888',
+    color: WHITE,
     fontSize: 14,
+    opacity: 0.9,
   },
   periodSelector: {
     flexDirection: 'row',
-    backgroundColor: '#1E1E1E',
+    backgroundColor: GRAY_LIGHT,
     borderRadius: 12,
     padding: 4,
+    marginHorizontal: 16,
     marginBottom: 20,
   },
   periodButton: {
     flex: 1,
-    paddingVertical: 8,
-    borderRadius: 8,
+    paddingVertical: 10,
+    borderRadius: 10,
     alignItems: 'center',
   },
   periodButtonActive: {
-    backgroundColor: '#2A2A2A',
+    backgroundColor: WHITE,
+    shadowColor: BLACK,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
   },
   periodText: {
-    color: '#888',
+    color: GRAY_MEDIUM,
     fontSize: 14,
+    fontWeight: '500',
   },
   periodTextActive: {
-    color: '#FFF',
-    fontWeight: 'bold',
+    color: BLACK,
+    fontWeight: '600',
   },
   chartContainer: {
-    backgroundColor: '#1E1E1E',
+    backgroundColor: WHITE,
     borderRadius: 16,
     padding: 16,
+    marginHorizontal: 16,
     marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#F0F0F0',
+    shadowColor: BLACK,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  chartHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: 12,
+  },
+  chartTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: BLACK,
+  },
+  chartPeriod: {
+    fontSize: 12,
+    color: GRAY_MEDIUM,
+    fontWeight: '500',
   },
   chart: {
-    borderRadius: 16,
+    borderRadius: 12,
+    marginLeft: -20,
   },
   breakdownSection: {
+    marginHorizontal: 16,
     marginBottom: 20,
   },
   sectionTitle: {
-    color: '#FFF',
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: '700',
+    color: BLACK,
     marginBottom: 12,
   },
   breakdownCard: {
-    backgroundColor: '#1E1E1E',
-    borderRadius: 12,
+    backgroundColor: WHITE,
+    borderRadius: 16,
     padding: 16,
+    borderWidth: 1,
+    borderColor: '#F0F0F0',
+    shadowColor: BLACK,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
   },
   breakdownRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    alignItems: 'center',
   },
   breakdownItem: {
     flex: 1,
-  },
-  breakdownLabel: {
-    color: '#888',
-    fontSize: 12,
-  },
-  breakdownValue: {
-    color: '#FFF',
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginTop: 4,
-  },
-  withdrawButton: {
-    flexDirection: 'row',
-    backgroundColor: '#FFD700',
-    paddingVertical: 14,
-    borderRadius: 12,
-    justifyContent: 'center',
     alignItems: 'center',
-    gap: 8,
-    marginBottom: 20,
+    paddingVertical: 8,
   },
-  withdrawButtonText: {
-    color: '#121212',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  transactionsSection: {
-    marginBottom: 30,
-  },
-  transactionItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#1E1E1E',
-    padding: 12,
-    borderRadius: 10,
-    marginBottom: 8,
-  },
-  transactionIcon: {
+  breakdownIconContainer: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#2A2A2A',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  breakdownLabel: {
+    color: GRAY_MEDIUM,
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  breakdownValue: {
+    color: BLACK,
+    fontSize: 18,
+    fontWeight: '700',
+    marginTop: 2,
+  },
+  breakdownSubtext: {
+    color: GRAY_MEDIUM,
+    fontSize: 11,
+    marginTop: 2,
+  },
+  breakdownDivider: {
+    width: 1,
+    height: 50,
+    backgroundColor: '#F0F0F0',
+  },
+  breakdownDividerFull: {
+    height: 1,
+    backgroundColor: '#F0F0F0',
+    marginVertical: 4,
+  },
+  categoryCard: {
+    backgroundColor: WHITE,
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#F0F0F0',
+    shadowColor: BLACK,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  categoryRow: {
+    marginBottom: 12,
+  },
+  categoryItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  categoryIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
   },
-  transactionInfo: {
+  categoryInfo: {
     flex: 1,
   },
-  transactionTitle: {
-    color: '#FFF',
-    fontSize: 14,
+  categoryLabel: {
+    color: GRAY_MEDIUM,
+    fontSize: 13,
     fontWeight: '500',
   },
-  transactionDate: {
-    color: '#888',
-    fontSize: 12,
+  categoryValue: {
+    color: BLACK,
+    fontSize: 16,
+    fontWeight: '600',
     marginTop: 2,
   },
-  transactionAmount: {
-    color: '#4ECDC4',
-    fontSize: 16,
-    fontWeight: 'bold',
+  categoryPercentage: {
+    backgroundColor: GRAY_LIGHT,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
   },
-  noTransactions: {
-    color: '#888',
-    textAlign: 'center',
-    paddingVertical: 20,
+  percentageText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: GRAY_DARK,
+  },
+  categoryDivider: {
+    height: 1,
+    backgroundColor: '#F0F0F0',
+    marginVertical: 12,
+  },
+  withdrawButton: {
+    marginHorizontal: 16,
+    borderRadius: 14,
+    overflow: 'hidden',
+    shadowColor: YELLOW_PRIMARY,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  withdrawGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    gap: 10,
+  },
+  withdrawButtonText: {
+    color: WHITE,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  bottomSpacer: {
+    height: 70,
   },
 });
 

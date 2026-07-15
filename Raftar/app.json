@@ -7,6 +7,65 @@
     "scheme": "raftar",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    
+    "icon": "./assets/raftar.png",
+    
+    "splash": {
+      "image": "./assets/raftar.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#FFFFFF"
+    },
+    
+    "ios": {
+      "bundleIdentifier": "com.raftar.app",
+      "supportsTablet": true,
+      "icon": "./assets/raftar.png",
+      "splash": {
+        "image": "./assets/raftar.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#FFFFFF"
+      },
+      "infoPlist": {
+        "UIBackgroundModes": [
+          "voip",
+          "audio",
+          "fetch",
+          "remote-notification"
+        ]
+      },
+      "bitcode": false
+    },
+    
+    "android": {
+      "package": "com.raftar.app",
+      "edgeToEdgeEnabled": true,
+      "predictiveBackGestureEnabled": false,
+      "icon": "./assets/raftar.png",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/raftar.png",
+        "backgroundColor": "#FFFFFF"
+      },
+      "splash": {
+        "image": "./assets/raftar.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#FFFFFF"
+      },
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.CAMERA",
+        "android.permission.INTERNET",
+        "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.VIBRATE",
+        "android.permission.WAKE_LOCK",
+        "android.permission.MANAGE_OWN_CALLS",
+        "android.permission.READ_PHONE_STATE",
+        "android.permission.USE_FULL_SCREEN_INTENT",
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.BLUETOOTH"
+      ]
+    },
+    
     "plugins": [
       "expo-router",
       "expo-splash-screen",
@@ -31,42 +90,12 @@
         }
       ]
     ],
-    "ios": {
-      "bundleIdentifier": "com.raftar.app",
-      "supportsTablet": true,
-      "infoPlist": {
-        "UIBackgroundModes": [
-          "voip",
-          "audio",
-          "fetch",
-          "remote-notification"
-        ]
-      },
-      "bitcode": false
-    },
-    "android": {
-      "package": "com.raftar.app",
-      "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false,
-      "permissions": [
-        "android.permission.RECORD_AUDIO",
-        "android.permission.CAMERA",
-        "android.permission.INTERNET",
-        "android.permission.ACCESS_NETWORK_STATE",
-        "android.permission.MODIFY_AUDIO_SETTINGS",
-        "android.permission.VIBRATE",
-        "android.permission.WAKE_LOCK",
-        "android.permission.MANAGE_OWN_CALLS",
-        "android.permission.READ_PHONE_STATE",
-        "android.permission.USE_FULL_SCREEN_INTENT",
-        "android.permission.SYSTEM_ALERT_WINDOW",
-        "android.permission.BLUETOOTH"
-      ]
-    },
+    
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
     },
+    
     "extra": {
       "router": {},
       "eas": {
