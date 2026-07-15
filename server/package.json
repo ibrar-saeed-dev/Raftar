@@ -1,0 +1,30 @@
+{
+  "name": "raftar-backend",
+  "version": "1.0.0",
+  "description": "Raftar Ride Sharing Backend",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js"
+  },
+  "dependencies": {
+    "axios": "^1.18.1",
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.6",
+    "dns": "^0.2.2",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "express-validator": "^7.3.2",
+    "jsonwebtoken": "^9.0.3",
+    "mongoose": "^9.7.4",
+    "mongoose-validator": "^2.1.0",
+    "multer": "^2.2.0",
+    "node-geocoder": "^4.4.1",
+    "nodemailer": "^9.0.3",
+    "nodemon": "^3.1.14",
+    "redis": "^6.1.0",
+    "socket.io": "^4.8.3",
+    "stripe": "^22.3.0",
+    "twilio": "^6.0.2"
+  }
+}

@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  coturn:
+    image: coturn/coturn:latest
+    container_name: raftar-coturn
+    network_mode: "host"
+    restart: unless-stopped
+    command:
+      - --log-file=stdout
+      - --listening-port=3478
+      - --listening-ip=0.0.0.0
+      - --min-port=49152
+      - --max-port=65535
+      - --use-auth-secret
+      - --static-auth-secret=raftar_turn_secret_default # Change this in production
+      - --realm=raftar.local
+      - --stale-nonce=600
+      - --no-cli
+    environment:
+      - TURN_SECRET=raftar_turn_secret_default
