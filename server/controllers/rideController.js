@@ -10,7 +10,7 @@ const { calculateAIFare, calculateCarpoolFare, calculateCommission } = require('
  */
 exports.createRide = async (req, res) => {
   try {
-    const { pickup, dropoff, vehicleType, fare, type, carpool, parcel, scheduledTime, guest } = req.body;
+    const { pickup, dropoff, waypoints, vehicleType, fare, type, carpool, parcel, scheduledTime, guest } = req.body;
     const passengerId = req.user.id;
 
     // Validate passenger
@@ -25,7 +25,7 @@ exports.createRide = async (req, res) => {
     // Calculate AI fare if not offered
     let finalFare = fare;
     if (!fare || fare.type === 'ai') {
-      const aiFare = await calculateAIFare(pickup, dropoff, vehicleType);
+      const aiFare = await calculateAIFare(pickup, dropoff, vehicleType, waypoints || []);
       finalFare = {
         offered: null,
         accepted: aiFare.total,
@@ -40,6 +40,7 @@ exports.createRide = async (req, res) => {
       pickup,
       dropoff,
       vehicleType,
+      waypoints: waypoints || [],
       fare: {
         offered: fare?.offered || null,
         accepted: finalFare.accepted || finalFare.offered,
@@ -64,6 +65,7 @@ exports.createRide = async (req, res) => {
         rideId: ride._id,
         pickup: ride.pickup.address,
         dropoff: ride.dropoff.address,
+        waypoints: ride.waypoints.map(w => w.address),
         fare: finalFare.accepted || finalFare.offered,
         distance: distance.distance,
         duration: distance.duration
@@ -89,10 +91,10 @@ exports.createRide = async (req, res) => {
  */
 exports.calculateFare = async (req, res) => {
   try {
-    const { pickup, dropoff, vehicleType, seats } = req.body;
+    const { pickup, dropoff, waypoints, vehicleType, seats } = req.body;
 
     // Calculate fare
-    const fare = await calculateAIFare(pickup, dropoff, vehicleType);
+    const fare = await calculateAIFare(pickup, dropoff, vehicleType, waypoints || []);
 
     // If carpool, calculate per seat fare
     if (seats && seats > 1) {

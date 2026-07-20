@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { useTheme } from '../../context/ThemeContext';
 import {
   View,
   Text,
@@ -21,6 +22,8 @@ import api from '../../services/api';
 const { width, height } = Dimensions.get('window');
 
 const RideHistoryScreen = () => {
+  const { colors, isDark } = useTheme();
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   const navigation = useNavigation();
   const { user } = useSelector(state => state.auth);
   const [history, setHistory] = useState([]);
@@ -76,7 +79,7 @@ const RideHistoryScreen = () => {
     const colors = {
       completed: '#4ECDC4',
       cancelled: '#FF3B30',
-      started: '#F9C349',
+      started: colors.accent,
       accepted: '#45B7D1',
       pending: '#FF9F43'
     };
@@ -127,7 +130,7 @@ const RideHistoryScreen = () => {
               <Icon 
                 name={item.tripType === 'Parcel' ? 'local-shipping' : (item.tripType === 'Carpool' ? 'people' : 'directions-car')} 
                 size={20} 
-                color="#F9C349" 
+                color={colors.accent} 
               />
             </View>
             <Text style={styles.rideTypeText}>{item.tripType || 'Ride'}</Text>
@@ -159,18 +162,18 @@ const RideHistoryScreen = () => {
         <View style={styles.rideFooter}>
           <View style={styles.rideInfo}>
             <View style={styles.infoItem}>
-              <Icon name="calendar-today" size={14} color="#999" />
+              <Icon name="calendar-today" size={14} color={colors.textSecondary} />
               <Text style={styles.rideDate}>{formatDate(item.date)}</Text>
             </View>
             <View style={styles.infoItem}>
-              <Icon name="person" size={14} color="#999" />
+              <Icon name="person" size={14} color={colors.textSecondary} />
               <Text style={styles.ridePerson}>
                 {user?.role === 'driver' ? item.passengerName : item.driverName}
               </Text>
             </View>
             {item.ratingGiven && (
               <View style={styles.infoItem}>
-                <Icon name="star" size={14} color="#F9C349" />
+                <Icon name="star" size={14} color={colors.accent} />
                 <Text style={styles.rideRating}>You Rated: {item.ratingGiven}</Text>
               </View>
             )}
@@ -204,7 +207,7 @@ const RideHistoryScreen = () => {
         style={styles.backButton}
         onPress={() => navigation.goBack()}
       >
-        <Icon name="arrow-back" size={24} color="#000" />
+        <Icon name="arrow-back" size={24} color={colors.text} />
       </TouchableOpacity>
       <Text style={styles.headerTitle}>Ride History</Text>
       <View style={styles.headerRight} />
@@ -214,9 +217,9 @@ const RideHistoryScreen = () => {
   if (loading && !refreshing) {
     return (
       <SafeAreaView style={styles.safeArea}>
-        <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+        <StatusBar barStyle={colors.statusBarStyle} backgroundColor={colors.background} />
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#F9C349" />
+          <ActivityIndicator size="large" color={colors.accent} />
           <Text style={styles.loadingText}>Loading history...</Text>
         </View>
       </SafeAreaView>
@@ -225,7 +228,7 @@ const RideHistoryScreen = () => {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+      <StatusBar barStyle={colors.statusBarStyle} backgroundColor={colors.background} />
       
       <View style={styles.container}>
         {renderHeader()}
@@ -239,7 +242,7 @@ const RideHistoryScreen = () => {
               refreshing={refreshing} 
               onRefresh={onRefresh} 
               tintColor="#F9C349"
-              colors={['#F9C349']}
+              colors={[colors.accent]}
             />
           }
           ListEmptyComponent={
@@ -256,7 +259,7 @@ const RideHistoryScreen = () => {
                 onPress={() => navigation.navigate('BookRide')}
               >
                 <Text style={styles.emptyButtonText}>Book a Ride</Text>
-                <Icon name="arrow-forward" size={18} color="#000" />
+                <Icon name="arrow-forward" size={18} color={colors.text} />
               </TouchableOpacity>
             </Animatable.View>
           }
@@ -268,14 +271,17 @@ const RideHistoryScreen = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors, isDark) => {
+  const cardBg = isDark ? colors.card : '#FFFFFF';
+  const insetBg = isDark ? colors.cardElevated : '#F5F5F5';
+  return StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: cardBg,
   },
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: cardBg,
     marginTop:30
   },
   header: {
@@ -286,8 +292,8 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     paddingBottom: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
-    backgroundColor: '#FFFFFF',
+    borderBottomColor: colors.border,
+    backgroundColor: cardBg,
   },
   backButton: {
     padding: 8,
@@ -296,7 +302,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#000',
+    color: colors.text,
     flex: 1,
     marginLeft: 8,
   },
@@ -307,10 +313,10 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: cardBg,
   },
   loadingText: {
-    color: '#888',
+    color: colors.textSecondary,
     fontSize: 14,
     marginTop: 12,
     fontWeight: '500',
@@ -324,11 +330,11 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   rideCard: {
-    backgroundColor: '#F8F8F8',
+    backgroundColor: insetBg,
     borderRadius: 16,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#F0F0F0',
+    borderColor: colors.border,
   },
   rideHeader: {
     flexDirection: 'row',
@@ -345,12 +351,12 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#FFF8E8',
+    backgroundColor: colors.accent + '18',
     justifyContent: 'center',
     alignItems: 'center',
   },
   rideTypeText: {
-    color: '#000',
+    color: colors.text,
     fontSize: 14,
     fontWeight: '600',
   },
@@ -407,7 +413,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     borderTopWidth: 1,
-    borderTopColor: '#F0F0F0',
+    borderTopColor: colors.border,
     paddingTop: 12,
   },
   rideInfo: {
@@ -420,15 +426,15 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   rideDate: {
-    color: '#888',
+    color: colors.textSecondary,
     fontSize: 12,
   },
   ridePerson: {
-    color: '#888',
+    color: colors.textSecondary,
     fontSize: 12,
   },
   rideRating: {
-    color: '#F9C349',
+    color: colors.accent,
     fontSize: 12,
     fontWeight: '600',
   },
@@ -437,12 +443,12 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   rideFare: {
-    color: '#000',
+    color: colors.text,
     fontSize: 18,
     fontWeight: '700',
   },
   cancelledFare: {
-    color: '#999',
+    color: colors.textSecondary,
     textDecorationLine: 'line-through',
   },
   completedBadge: {
@@ -464,20 +470,20 @@ const styles = StyleSheet.create({
     width: 100,
     height: 100,
     borderRadius: 50,
-    backgroundColor: '#F8F8F8',
+    backgroundColor: insetBg,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#F0F0F0',
+    borderColor: colors.border,
   },
   emptyTitle: {
-    color: '#000',
+    color: colors.text,
     fontSize: 20,
     fontWeight: '700',
     marginTop: 16,
   },
   emptyText: {
-    color: '#888',
+    color: colors.textSecondary,
     fontSize: 14,
     textAlign: 'center',
     marginTop: 8,
@@ -487,7 +493,7 @@ const styles = StyleSheet.create({
   emptyButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F9C349',
+    backgroundColor: colors.accent,
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 25,
@@ -495,10 +501,11 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   emptyButtonText: {
-    color: '#000',
+    color: colors.text,
     fontSize: 14,
     fontWeight: '600',
   },
-});
+  });
+};
 
 export default RideHistoryScreen;

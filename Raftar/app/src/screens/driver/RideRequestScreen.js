@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useTheme } from '../../context/ThemeContext';
 import {
   View,
   Text,
@@ -26,22 +27,28 @@ import * as Animatable from 'react-native-animatable';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import Button from '../../components/common/Button';
 import { getRideRequests, acceptRide, counterOffer, removeRideRequest } from '../../redux/slices/driverSlice';
+import { getVehicleType } from '../../utils/constants';
 import { useSocket } from '../../context/SocketContext';
 import api from '../../services/api';
 
 const { width } = Dimensions.get('window');
 
 // Yellow Theme Colors
-const YELLOW_PRIMARY = '#F8B82A';
-const YELLOW_SECONDARY = '#F9C349';
-const WHITE = '#FFFFFF';
-const BLACK = '#000000';
-const GRAY_DARK = '#333333';
-const GRAY_MEDIUM = '#666666';
-const GRAY_LIGHT = '#F5F5F5';
-const GRAY_BG = '#F8F9FA';
+const getThemePalette = (colors, isDark) => ({
+  YELLOW_PRIMARY: colors.accent,
+  YELLOW_SECONDARY: colors.accent,
+  WHITE: isDark ? colors.card : '#FFFFFF',
+  BLACK: colors.text,
+  GRAY_DARK: colors.text,
+  GRAY_MEDIUM: colors.textSecondary,
+  GRAY_LIGHT: isDark ? colors.cardElevated : '#F5F5F5',
+  GRAY_BG: colors.background,
+});
 
 const RideRequestScreen = () => {
+  const { colors, isDark } = useTheme();
+  const { YELLOW_PRIMARY, YELLOW_SECONDARY, WHITE, BLACK, GRAY_DARK, GRAY_MEDIUM, GRAY_LIGHT, GRAY_BG } = useMemo(() => getThemePalette(colors, isDark), [colors, isDark]);
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   const navigation = useNavigation();
   const dispatch = useDispatch();
   const { rideRequests, loading, profile } = useSelector(state => state.driver);
@@ -263,6 +270,24 @@ const RideRequestScreen = () => {
                 {item.pickup?.address || 'Pickup location'}
               </Text>
             </View>
+            
+            {item.waypoints && item.waypoints.length > 0 && item.waypoints.map((wp, idx) => (
+              <React.Fragment key={idx}>
+                <View style={styles.routeConnector}>
+                  <View style={styles.routeLine} />
+                  <View style={styles.routeDot} />
+                </View>
+                <View style={styles.routePoint}>
+                  <View style={[styles.routeIconGreen, { backgroundColor: '#FF9F43' }]}>
+                    <Icon name="stop-circle" size={14} color={WHITE} />
+                  </View>
+                  <Text style={styles.routeText} numberOfLines={1}>
+                    {wp.address || wp}
+                  </Text>
+                </View>
+              </React.Fragment>
+            ))}
+
             <View style={styles.routeConnector}>
               <View style={styles.routeLine} />
               <View style={styles.routeDot} />
@@ -321,7 +346,7 @@ const RideRequestScreen = () => {
                     <IconMC name="car-sports" size={20} color={YELLOW_PRIMARY} />
                     <Text style={styles.detailLabel}>Vehicle</Text>
                     <Text style={styles.detailValue}>
-                      {item.type === 'parcel' ? 'Parcel' : (item.vehicleType || 'Economy')}
+                      {item.type === 'parcel' ? 'Parcel' : (getVehicleType(item.vehicleType)?.label || 'Economy')}
                     </Text>
                   </View>
                   <View style={styles.detailItem}>
@@ -413,7 +438,7 @@ const RideRequestScreen = () => {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor={WHITE} />
+      <StatusBar barStyle={colors.statusBarStyle} backgroundColor={WHITE} />
       
       <View style={styles.container}>
         {/* Header with Back Arrow */}
@@ -567,7 +592,11 @@ const RideRequestScreen = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors, isDark) => {
+  const { YELLOW_PRIMARY, YELLOW_SECONDARY, WHITE, BLACK, GRAY_DARK, GRAY_MEDIUM, GRAY_LIGHT, GRAY_BG } = getThemePalette(colors, isDark);
+  const cardBg = isDark ? colors.card : '#FFFFFF';
+  const insetBg = isDark ? colors.cardElevated : '#F5F5F5';
+  return StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: WHITE,
@@ -597,7 +626,7 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
     backgroundColor: WHITE,
     borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
+    borderBottomColor: colors.border,
   },
   backButton: {
     width: 40,
@@ -674,7 +703,7 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#F0F0F0',
+    borderColor: colors.border,
     shadowColor: BLACK,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04,
@@ -808,7 +837,7 @@ const styles = StyleSheet.create({
   expandedContent: {
     marginTop: 12,
     borderTopWidth: 1,
-    borderTopColor: '#F0F0F0',
+    borderTopColor: colors.border,
     paddingTop: 12,
   },
   mapContainer: {
@@ -904,7 +933,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#E0E0E0',
+    borderColor: colors.border,
     gap: 6,
   },
   declineButtonText: {
@@ -1059,7 +1088,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#E0E0E0',
+    borderColor: colors.border,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1083,6 +1112,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: WHITE,
   },
-});
+  });
+};
 
 export default RideRequestScreen;

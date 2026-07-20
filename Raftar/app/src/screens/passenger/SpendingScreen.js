@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { useTheme } from '../../context/ThemeContext';
 import {
   View,
   Text,
@@ -22,6 +23,8 @@ import api from '../../services/api';
 const { width } = Dimensions.get('window');
 
 const SpendingScreen = () => {
+  const { colors, isDark } = useTheme();
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   const navigation = useNavigation();
   const [loading, setLoading] = useState(true);
   const [selectedPeriod, setSelectedPeriod] = useState('weekly');
@@ -105,9 +108,9 @@ const SpendingScreen = () => {
   if (loading && !refreshing) {
     return (
       <SafeAreaView style={styles.safeArea}>
-        <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+        <StatusBar barStyle={colors.statusBarStyle} backgroundColor={colors.background} />
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#F9C349" />
+          <ActivityIndicator size="large" color={colors.accent} />
           <Text style={styles.loadingText}>Loading spending data...</Text>
         </View>
       </SafeAreaView>
@@ -116,7 +119,7 @@ const SpendingScreen = () => {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+      <StatusBar barStyle={colors.statusBarStyle} backgroundColor={colors.background} />
       
       <Animated.View 
         style={[
@@ -134,7 +137,7 @@ const SpendingScreen = () => {
               refreshing={refreshing} 
               onRefresh={onRefresh} 
               tintColor="#F9C349"
-              colors={['#F9C349']}
+              colors={[colors.accent]}
             />
           }
         >
@@ -144,7 +147,7 @@ const SpendingScreen = () => {
               style={styles.backButton}
               onPress={() => navigation.goBack()}
             >
-              <Icon name="arrow-back" size={24} color="#000" />
+              <Icon name="arrow-back" size={24} color={colors.text} />
             </TouchableOpacity>
             <View style={styles.headerContent}>
               <Text style={styles.title}>My Spending</Text>
@@ -156,12 +159,12 @@ const SpendingScreen = () => {
           {/* Total Spending */}
           <Animatable.View animation="fadeInUp" duration={600} delay={100} style={styles.totalCard}>
             <View style={styles.totalIconContainer}>
-              <Icon name="account-balance-wallet" size={32} color="#F9C349" />
+              <Icon name="account-balance-wallet" size={32} color={colors.accent} />
             </View>
             <Text style={styles.totalLabel}>Total Lifetime Spending</Text>
             <Text style={styles.totalAmount}>{formatCurrency(earnings?.total || 0)}</Text>
             <View style={styles.totalRidesContainer}>
-              <Icon name="directions-car" size={16} color="#888" />
+              <Icon name="directions-car" size={16} color={colors.textSecondary} />
               <Text style={styles.totalRides}>{earnings?.rides?.total || 0} lifetime trips completed</Text>
             </View>
           </Animatable.View>
@@ -201,7 +204,7 @@ const SpendingScreen = () => {
               width={width - 48}
               height={200}
               chartConfig={{
-                backgroundColor: '#FFFFFF',
+                backgroundColor: isDark ? colors.card : '#FFFFFF',
                 backgroundGradientFrom: '#FFFFFF',
                 backgroundGradientTo: '#FFFFFF',
                 decimalPlaces: 0,
@@ -213,7 +216,7 @@ const SpendingScreen = () => {
                 propsForDots: {
                   r: '6',
                   strokeWidth: '2',
-                  stroke: '#F9C349',
+                  stroke: colors.accent,
                 },
                 propsForBackgroundLines: {
                   strokeDasharray: '5, 5',
@@ -236,8 +239,8 @@ const SpendingScreen = () => {
             
             <View style={styles.breakdownGrid}>
               <View style={styles.breakdownItem}>
-                <View style={[styles.breakdownIcon, { backgroundColor: '#FFF8E8' }]}>
-                  <Icon name="today" size={20} color="#F9C349" />
+                <View style={[styles.breakdownIcon, { backgroundColor: colors.accent + '18' }]}>
+                  <Icon name="today" size={20} color={colors.accent} />
                 </View>
                 <Text style={styles.breakdownLabel}>Today</Text>
                 <Text style={styles.breakdownValue}>{formatCurrency(earnings?.today || 0)}</Text>
@@ -245,8 +248,8 @@ const SpendingScreen = () => {
               </View>
               
               <View style={styles.breakdownItem}>
-                <View style={[styles.breakdownIcon, { backgroundColor: '#FFF8E8' }]}>
-                  <Icon name="date-range" size={20} color="#F9C349" />
+                <View style={[styles.breakdownIcon, { backgroundColor: colors.accent + '18' }]}>
+                  <Icon name="date-range" size={20} color={colors.accent} />
                 </View>
                 <Text style={styles.breakdownLabel}>This Week</Text>
                 <Text style={styles.breakdownValue}>{formatCurrency(earnings?.weekly || 0)}</Text>
@@ -254,8 +257,8 @@ const SpendingScreen = () => {
               </View>
               
               <View style={styles.breakdownItem}>
-                <View style={[styles.breakdownIcon, { backgroundColor: '#FFF8E8' }]}>
-                  <Icon name="calendar-month" size={20} color="#F9C349" />
+                <View style={[styles.breakdownIcon, { backgroundColor: colors.accent + '18' }]}>
+                  <Icon name="calendar-month" size={20} color={colors.accent} />
                 </View>
                 <Text style={styles.breakdownLabel}>This Month</Text>
                 <Text style={styles.breakdownValue}>{formatCurrency(earnings?.monthly || 0)}</Text>
@@ -263,8 +266,8 @@ const SpendingScreen = () => {
               </View>
               
               <View style={styles.breakdownItem}>
-                <View style={[styles.breakdownIcon, { backgroundColor: '#FFF8E8' }]}>
-                  <Icon name="stats" size={20} color="#F9C349" />
+                <View style={[styles.breakdownIcon, { backgroundColor: colors.accent + '18' }]}>
+                  <Icon name="stats" size={20} color={colors.accent} />
                 </View>
                 <Text style={styles.breakdownLabel}>Total Rides</Text>
                 <Text style={styles.breakdownValue}>{earnings?.rides?.total || 0}</Text>
@@ -280,8 +283,8 @@ const SpendingScreen = () => {
             <View style={styles.typeCard}>
               <View style={styles.typeRow}>
                 <View style={styles.typeItem}>
-                  <View style={[styles.typeIcon, { backgroundColor: '#FFF8E8' }]}>
-                    <Icon name="directions-car" size={20} color="#F9C349" />
+                  <View style={[styles.typeIcon, { backgroundColor: colors.accent + '18' }]}>
+                    <Icon name="directions-car" size={20} color={colors.accent} />
                   </View>
                   <View style={styles.typeInfo}>
                     <Text style={styles.typeLabel}>Rides</Text>
@@ -289,8 +292,8 @@ const SpendingScreen = () => {
                   </View>
                 </View>
                 <View style={styles.typeItem}>
-                  <View style={[styles.typeIcon, { backgroundColor: '#FFF8E8' }]}>
-                    <Icon name="people" size={20} color="#F9C349" />
+                  <View style={[styles.typeIcon, { backgroundColor: colors.accent + '18' }]}>
+                    <Icon name="people" size={20} color={colors.accent} />
                   </View>
                   <View style={styles.typeInfo}>
                     <Text style={styles.typeLabel}>Carpools</Text>
@@ -300,8 +303,8 @@ const SpendingScreen = () => {
               </View>
               <View style={styles.typeRow}>
                 <View style={styles.typeItem}>
-                  <View style={[styles.typeIcon, { backgroundColor: '#FFF8E8' }]}>
-                    <Icon name="local-shipping" size={20} color="#F9C349" />
+                  <View style={[styles.typeIcon, { backgroundColor: colors.accent + '18' }]}>
+                    <Icon name="local-shipping" size={20} color={colors.accent} />
                   </View>
                   <View style={styles.typeInfo}>
                     <Text style={styles.typeLabel}>Parcels</Text>
@@ -309,8 +312,8 @@ const SpendingScreen = () => {
                   </View>
                 </View>
                 <View style={styles.typeItem}>
-                  <View style={[styles.typeIcon, { backgroundColor: '#FFF8E8' }]}>
-                    <Icon name="map" size={20} color="#F9C349" />
+                  <View style={[styles.typeIcon, { backgroundColor: colors.accent + '18' }]}>
+                    <Icon name="map" size={20} color={colors.accent} />
                   </View>
                   <View style={styles.typeInfo}>
                     <Text style={styles.typeLabel}>Intercity</Text>
@@ -328,24 +331,27 @@ const SpendingScreen = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors, isDark) => {
+  const cardBg = isDark ? colors.card : '#FFFFFF';
+  const insetBg = isDark ? colors.cardElevated : '#F5F5F5';
+  return StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: cardBg,
   },
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: cardBg,
     marginTop:30
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: cardBg,
   },
   loadingText: {
-    color: '#888',
+    color: colors.textSecondary,
     fontSize: 14,
     marginTop: 12,
     fontWeight: '500',
@@ -370,41 +376,41 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#000',
+    color: colors.text,
   },
   subtitle: {
-    color: '#888',
+    color: colors.textSecondary,
     fontSize: 14,
     marginTop: 2,
   },
   totalCard: {
-    backgroundColor: '#FFF8E8',
+    backgroundColor: colors.accent + '18',
     padding: 24,
     borderRadius: 16,
     alignItems: 'center',
     marginHorizontal: 20,
     marginBottom: 20,
     borderWidth: 1,
-    borderColor: '#F9C349',
+    borderColor: colors.accent,
   },
   totalIconContainer: {
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: cardBg,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#F9C349',
+    borderColor: colors.accent,
   },
   totalLabel: {
-    color: '#888',
+    color: colors.textSecondary,
     fontSize: 14,
     fontWeight: '500',
   },
   totalAmount: {
-    color: '#000',
+    color: colors.text,
     fontSize: 40,
     fontWeight: '800',
     marginVertical: 6,
@@ -415,12 +421,12 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   totalRides: {
-    color: '#888',
+    color: colors.textSecondary,
     fontSize: 14,
   },
   periodSelector: {
     flexDirection: 'row',
-    backgroundColor: '#F5F5F5',
+    backgroundColor: insetBg,
     borderRadius: 12,
     padding: 4,
     marginHorizontal: 20,
@@ -433,7 +439,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   periodButtonActive: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: cardBg,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
@@ -441,22 +447,22 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   periodText: {
-    color: '#888',
+    color: colors.textSecondary,
     fontSize: 14,
     fontWeight: '500',
   },
   periodTextActive: {
-    color: '#000',
+    color: colors.text,
     fontWeight: '700',
   },
   chartContainer: {
-    backgroundColor: '#F8F8F8',
+    backgroundColor: insetBg,
     borderRadius: 16,
     padding: 16,
     marginHorizontal: 20,
     marginBottom: 20,
     borderWidth: 1,
-    borderColor: '#F0F0F0',
+    borderColor: colors.border,
   },
   chartHeader: {
     flexDirection: 'row',
@@ -465,7 +471,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   chartTitle: {
-    color: '#000',
+    color: colors.text,
     fontSize: 14,
     fontWeight: '600',
   },
@@ -478,10 +484,10 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: '#F9C349',
+    backgroundColor: colors.accent,
   },
   legendText: {
-    color: '#888',
+    color: colors.textSecondary,
     fontSize: 12,
   },
   chart: {
@@ -493,7 +499,7 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   sectionTitle: {
-    color: '#000',
+    color: colors.text,
     fontSize: 18,
     fontWeight: '700',
     marginBottom: 12,
@@ -506,11 +512,11 @@ const styles = StyleSheet.create({
   breakdownItem: {
     flex: 1,
     minWidth: '45%',
-    backgroundColor: '#F8F8F8',
+    backgroundColor: insetBg,
     borderRadius: 12,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#F0F0F0',
+    borderColor: colors.border,
   },
   breakdownIcon: {
     width: 40,
@@ -521,27 +527,27 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   breakdownLabel: {
-    color: '#888',
+    color: colors.textSecondary,
     fontSize: 12,
     fontWeight: '500',
   },
   breakdownValue: {
-    color: '#000',
+    color: colors.text,
     fontSize: 18,
     fontWeight: '700',
     marginTop: 2,
   },
   breakdownSub: {
-    color: '#999',
+    color: colors.textSecondary,
     fontSize: 12,
     marginTop: 2,
   },
   typeCard: {
-    backgroundColor: '#F8F8F8',
+    backgroundColor: insetBg,
     borderRadius: 12,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#F0F0F0',
+    borderColor: colors.border,
   },
   typeRow: {
     flexDirection: 'row',
@@ -567,18 +573,19 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   typeLabel: {
-    color: '#888',
+    color: colors.textSecondary,
     fontSize: 12,
     fontWeight: '500',
   },
   typeValue: {
-    color: '#000',
+    color: colors.text,
     fontSize: 16,
     fontWeight: '700',
   },
   bottomSpacer: {
     height: 20,
   },
-});
+  });
+};
 
 export default SpendingScreen;

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -19,7 +19,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Button from '../../components/common/Button';
 import { updateSettings } from '../../redux/slices/userSlice';
 import { logout } from '../../redux/slices/authSlice';
-import { COLORS } from '../../utils/constants';
+import { useTheme } from '../../context/ThemeContext';
 import storage from '../../services/storage';
 
 const SettingsScreen = () => {
@@ -27,6 +27,8 @@ const SettingsScreen = () => {
   const dispatch = useDispatch();
   const { user } = useSelector(state => state.auth);
   const { settings } = useSelector(state => state.user);
+  const { colors, isDark, toggleTheme } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const [loading, setLoading] = useState(false);
   const [preferences, setPreferences] = useState({
@@ -205,22 +207,44 @@ const SettingsScreen = () => {
   const renderToggleItem = (label, key, icon) => (
     <View style={styles.settingItem}>
       <View style={styles.settingItemLeft}>
-        {icon && <Icon name={icon} size={24} color="#888" style={styles.settingIcon} />}
+        {icon && <Icon name={icon} size={24} color={colors.textSecondary} style={styles.settingIcon} />}
         <Text style={styles.settingLabel}>{label}</Text>
       </View>
       <Switch
         value={preferences[key]}
         onValueChange={(value) => handleToggle(key, value)}
-        trackColor={{ false: '#333', true: '#FFD700' }}
-        thumbColor={preferences[key] ? '#FFF' : '#666'}
+        trackColor={{ false: colors.switchTrackOff, true: colors.accent }}
+        thumbColor={preferences[key] ? '#FFFFFF' : colors.switchThumbOff}
       />
     </View>
   );
 
+  const renderThemeToggle = () => {
+    const handleThemeChange = () => {
+      handleToggle('darkMode', !isDark);
+      toggleTheme();
+    };
+
+    return (
+      <View style={styles.settingItem}>
+        <View style={styles.settingItemLeft}>
+          <Icon name="dark-mode" size={24} color={colors.textSecondary} style={styles.settingIcon} />
+          <Text style={styles.settingLabel}>Dark Mode</Text>
+        </View>
+        <Switch
+          value={isDark}
+          onValueChange={handleThemeChange}
+          trackColor={{ false: colors.switchTrackOff, true: colors.accent }}
+          thumbColor={isDark ? '#FFFFFF' : colors.switchThumbOff}
+        />
+      </View>
+    );
+  };
+
   const renderMenuItem = (label, icon, onPress, badge) => (
     <TouchableOpacity style={styles.menuItem} onPress={onPress}>
       <View style={styles.menuItemLeft}>
-        <Icon name={icon} size={24} color="#888" style={styles.menuIcon} />
+        <Icon name={icon} size={24} color={colors.textSecondary} style={styles.menuIcon} />
         <Text style={styles.menuLabel}>{label}</Text>
       </View>
       <View style={styles.menuItemRight}>
@@ -229,7 +253,7 @@ const SettingsScreen = () => {
             <Text style={styles.badgeText}>{badge}</Text>
           </View>
         )}
-        <Icon name="chevron-right" size={24} color="#666" />
+        <Icon name="chevron-right" size={24} color={colors.textSecondary} />
       </View>
     </TouchableOpacity>
   );
@@ -258,7 +282,7 @@ const SettingsScreen = () => {
       {renderSection('Preferences', (
         <>
           {renderToggleItem('Push Notifications', 'notifications', 'notifications')}
-          {renderToggleItem('Dark Mode', 'darkMode', 'dark-mode')}
+          {renderThemeToggle()}
           {renderToggleItem('Location Services', 'locationServices', 'location-on')}
           {renderToggleItem('Sound Effects', 'soundEnabled', 'volume-up')}
           {renderToggleItem('Vibration', 'vibrationEnabled', 'vibration')}
@@ -285,7 +309,7 @@ const SettingsScreen = () => {
                 {lang}
               </Text>
               {preferences.language === lang.toLowerCase() && (
-                <Icon name="check" size={20} color="#FFD700" />
+                <Icon name="check" size={20} color={colors.accent} />
               )}
             </TouchableOpacity>
           ))}
@@ -364,19 +388,19 @@ const SettingsScreen = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#121212',
+    backgroundColor: colors.background,
   },
   profileSection: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: 20,
-    backgroundColor: '#1E1E1E',
+    backgroundColor: colors.card,
     borderBottomWidth: 1,
-    borderBottomColor: '#2A2A2A',
+    borderBottomColor: colors.border,
   },
   profileInfo: {
     flexDirection: 'row',
@@ -386,12 +410,12 @@ const styles = StyleSheet.create({
     width: 50,
     height: 50,
     borderRadius: 25,
-    backgroundColor: '#FFD700',
+    backgroundColor: colors.accent,
     justifyContent: 'center',
     alignItems: 'center',
   },
   avatarText: {
-    color: '#121212',
+    color: colors.accentText,
     fontSize: 20,
     fontWeight: 'bold',
   },
@@ -399,16 +423,16 @@ const styles = StyleSheet.create({
     marginLeft: 12,
   },
   profileName: {
-    color: '#FFF',
+    color: colors.text,
     fontSize: 18,
     fontWeight: 'bold',
   },
   profileEmail: {
-    color: '#888',
+    color: colors.textSecondary,
     fontSize: 14,
   },
   editProfile: {
-    color: '#FFD700',
+    color: colors.accent,
     fontSize: 14,
     fontWeight: '500',
   },
@@ -417,7 +441,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   sectionTitle: {
-    color: '#888',
+    color: colors.textSecondary,
     fontSize: 14,
     fontWeight: '600',
     marginBottom: 8,
@@ -428,10 +452,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#1E1E1E',
+    backgroundColor: colors.card,
     paddingVertical: 12,
     paddingHorizontal: 16,
-    borderRadius: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
     marginBottom: 4,
   },
   settingItemLeft: {
@@ -442,13 +468,15 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   settingLabel: {
-    color: '#FFF',
+    color: colors.text,
     fontSize: 16,
   },
   languageContainer: {
     flexDirection: 'row',
-    backgroundColor: '#1E1E1E',
-    borderRadius: 10,
+    backgroundColor: colors.card,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
     padding: 4,
   },
   languageOption: {
@@ -461,24 +489,26 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   languageOptionActive: {
-    backgroundColor: '#2A2A2A',
+    backgroundColor: colors.cardElevated,
   },
   languageText: {
-    color: '#888',
+    color: colors.textSecondary,
     fontSize: 14,
   },
   languageTextActive: {
-    color: '#FFF',
+    color: colors.text,
     fontWeight: 'bold',
   },
   menuItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#1E1E1E',
+    backgroundColor: colors.card,
     paddingVertical: 12,
     paddingHorizontal: 16,
-    borderRadius: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
     marginBottom: 4,
   },
   menuItemLeft: {
@@ -489,7 +519,7 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   menuLabel: {
-    color: '#FFF',
+    color: colors.text,
     fontSize: 16,
   },
   menuItemRight: {
@@ -497,14 +527,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   badge: {
-    backgroundColor: '#FFD700',
+    backgroundColor: colors.accent,
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 12,
     marginRight: 8,
   },
   badgeText: {
-    color: '#121212',
+    color: colors.accentText,
     fontSize: 12,
     fontWeight: 'bold',
   },
@@ -514,11 +544,11 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
   },
   appVersion: {
-    color: '#666',
+    color: colors.textSecondary,
     fontSize: 14,
   },
   appBuild: {
-    color: '#444',
+    color: colors.textSecondary,
     fontSize: 12,
     marginTop: 4,
   },
@@ -531,7 +561,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   deleteAccount: {
-    color: '#FF6B6B',
+    color: colors.danger,
     textAlign: 'center',
     fontSize: 14,
     marginTop: 12,

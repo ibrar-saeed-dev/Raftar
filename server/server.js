@@ -18,9 +18,6 @@ const io = socketIO(server, {
   }
 });
 
-// DNS Configuration for MongoDB Atlas
-dns.setServers(["1.1.1.1", "8.8.8.8"]);
-
 // Store io instance
 app.set('io', io);
 
@@ -38,6 +35,7 @@ mongoose.connect(process.env.MONGODB_URI, {
   socketTimeoutMS: 45000,
   maxPoolSize: 10,
   minPoolSize: 2,
+  family: 4,
 })
   .then(async () => {
     console.log('✅ MongoDB Connected');

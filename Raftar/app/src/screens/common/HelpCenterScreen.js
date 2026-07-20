@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { useTheme } from '../../context/ThemeContext';
 import {
   View,
   Text,
@@ -19,6 +20,8 @@ import { useNavigation } from '@react-navigation/native';
 const { width, height } = Dimensions.get('window');
 
 const HelpCenterScreen = () => {
+  const { colors, isDark } = useTheme();
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   const navigation = useNavigation();
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedFaq, setExpandedFaq] = useState(null);
@@ -108,7 +111,7 @@ const HelpCenterScreen = () => {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+      <StatusBar barStyle={colors.statusBarStyle} backgroundColor={colors.background} />
       
       <Animated.View 
         style={[
@@ -129,7 +132,7 @@ const HelpCenterScreen = () => {
               style={styles.backButton}
               onPress={() => navigation.goBack()}
             >
-              <Icon name="arrow-back" size={24} color="#000" />
+              <Icon name="arrow-back" size={24} color={colors.text} />
             </TouchableOpacity>
             <Text style={styles.headerTitle}>Help Center</Text>
             <View style={styles.headerRight} />
@@ -137,17 +140,17 @@ const HelpCenterScreen = () => {
 
           {/* Search Bar */}
           <Animatable.View animation="fadeInUp" duration={600} delay={100} style={styles.searchContainer}>
-            <Icon name="search" size={22} color="#999" />
+            <Icon name="search" size={22} color={colors.textSecondary} />
             <TextInput
               style={styles.searchInput}
               placeholder="Search help articles..."
-              placeholderTextColor="#999"
+              placeholderTextColor={colors.textSecondary}
               value={searchQuery}
               onChangeText={setSearchQuery}
             />
             {searchQuery.length > 0 && (
               <TouchableOpacity onPress={() => setSearchQuery('')}>
-                <Icon name="close" size={20} color="#999" />
+                <Icon name="close" size={20} color={colors.textSecondary} />
               </TouchableOpacity>
             )}
           </Animatable.View>
@@ -155,14 +158,14 @@ const HelpCenterScreen = () => {
           {/* Quick Contact */}
           <Animatable.View animation="fadeInUp" duration={600} delay={200} style={styles.quickContact}>
             <View style={styles.quickContactHeader}>
-              <Icon name="support-agent" size={24} color="#F9C349" />
+              <Icon name="support-agent" size={24} color={colors.accent} />
               <Text style={styles.quickContactTitle}>Need immediate help?</Text>
             </View>
             <Text style={styles.quickContactSubtitle}>Our support team is available 24/7</Text>
             <View style={styles.contactButtons}>
               <TouchableOpacity style={styles.contactButton} onPress={handleCallSupport}>
-                <View style={[styles.contactIcon, { backgroundColor: '#FFF8E8' }]}>
-                  <Icon name="phone" size={24} color="#F9C349" />
+                <View style={[styles.contactIcon, { backgroundColor: colors.accent + '18' }]}>
+                  <Icon name="phone" size={24} color={colors.accent} />
                 </View>
                 <Text style={styles.contactButtonText}>Call</Text>
               </TouchableOpacity>
@@ -211,7 +214,7 @@ const HelpCenterScreen = () => {
                       <Icon
                         name={expandedFaq === faq.id ? 'expand-less' : 'expand-more'}
                         size={24}
-                        color="#888"
+                        color={colors.textSecondary}
                       />
                     </View>
                     {expandedFaq === faq.id && (
@@ -239,7 +242,7 @@ const HelpCenterScreen = () => {
               activeOpacity={0.8}
             >
               <View style={styles.reportButtonInner}>
-                <Icon name="report-problem" size={20} color="#000" />
+                <Icon name="report-problem" size={20} color={colors.text} />
                 <Text style={styles.reportButtonText}>Report an Issue</Text>
               </View>
             </TouchableOpacity>
@@ -248,7 +251,7 @@ const HelpCenterScreen = () => {
           {/* Support Hours */}
           <Animatable.View animation="fadeInUp" duration={600} delay={500} style={styles.supportHours}>
             <View style={styles.supportHoursRow}>
-              <Icon name="schedule" size={18} color="#F9C349" />
+              <Icon name="schedule" size={18} color={colors.accent} />
               <Text style={styles.supportHoursText}>Support Available 24/7</Text>
             </View>
             <Text style={styles.supportHoursSubtext}>Average response time: 2-5 minutes</Text>
@@ -261,14 +264,17 @@ const HelpCenterScreen = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors, isDark) => {
+  const cardBg = isDark ? colors.card : '#FFFFFF';
+  const insetBg = isDark ? colors.cardElevated : '#F5F5F5';
+  return StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: cardBg,
   },
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: cardBg,
     marginTop:34
   },
   scrollContent: {
@@ -289,7 +295,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 22,
     fontWeight: '700',
-    color: '#000',
+    color: colors.text,
     flex: 1,
     marginLeft: 12,
   },
@@ -299,28 +305,28 @@ const styles = StyleSheet.create({
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F5F5F5',
+    backgroundColor: insetBg,
     borderRadius: 12,
     paddingHorizontal: 14,
     marginBottom: 20,
     borderWidth: 1,
-    borderColor: '#F0F0F0',
+    borderColor: colors.border,
     height: 50,
   },
   searchInput: {
     flex: 1,
-    color: '#000',
+    color: colors.text,
     paddingVertical: 12,
     paddingHorizontal: 10,
     fontSize: 15,
   },
   quickContact: {
-    backgroundColor: '#F8F8F8',
+    backgroundColor: insetBg,
     borderRadius: 16,
     padding: 20,
     marginBottom: 24,
     borderWidth: 1,
-    borderColor: '#F0F0F0',
+    borderColor: colors.border,
   },
   quickContactHeader: {
     flexDirection: 'row',
@@ -329,12 +335,12 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   quickContactTitle: {
-    color: '#000',
+    color: colors.text,
     fontSize: 16,
     fontWeight: '700',
   },
   quickContactSubtitle: {
-    color: '#888',
+    color: colors.textSecondary,
     fontSize: 13,
     marginBottom: 16,
     marginLeft: 34,
@@ -356,7 +362,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   contactButtonText: {
-    color: '#000',
+    color: colors.text,
     fontSize: 12,
     fontWeight: '500',
   },
@@ -370,22 +376,22 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   sectionTitle: {
-    color: '#000',
+    color: colors.text,
     fontSize: 18,
     fontWeight: '700',
   },
   sectionCount: {
-    color: '#888',
+    color: colors.textSecondary,
     fontSize: 13,
     fontWeight: '500',
   },
   faqItem: {
-    backgroundColor: '#F8F8F8',
+    backgroundColor: insetBg,
     borderRadius: 12,
     padding: 16,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: '#F0F0F0',
+    borderColor: colors.border,
   },
   faqHeader: {
     flexDirection: 'row',
@@ -402,17 +408,17 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: '#FFF8E8',
+    backgroundColor: colors.accent + '18',
     justifyContent: 'center',
     alignItems: 'center',
   },
   faqNumberText: {
-    color: '#F9C349',
+    color: colors.accent,
     fontSize: 12,
     fontWeight: '700',
   },
   faqQuestion: {
-    color: '#000',
+    color: colors.text,
     fontSize: 14,
     fontWeight: '600',
     flex: 1,
@@ -421,10 +427,10 @@ const styles = StyleSheet.create({
     marginTop: 12,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: '#F0F0F0',
+    borderTopColor: colors.border,
   },
   faqAnswer: {
-    color: '#666',
+    color: colors.textSecondary,
     fontSize: 14,
     lineHeight: 22,
   },
@@ -433,13 +439,13 @@ const styles = StyleSheet.create({
     paddingVertical: 40,
   },
   noResultsText: {
-    color: '#000',
+    color: colors.text,
     fontSize: 18,
     fontWeight: '600',
     marginTop: 12,
   },
   noResultsSubtext: {
-    color: '#888',
+    color: colors.textSecondary,
     fontSize: 14,
     marginTop: 4,
   },
@@ -447,7 +453,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   reportButton: {
-    backgroundColor: '#F9C349',
+    backgroundColor: colors.accent,
     borderRadius: 12,
     paddingVertical: 14,
     alignItems: 'center',
@@ -458,7 +464,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   reportButtonText: {
-    color: '#000',
+    color: colors.text,
     fontSize: 16,
     fontWeight: '600',
   },
@@ -472,18 +478,19 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   supportHoursText: {
-    color: '#000',
+    color: colors.text,
     fontSize: 14,
     fontWeight: '500',
   },
   supportHoursSubtext: {
-    color: '#888',
+    color: colors.textSecondary,
     fontSize: 12,
     marginTop: 4,
   },
   bottomSpacer: {
     height: 10,
   },
-});
+  });
+};
 
 export default HelpCenterScreen;

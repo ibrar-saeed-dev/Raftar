@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { useTheme } from '../../context/ThemeContext';
 import {
   View,
   Text,
@@ -35,16 +36,21 @@ import CallService from '../../services/CallService';
 const { width, height } = Dimensions.get('window');
 
 // Yellow Theme Colors
-const YELLOW_PRIMARY = '#F8B82A';
-const YELLOW_SECONDARY = '#F9C349';
-const WHITE = '#FFFFFF';
-const BLACK = '#000000';
-const GRAY_DARK = '#333333';
-const GRAY_MEDIUM = '#666666';
-const GRAY_LIGHT = '#F5F5F5';
-const GRAY_BG = '#F8F9FA';
+const getThemePalette = (colors, isDark) => ({
+  YELLOW_PRIMARY: colors.accent,
+  YELLOW_SECONDARY: colors.accent,
+  WHITE: isDark ? colors.card : '#FFFFFF',
+  BLACK: colors.text,
+  GRAY_DARK: colors.text,
+  GRAY_MEDIUM: colors.textSecondary,
+  GRAY_LIGHT: isDark ? colors.cardElevated : '#F5F5F5',
+  GRAY_BG: colors.background,
+});
 
 const ActiveRideScreen = () => {
+  const { colors, isDark } = useTheme();
+  const { YELLOW_PRIMARY, YELLOW_SECONDARY, WHITE, BLACK, GRAY_DARK, GRAY_MEDIUM, GRAY_LIGHT, GRAY_BG } = useMemo(() => getThemePalette(colors, isDark), [colors, isDark]);
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   const navigation = useNavigation();
   const route = useRoute();
   const dispatch = useDispatch();
@@ -58,6 +64,8 @@ const ActiveRideScreen = () => {
   const [rideState, setRideState] = useState(ride?.status === 'searching' ? 'pending' : (ride?.status || 'accepted'));
   const [loading, setLoading] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
+  const [currentStopIndex, setCurrentStopIndex] = useState(0);
+  const [stopState, setStopState] = useState('heading'); // 'heading' or 'arrived'
   const [message, setMessage] = useState('');
   const [messages, setMessages] = useState(ride?.chat || []);
   const { user } = useSelector(state => state.auth);
@@ -255,15 +263,25 @@ const ActiveRideScreen = () => {
         setLoading(false);
       }
     } else if (rideState === 'started') {
-      setLoading(true);
-      try {
-        await dispatch(completeRide(ride._id)).unwrap();
-        setRideState('completed');
-        if (locationInterval.current) clearInterval(locationInterval.current);
-      } catch (err) {
-        Alert.alert('Error', err.message || 'Failed to complete ride');
-      } finally {
-        setLoading(false);
+      const hasStops = ride.waypoints && ride.waypoints.length > 0;
+      if (hasStops && currentStopIndex < ride.waypoints.length) {
+        if (stopState === 'heading') {
+          setStopState('arrived');
+        } else {
+          setStopState('heading');
+          setCurrentStopIndex(prev => prev + 1);
+        }
+      } else {
+        setLoading(true);
+        try {
+          await dispatch(completeRide(ride._id)).unwrap();
+          setRideState('completed');
+          if (locationInterval.current) clearInterval(locationInterval.current);
+        } catch (err) {
+          Alert.alert('Error', err.message || 'Failed to complete ride');
+        } finally {
+          setLoading(false);
+        }
       }
     }
   };
@@ -314,7 +332,11 @@ const ActiveRideScreen = () => {
       case 'pending': return 'Waiting for Passenger...';
       case 'accepted': return 'Heading to Pickup';
       case 'arrived': return ride.type === 'parcel' ? 'Pick Up Parcel' : 'Start Ride';
-      case 'started': return ride.type === 'parcel' ? 'Delivering Parcel' : 'Ride in Progress';
+      case 'started': 
+        if (ride.waypoints && currentStopIndex < ride.waypoints.length) {
+          return stopState === 'heading' ? `Heading to Stop ${currentStopIndex + 1}` : `Arrived at Stop ${currentStopIndex + 1}`;
+        }
+        return ride.type === 'parcel' ? 'Delivering Parcel' : 'Heading to Destination';
       case 'completed': return 'Completed';
       default: return rideState;
     }
@@ -348,7 +370,7 @@ const ActiveRideScreen = () => {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor={WHITE} />
+      <StatusBar barStyle={colors.statusBarStyle} backgroundColor={WHITE} />
       
       <View style={styles.container}>
         {/* Header */}
@@ -596,6 +618,19 @@ const ActiveRideScreen = () => {
                   <View style={[styles.addressDot, { backgroundColor: '#4ECDC4' }]} />
                   <Text style={styles.addressText} numberOfLines={1}>{ride.pickup?.address}</Text>
                 </View>
+                
+                {ride.waypoints && ride.waypoints.map((wp, idx) => (
+                  <React.Fragment key={idx}>
+                    <View style={styles.addressConnector}>
+                      <View style={styles.addressLine} />
+                    </View>
+                    <View style={styles.addressRow}>
+                      <View style={[styles.addressDot, { backgroundColor: '#FF9F43' }]} />
+                      <Text style={[styles.addressText, idx < currentStopIndex && { textDecorationLine: 'line-through', color: GRAY_MEDIUM }]} numberOfLines={1}>{wp.address}</Text>
+                    </View>
+                  </React.Fragment>
+                ))}
+
                 <View style={styles.addressConnector}>
                   <View style={styles.addressLine} />
                 </View>
@@ -635,6 +670,7 @@ const ActiveRideScreen = () => {
                         {rideState === 'pending' ? 'Waiting for Passenger...' :
                          rideState === 'accepted' ? 'Arrived at Pickup' :
                          rideState === 'arrived' ? (ride.type === 'parcel' ? 'Pick Up Parcel' : 'Start Ride') :
+                         rideState === 'started' && ride.waypoints && currentStopIndex < ride.waypoints.length ? (stopState === 'heading' ? 'Arrived at Stop' : 'Complete Stop') :
                          (ride.type === 'parcel' ? 'Deliver Parcel' : 'Complete Ride')}
                       </Text>
                     </>
@@ -717,7 +753,11 @@ const ActiveRideScreen = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors, isDark) => {
+  const { YELLOW_PRIMARY, YELLOW_SECONDARY, WHITE, BLACK, GRAY_DARK, GRAY_MEDIUM, GRAY_LIGHT, GRAY_BG } = getThemePalette(colors, isDark);
+  const cardBg = isDark ? colors.card : '#FFFFFF';
+  const insetBg = isDark ? colors.cardElevated : '#F5F5F5';
+  return StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: WHITE,
@@ -745,7 +785,7 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
     backgroundColor: WHITE,
     borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
+    borderBottomColor: colors.border,
   },
   backButton: {
     width: 40,
@@ -1146,6 +1186,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-});
+  });
+};
 
 export default ActiveRideScreen;

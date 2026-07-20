@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { useTheme } from '../../context/ThemeContext';
 import {
   View,
   Text,
@@ -35,6 +36,8 @@ import * as Location from 'expo-location';
 const { width, height } = Dimensions.get('window');
 
 const SendParcelScreen = () => {
+  const { colors, isDark } = useTheme();
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   const navigation = useNavigation();
   const dispatch = useDispatch();
   const { user } = useSelector(state => state.auth);
@@ -53,9 +56,31 @@ const SendParcelScreen = () => {
     fragile: false,
     urgent: false
   });
-  const [fareMode, setFareMode] = useState('ai');
-  const [offerPrice, setOfferPrice] = useState('');
+  const [selectedPriceOption, setSelectedPriceOption] = useState(null);
   const [estimatedFare, setEstimatedFare] = useState(null);
+
+  useEffect(() => {
+    const selectedSize = parcelSizes.find(s => s.id === parcelDetails.size);
+    if (selectedSize) {
+      setEstimatedFare(selectedSize.price);
+      setSelectedPriceOption(selectedSize.price);
+    }
+  }, [parcelDetails.size]);
+
+  const getPriceOptions = (base) => {
+    if (!base) return [];
+    const baseFare = Math.round(base);
+    const minFare = Math.round(baseFare * 0.8);
+    const maxFare = Math.round(baseFare * 1.2);
+    const step = (maxFare - minFare) / 4;
+    return [
+      Math.round(minFare),
+      Math.round(minFare + step),
+      Math.round(minFare + 2 * step),
+      Math.round(minFare + 3 * step),
+      Math.round(maxFare)
+    ];
+  };
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [createdParcelId, setCreatedParcelId] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -258,7 +283,7 @@ const SendParcelScreen = () => {
     if (!parcelDetails.receiverPhone || parcelDetails.receiverPhone.length < 10) { Alert.alert('Error', 'Please enter a valid receiver phone number'); return false; }
     if (parcelDetails.weight && isNaN(parseFloat(parcelDetails.weight))) { Alert.alert('Error', 'Please enter a valid weight'); return false; }
     if (parcelDetails.codAmount && isNaN(parseFloat(parcelDetails.codAmount))) { Alert.alert('Error', 'Please enter a valid COD amount'); return false; }
-    if (fareMode === 'offer' && (!offerPrice || parseFloat(offerPrice) <= 0)) { Alert.alert('Error', 'Please enter a valid offer price'); return false; }
+    if (!selectedPriceOption || selectedPriceOption <= 0) { Alert.alert('Error', 'Please select a valid price'); return false; }
     return true;
   };
 
@@ -280,9 +305,9 @@ const SendParcelScreen = () => {
         vehicleType: parcelDetails.size,
         type: 'parcel',
         fare: {
-          type: fareMode,
-          amount: fareMode === 'ai' ? 100 : parseFloat(offerPrice),
-          offered: fareMode === 'offer' ? parseFloat(offerPrice) : null
+          type: 'offer',
+          amount: selectedPriceOption,
+          offered: selectedPriceOption
         },
         parcel: {
           ...parcelDetails,
@@ -334,13 +359,13 @@ const SendParcelScreen = () => {
       >
         <View style={[
           styles.sizeCardContent,
-          isSelected && { borderColor: '#F9C349' }
+          isSelected && { borderColor: colors.accent }
         ]}>
           <View style={[
             styles.sizeIconContainer,
-            { backgroundColor: isSelected ? '#F9C34915' : '#F5F5F5' }
+            { backgroundColor: isSelected ? colors.accent + '15' : '#F5F5F5' }
           ]}>
-            {getIcon(size.icon, size.iconType, 28, isSelected ? '#F9C349' : '#999')}
+            {getIcon(size.icon, size.iconType, 28, isSelected ? colors.accent : '#999')}
           </View>
           <Text style={[
             styles.sizeLabel,
@@ -363,7 +388,7 @@ const SendParcelScreen = () => {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+      <StatusBar barStyle={colors.statusBarStyle} backgroundColor={colors.background} />
       
       <KeyboardAvoidingView 
         style={styles.container}
@@ -384,11 +409,11 @@ const SendParcelScreen = () => {
               onPress={() => navigation.goBack()}
               activeOpacity={0.7}
             >
-              <Icon name="arrow-back" size={24} color="#000" />
+              <Icon name="arrow-back" size={24} color={colors.text} />
             </TouchableOpacity>
             <Text style={styles.headerTitle}>Send Parcel</Text>
             <TouchableOpacity style={styles.historyButton} activeOpacity={0.7}>
-              <Icon name="history" size={24} color="#000" />
+              <Icon name="history" size={24} color={colors.text} />
               <View style={styles.historyBadge} />
             </TouchableOpacity>
           </View>
@@ -402,7 +427,7 @@ const SendParcelScreen = () => {
             <Animatable.View animation="fadeIn" duration={600} style={styles.mapContainer}>
               {locationLoading ? (
                 <View style={styles.mapLoading}>
-                  <ActivityIndicator size="large" color="#F9C349" />
+                  <ActivityIndicator size="large" color={colors.accent} />
                   <Text style={styles.mapLoadingText}>Finding your location...</Text>
                 </View>
               ) : (
@@ -452,7 +477,7 @@ const SendParcelScreen = () => {
                 </MapView>
               )}
               <TouchableOpacity style={styles.mapOverlayBtn} onPress={() => openMapPicker('pickup')} activeOpacity={0.8}>
-                <Icon name="edit-location" size={20} color="#F9C349" />
+                <Icon name="edit-location" size={20} color={colors.accent} />
               </TouchableOpacity>
             </Animatable.View>
 
@@ -466,7 +491,7 @@ const SendParcelScreen = () => {
               <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>📍 Pickup & Delivery</Text>
                 <TouchableOpacity style={styles.quickFillButton} onPress={getCurrentLocation} activeOpacity={0.7}>
-                  <Icon name="my-location" size={18} color="#F9C349" />
+                  <Icon name="my-location" size={18} color={colors.accent} />
                   <Text style={styles.quickFillText}>Current</Text>
                 </TouchableOpacity>
               </View>
@@ -500,7 +525,7 @@ const SendParcelScreen = () => {
                       row: styles.autocompleteRow,
                       description: styles.autocompleteDescription
                     }}
-                    placeholderTextColor="#999"
+                    placeholderTextColor={colors.textSecondary}
                     renderRightButton={() => (
                       <TouchableOpacity onPress={() => openMapPicker('pickup')} style={styles.mapIconBtn} activeOpacity={0.7}>
                         <Icon name="map" size={22} color="#4ECDC4" />
@@ -540,7 +565,7 @@ const SendParcelScreen = () => {
                       row: styles.autocompleteRow,
                       description: styles.autocompleteDescription
                     }}
-                    placeholderTextColor="#999"
+                    placeholderTextColor={colors.textSecondary}
                     renderRightButton={() => (
                       <TouchableOpacity onPress={() => openMapPicker('dropoff')} style={styles.mapIconBtn} activeOpacity={0.7}>
                         <Icon name="map" size={22} color="#FF6B6B" />
@@ -568,11 +593,11 @@ const SendParcelScreen = () => {
               <View style={styles.inputGrid}>
                 <View style={styles.inputHalf}>
                   <View style={styles.inputWrapper}>
-                    <Icon name="scale" size={20} color="#F9C349" style={styles.inputIcon} />
+                    <Icon name="scale" size={20} color={colors.accent} style={styles.inputIcon} />
                     <TextInput
                       style={styles.input}
                       placeholder="Weight (kg)"
-                      placeholderTextColor="#999"
+                      placeholderTextColor={colors.textSecondary}
                       value={parcelDetails.weight}
                       onChangeText={(value) => handleChange('weight', value)}
                       keyboardType="numeric"
@@ -581,11 +606,11 @@ const SendParcelScreen = () => {
                 </View>
                 <View style={styles.inputHalf}>
                   <View style={styles.inputWrapper}>
-                    <Icon name="attach-money" size={20} color="#F9C349" style={styles.inputIcon} />
+                    <Icon name="attach-money" size={20} color={colors.accent} style={styles.inputIcon} />
                     <TextInput
                       style={styles.input}
                       placeholder="COD Amount"
-                      placeholderTextColor="#999"
+                      placeholderTextColor={colors.textSecondary}
                       value={parcelDetails.codAmount}
                       onChangeText={(value) => handleChange('codAmount', value)}
                       keyboardType="numeric"
@@ -595,11 +620,11 @@ const SendParcelScreen = () => {
               </View>
 
               <View style={styles.inputWrapper}>
-                <Icon name="description" size={20} color="#F9C349" style={styles.inputIcon} />
+                <Icon name="description" size={20} color={colors.accent} style={styles.inputIcon} />
                 <TextInput
                   style={[styles.input, styles.textArea]}
                   placeholder="Describe your parcel (e.g., Books, Electronics, Documents)"
-                  placeholderTextColor="#999"
+                  placeholderTextColor={colors.textSecondary}
                   value={parcelDetails.description}
                   onChangeText={(value) => handleChange('description', value)}
                   multiline
@@ -608,11 +633,11 @@ const SendParcelScreen = () => {
               </View>
 
               <View style={styles.inputWrapper}>
-                <Icon name="info" size={20} color="#F9C349" style={styles.inputIcon} />
+                <Icon name="info" size={20} color={colors.accent} style={styles.inputIcon} />
                 <TextInput
                   style={[styles.input, styles.textArea]}
                   placeholder="Special instructions for delivery"
-                  placeholderTextColor="#999"
+                  placeholderTextColor={colors.textSecondary}
                   value={parcelDetails.instructions}
                   onChangeText={(value) => handleChange('instructions', value)}
                   multiline
@@ -626,7 +651,7 @@ const SendParcelScreen = () => {
                   onPress={() => handleChange('fragile', !parcelDetails.fragile)}
                   activeOpacity={0.7}
                 >
-                  <Icon name="warning" size={20} color={parcelDetails.fragile ? '#F9C349' : '#999'} />
+                  <Icon name="warning" size={20} color={parcelDetails.fragile ? colors.accent : '#999'} />
                   <Text style={[styles.optionText, parcelDetails.fragile && styles.optionTextActive]}>
                     Fragile
                   </Text>
@@ -636,7 +661,7 @@ const SendParcelScreen = () => {
                   onPress={() => handleChange('urgent', !parcelDetails.urgent)}
                   activeOpacity={0.7}
                 >
-                  <Icon name="flash-on" size={20} color={parcelDetails.urgent ? '#F9C349' : '#999'} />
+                  <Icon name="flash-on" size={20} color={parcelDetails.urgent ? colors.accent : '#999'} />
                   <Text style={[styles.optionText, parcelDetails.urgent && styles.optionTextActive]}>
                     Urgent
                   </Text>
@@ -654,22 +679,22 @@ const SendParcelScreen = () => {
               <Text style={styles.sectionTitle}>👤 Receiver Details</Text>
               
               <View style={styles.inputWrapper}>
-                <Icon name="person" size={20} color="#F9C349" style={styles.inputIcon} />
+                <Icon name="person" size={20} color={colors.accent} style={styles.inputIcon} />
                 <TextInput
                   style={styles.input}
                   placeholder="Receiver Name *"
-                  placeholderTextColor="#999"
+                  placeholderTextColor={colors.textSecondary}
                   value={parcelDetails.receiverName}
                   onChangeText={(value) => handleChange('receiverName', value)}
                 />
               </View>
 
               <View style={styles.inputWrapper}>
-                <Icon name="phone" size={20} color="#F9C349" style={styles.inputIcon} />
+                <Icon name="phone" size={20} color={colors.accent} style={styles.inputIcon} />
                 <TextInput
                   style={styles.input}
                   placeholder="Receiver Phone *"
-                  placeholderTextColor="#999"
+                  placeholderTextColor={colors.textSecondary}
                   value={parcelDetails.receiverPhone}
                   onChangeText={(value) => handleChange('receiverPhone', value)}
                   keyboardType="phone-pad"
@@ -677,87 +702,38 @@ const SendParcelScreen = () => {
               </View>
             </Animatable.View>
 
-            {/* Fare Mode */}
+            {/* Price Selection */}
             <Animatable.View 
               animation="fadeInUp" 
               duration={600} 
               delay={350}
-              style={styles.section}
+              style={[styles.section, { marginBottom: 40 }]}
             >
-              <Text style={styles.sectionTitle}>💵 Delivery Fare</Text>
-              <View style={styles.fareModeContainer}>
-                <TouchableOpacity
-                  style={[
-                    styles.fareMode,
-                    fareMode === 'ai' && styles.fareModeSelected
-                  ]}
-                  onPress={() => setFareMode('ai')}
-                  activeOpacity={0.8}
-                >
-                  <View style={[
-                    styles.fareModeContent,
-                    fareMode === 'ai' && { backgroundColor: '#F9C349' }
-                  ]}>
-                    <View style={styles.fareModeIcon}>
-                      <Icon name="auto-awesome" size={24} color={fareMode === 'ai' ? '#000' : '#999'} />
-                    </View>
-                    <Text style={[
-                      styles.fareModeText,
-                      fareMode === 'ai' && { color: '#000' }
-                    ]}>
-                      Standard
-                    </Text>
-                    {estimatedFare && (
+              <Text style={styles.sectionTitle}>Select Your Price</Text>
+              <ScrollView 
+                horizontal 
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.priceScrollContent}
+              >
+                {getPriceOptions(estimatedFare).map((price, index) => (
+                  <View key={index} style={styles.priceOptionWrapper}>
+                    <TouchableOpacity
+                      style={[
+                        styles.priceOptionCard,
+                        selectedPriceOption === price && styles.priceOptionSelected
+                      ]}
+                      onPress={() => setSelectedPriceOption(price)}
+                    >
                       <Text style={[
-                        styles.fareAmount,
-                        fareMode === 'ai' && { color: '#000' }
+                        styles.priceOptionText,
+                        selectedPriceOption === price && styles.priceOptionTextSelected
                       ]}>
-                        ₨ {estimatedFare}
+                        ₨ {price}
                       </Text>
-                    )}
+                    </TouchableOpacity>
                   </View>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[
-                    styles.fareMode,
-                    fareMode === 'offer' && styles.fareModeSelected
-                  ]}
-                  onPress={() => setFareMode('offer')}
-                  activeOpacity={0.8}
-                >
-                  <View style={[
-                    styles.fareModeContent,
-                    fareMode === 'offer' && { backgroundColor: '#F9C349' }
-                  ]}>
-                    <View style={styles.fareModeIcon}>
-                      <Icon name="attach-money" size={24} color={fareMode === 'offer' ? '#000' : '#999'} />
-                    </View>
-                    <Text style={[
-                      styles.fareModeText,
-                      fareMode === 'offer' && { color: '#000' }
-                    ]}>
-                      Offer Price
-                    </Text>
-                    {fareMode === 'offer' && (
-                      <TextInput
-                        style={[
-                          styles.offerInput,
-                          fareMode === 'offer' && { 
-                            backgroundColor: 'rgba(255,255,255,0.3)',
-                            color: '#000'
-                          }
-                        ]}
-                        placeholder="Enter amount"
-                        placeholderTextColor={fareMode === 'offer' ? 'rgba(0,0,0,0.4)' : '#999'}
-                        keyboardType="numeric"
-                        value={offerPrice}
-                        onChangeText={setOfferPrice}
-                      />
-                    )}
-                  </View>
-                </TouchableOpacity>
-              </View>
+                ))}
+              </ScrollView>
             </Animatable.View>
 
             {/* Summary Section */}
@@ -819,14 +795,14 @@ const SendParcelScreen = () => {
               >
                 {isSubmitting || loading || searchingDriver ? (
                   <View style={styles.loadingContainer}>
-                    <ActivityIndicator color="#000" size="small" />
+                    <ActivityIndicator color={colors.text} size="small" />
                     <Text style={styles.loadingText}>
                       {searchingDriver ? 'Finding Driver...' : 'Sending...'}
                     </Text>
                   </View>
                 ) : (
                   <>
-                    <Icon name="send" size={24} color="#000" />
+                    <Icon name="send" size={24} color={colors.text} />
                     <Text style={styles.sendButtonText}>Send Parcel</Text>
                   </>
                 )}
@@ -841,7 +817,7 @@ const SendParcelScreen = () => {
             <View style={styles.pickerModalContainer}>
               <View style={styles.pickerModalHeader}>
                 <TouchableOpacity onPress={() => setShowMapPicker(false)} style={styles.pickerBackBtn} activeOpacity={0.7}>
-                  <Icon name="arrow-back" size={24} color="#000" />
+                  <Icon name="arrow-back" size={24} color={colors.text} />
                 </TouchableOpacity>
                 <Text style={styles.pickerModalTitle}>Select {mapPickerType === 'pickup' ? 'Pickup' : 'Dropoff'}</Text>
                 <View style={{ width: 32 }} />
@@ -880,14 +856,17 @@ const SendParcelScreen = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors, isDark) => {
+  const cardBg = isDark ? colors.card : '#FFFFFF';
+  const insetBg = isDark ? colors.cardElevated : '#F5F5F5';
+  return StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: cardBg,
   },
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: cardBg,
   },
   scrollContent: {
     paddingBottom: 40,
@@ -899,9 +878,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 50,
     paddingBottom: 15,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: cardBg,
     borderBottomWidth: 1,
-    borderBottomColor: '#F5F5F5',
+    borderBottomColor: colors.border,
   },
   backButton: {
     padding: 4,
@@ -909,7 +888,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#000',
+    color: colors.text,
     letterSpacing: 0.5,
   },
   historyButton: {
@@ -923,7 +902,7 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#F9C349',
+    backgroundColor: colors.accent,
   },
   mapContainer: {
     height: 200,
@@ -932,19 +911,19 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     borderRadius: 16,
     overflow: 'hidden',
-    backgroundColor: '#F5F5F5',
+    backgroundColor: insetBg,
     position: 'relative',
     borderWidth: 1,
-    borderColor: '#F0F0F0',
+    borderColor: colors.border,
   },
   mapLoading: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: insetBg,
     justifyContent: 'center',
     alignItems: 'center',
   },
   mapLoadingText: {
-    color: '#999',
+    color: colors.textSecondary,
     marginTop: 12,
     fontSize: 14,
   },
@@ -958,7 +937,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: cardBg,
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
@@ -994,13 +973,13 @@ const styles = StyleSheet.create({
     borderColor: '#FFF',
   },
   section: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: cardBg,
     marginHorizontal: 20,
     marginBottom: 16,
     padding: 20,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#F0F0F0',
+    borderColor: colors.border,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04,
@@ -1016,7 +995,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 17,
     fontWeight: '600',
-    color: '#000',
+    color: colors.text,
   },
   quickFillButton: {
     flexDirection: 'row',
@@ -1024,11 +1003,11 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingHorizontal: 12,
     paddingVertical: 6,
-    backgroundColor: '#F9C34915',
+    backgroundColor: colors.accent + '15',
     borderRadius: 20,
   },
   quickFillText: {
-    color: '#F9C349',
+    color: colors.accent,
     fontSize: 13,
     fontWeight: '500',
   },
@@ -1059,13 +1038,13 @@ const styles = StyleSheet.create({
   pickupInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8F8F8',
+    backgroundColor: insetBg,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#F0F0F0',
+    borderColor: colors.border,
   },
   pickupTextInput: {
-    color: '#000',
+    color: colors.text,
     flex: 1,
     paddingHorizontal: 16,
     paddingVertical: 14,
@@ -1075,13 +1054,13 @@ const styles = StyleSheet.create({
   dropoffInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8F8F8',
+    backgroundColor: insetBg,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#F0F0F0',
+    borderColor: colors.border,
   },
   dropoffTextInput: {
-    color: '#000',
+    color: colors.text,
     flex: 1,
     paddingHorizontal: 16,
     paddingVertical: 14,
@@ -1093,13 +1072,13 @@ const styles = StyleSheet.create({
     zIndex: 999,
   },
   autocompleteList: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: cardBg,
     borderRadius: 12,
     marginTop: 4,
     maxHeight: 200,
     width: '100%',
     borderWidth: 1,
-    borderColor: '#F0F0F0',
+    borderColor: colors.border,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08,
@@ -1110,10 +1089,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#F5F5F5',
+    borderBottomColor: colors.border,
   },
   autocompleteDescription: {
-    color: '#000',
+    color: colors.text,
     fontSize: 14,
   },
   locationDivider: {
@@ -1121,7 +1100,7 @@ const styles = StyleSheet.create({
     marginVertical: 0,
   },
   sizeTitle: {
-    color: '#999',
+    color: colors.textSecondary,
     fontSize: 14,
     marginBottom: 12,
     fontWeight: '500',
@@ -1141,11 +1120,11 @@ const styles = StyleSheet.create({
     transform: [{ scale: 1.02 }],
   },
   sizeCardContent: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: cardBg,
     padding: 14,
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: '#F0F0F0',
+    borderColor: colors.border,
     borderRadius: 14,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -1162,23 +1141,23 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   sizeLabel: {
-    color: '#000',
+    color: colors.text,
     fontSize: 14,
     fontWeight: '600',
   },
   sizeLabelSelected: {
-    color: '#F9C349',
+    color: colors.accent,
   },
   sizePrice: {
-    color: '#999',
+    color: colors.textSecondary,
     fontSize: 12,
     marginTop: 2,
   },
   sizePriceSelected: {
-    color: '#F9C349',
+    color: colors.accent,
   },
   sizeDimensions: {
-    color: '#999',
+    color: colors.textSecondary,
     fontSize: 10,
     marginTop: 2,
   },
@@ -1189,7 +1168,7 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: '#F9C349',
+    backgroundColor: colors.accent,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1203,10 +1182,10 @@ const styles = StyleSheet.create({
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8F8F8',
+    backgroundColor: insetBg,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#F0F0F0',
+    borderColor: colors.border,
     paddingHorizontal: 12,
     marginBottom: 12,
   },
@@ -1215,7 +1194,7 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    color: '#000',
+    color: colors.text,
     paddingVertical: 12,
     fontSize: 14,
   },
@@ -1234,24 +1213,24 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#F8F8F8',
+    backgroundColor: insetBg,
     paddingVertical: 12,
     borderRadius: 12,
     gap: 8,
     borderWidth: 2,
-    borderColor: '#F0F0F0',
+    borderColor: colors.border,
   },
   optionButtonActive: {
-    borderColor: '#F9C349',
-    backgroundColor: '#F9C34915',
+    borderColor: colors.accent,
+    backgroundColor: colors.accent + '15',
   },
   optionText: {
-    color: '#999',
+    color: colors.textSecondary,
     fontSize: 14,
     fontWeight: '500',
   },
   optionTextActive: {
-    color: '#F9C349',
+    color: colors.accent,
   },
   fareModeContainer: {
     flexDirection: 'row',
@@ -1263,39 +1242,39 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     overflow: 'hidden',
     borderWidth: 2,
-    borderColor: '#F0F0F0',
+    borderColor: colors.border,
   },
   fareModeSelected: {
-    borderColor: '#F9C349',
+    borderColor: colors.accent,
   },
   fareModeContent: {
     padding: 16,
     alignItems: 'center',
-    backgroundColor: '#F8F8F8',
+    backgroundColor: insetBg,
   },
   fareModeIcon: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: cardBg,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 8,
   },
   fareModeText: {
-    color: '#666',
+    color: colors.textSecondary,
     fontSize: 14,
     fontWeight: '500',
     marginBottom: 4,
   },
   fareAmount: {
-    color: '#F9C349',
+    color: colors.accent,
     fontSize: 18,
     fontWeight: '700',
   },
   offerInput: {
-    backgroundColor: '#FFFFFF',
-    color: '#000',
+    backgroundColor: cardBg,
+    color: colors.text,
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 6,
@@ -1304,18 +1283,18 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
     borderWidth: 1,
-    borderColor: '#E0E0E0',
+    borderColor: colors.border,
   },
   summarySection: {
     marginHorizontal: 20,
     marginBottom: 16,
   },
   summaryCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: cardBg,
     padding: 20,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#F0F0F0',
+    borderColor: colors.border,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04,
@@ -1323,7 +1302,7 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   summaryTitle: {
-    color: '#000',
+    color: colors.text,
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 12,
@@ -1333,22 +1312,22 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 8,
     borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
+    borderBottomColor: colors.border,
   },
   summaryRowLast: {
     borderBottomWidth: 0,
   },
   summaryLabel: {
-    color: '#999',
+    color: colors.textSecondary,
     fontSize: 14,
   },
   summaryValue: {
-    color: '#000',
+    color: colors.text,
     fontSize: 14,
     fontWeight: '500',
   },
   summaryValueHighlight: {
-    color: '#F9C349',
+    color: colors.accent,
   },
   sendButtonContainer: {
     paddingHorizontal: 20,
@@ -1356,21 +1335,21 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   sendButton: {
-    backgroundColor: '#F9C349',
+    backgroundColor: colors.accent,
     borderRadius: 16,
     paddingVertical: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 10,
-    shadowColor: '#F9C349',
+    shadowColor: colors.accent,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 12,
     elevation: 6,
   },
   sendButtonText: {
-    color: '#000',
+    color: colors.text,
     fontSize: 18,
     fontWeight: '700',
   },
@@ -1380,7 +1359,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   loadingText: {
-    color: '#000',
+    color: colors.text,
     fontSize: 16,
     fontWeight: '500',
   },
@@ -1395,17 +1374,17 @@ const styles = StyleSheet.create({
   },
   pickerModalContainer: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: cardBg,
   },
   pickerModalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: 16,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: cardBg,
     paddingTop: Platform.OS === 'ios' ? 50 : 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
+    borderBottomColor: colors.border,
   },
   pickerBackBtn: {
     padding: 4,
@@ -1413,7 +1392,7 @@ const styles = StyleSheet.create({
   pickerModalTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#000',
+    color: colors.text,
   },
   pickerMap: {
     flex: 1,
@@ -1425,7 +1404,7 @@ const styles = StyleSheet.create({
     marginLeft: -22,
     marginTop: -44,
     zIndex: 10,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: cardBg,
     borderRadius: 28,
     padding: 4,
     shadowColor: '#000',
@@ -1435,7 +1414,7 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   pickerBottomCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: cardBg,
     padding: 20,
     paddingBottom: Platform.OS === 'ios' ? 40 : 20,
     borderTopLeftRadius: 24,
@@ -1446,31 +1425,64 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 8,
     borderTopWidth: 1,
-    borderTopColor: '#F0F0F0',
+    borderTopColor: colors.border,
   },
   pickerAddressLabel: {
-    color: '#999',
+    color: colors.textSecondary,
     fontSize: 12,
     marginBottom: 8,
     fontWeight: '500',
   },
   pickerAddressText: {
-    color: '#000',
+    color: colors.text,
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 20,
   },
   pickerConfirmBtn: {
-    backgroundColor: '#F9C349',
+    backgroundColor: colors.accent,
     padding: 16,
     borderRadius: 12,
     alignItems: 'center',
   },
   pickerConfirmText: {
-    color: '#000',
+    color: colors.text,
     fontSize: 16,
     fontWeight: '600',
   },
-});
+  priceScrollContent: {
+    paddingHorizontal: 2,
+    gap: 12,
+    marginTop: 12,
+  },
+  priceOptionWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  priceOptionCard: {
+    backgroundColor: insetBg,
+    borderWidth: 2,
+    borderColor: colors.border,
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  priceOptionSelected: {
+    borderColor: colors.accent,
+    backgroundColor: colors.accent + '15',
+  },
+  priceOptionText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.textSecondary,
+  },
+  priceOptionTextSelected: {
+    color: colors.text,
+  },
+  });
+};
 
 export default SendParcelScreen;

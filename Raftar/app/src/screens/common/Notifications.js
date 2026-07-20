@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
+import { useTheme } from '../../context/ThemeContext';
 import {
   View,
   Text,
@@ -20,6 +21,8 @@ import * as Animatable from 'react-native-animatable';
 const { width } = Dimensions.get('window');
 
 const Notifications = ({ navigation }) => {
+  const { colors, isDark } = useTheme();
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState('all');
 
@@ -179,7 +182,7 @@ const Notifications = ({ navigation }) => {
               {item.title}
             </Text>
             <View style={styles.timeContainer}>
-              <Icon name={getTimeIcon(item.time)} size={12} color="#999" />
+              <Icon name={getTimeIcon(item.time)} size={12} color={colors.textSecondary} />
               <Text style={styles.timeText}>{item.time}</Text>
             </View>
           </View>
@@ -195,7 +198,7 @@ const Notifications = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+      <StatusBar barStyle={colors.statusBarStyle} backgroundColor={colors.background} />
 
       {/* Header */}
       <View style={styles.header}>
@@ -203,7 +206,7 @@ const Notifications = ({ navigation }) => {
           style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
-          <Icon name="arrow-back" size={24} color="#000" />
+          <Icon name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Notifications</Text>
         <TouchableOpacity
@@ -309,10 +312,13 @@ const Notifications = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors, isDark) => {
+  const cardBg = isDark ? colors.card : '#FFFFFF';
+  const insetBg = isDark ? colors.cardElevated : '#F5F5F5';
+  return StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: cardBg,
   },
   header: {
     flexDirection: 'row',
@@ -321,7 +327,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
+    borderBottomColor: colors.border,
     marginTop:20
   },
   backButton: {
@@ -330,7 +336,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#000000',
+    color: colors.text,
     flex: 1,
     marginLeft: 8,
   },
@@ -347,8 +353,8 @@ const styles = StyleSheet.create({
   },
   tabsContainer: {
     borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
-    backgroundColor: '#FFFFFF',
+    borderBottomColor: colors.border,
+    backgroundColor: cardBg,
   },
   tabsScroll: {
     paddingHorizontal: 16,
@@ -367,10 +373,10 @@ const styles = StyleSheet.create({
   tabText: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#666666',
+    color: colors.textSecondary,
   },
   activeTabText: {
-    color: '#000000',
+    color: colors.text,
     fontWeight: '600',
   },
   activeTabIndicator: {
@@ -386,9 +392,9 @@ const styles = StyleSheet.create({
   unreadCountContainer: {
     paddingHorizontal: 20,
     paddingVertical: 10,
-    backgroundColor: '#FFF8E1',
+    backgroundColor: colors.accent + '18',
     borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
+    borderBottomColor: colors.border,
   },
   unreadCountText: {
     fontSize: 13,
@@ -402,12 +408,12 @@ const styles = StyleSheet.create({
   },
   notificationCard: {
     flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: cardBg,
     borderRadius: 16,
     padding: 14,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#F0F0F0',
+    borderColor: colors.border,
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.04,
@@ -415,7 +421,7 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   unreadCard: {
-    backgroundColor: '#FFFAF0',
+    backgroundColor: colors.accent + '10',
     borderColor: '#FCE4A8',
   },
   notificationIconContainer: {
@@ -453,12 +459,12 @@ const styles = StyleSheet.create({
   notificationTitle: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#000000',
+    color: colors.text,
     flex: 1,
     marginRight: 8,
   },
   unreadTitle: {
-    color: '#000000',
+    color: colors.text,
   },
   timeContainer: {
     flexDirection: 'row',
@@ -466,12 +472,12 @@ const styles = StyleSheet.create({
   },
   timeText: {
     fontSize: 11,
-    color: '#999999',
+    color: colors.textSecondary,
     marginLeft: 4,
   },
   notificationMessage: {
     fontSize: 13,
-    color: '#666666',
+    color: colors.textSecondary,
     lineHeight: 18,
   },
   emptyContainer: {
@@ -487,12 +493,12 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#000000',
+    color: colors.text,
     marginTop: 16,
   },
   emptyText: {
     fontSize: 14,
-    color: '#888888',
+    color: colors.textSecondary,
     textAlign: 'center',
     marginTop: 8,
     lineHeight: 20,
@@ -520,6 +526,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-});
+  });
+};
 
 export default Notifications;

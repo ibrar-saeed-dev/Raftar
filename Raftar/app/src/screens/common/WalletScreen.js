@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { useTheme } from '../../context/ThemeContext';
 import {
   View,
   Text,
@@ -27,6 +28,8 @@ import { getWalletBalance, addToWallet, withdrawFromWallet, getTransactions } fr
 const { width, height } = Dimensions.get('window');
 
 const WalletScreen = () => {
+  const { colors, isDark } = useTheme();
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   const navigation = useNavigation();
   const dispatch = useDispatch();
   const { walletBalance = 0, transactions = [], loading = false } = useSelector(state => state.payment || {});
@@ -169,7 +172,7 @@ const WalletScreen = () => {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+      <StatusBar barStyle={colors.statusBarStyle} backgroundColor={colors.background} />
 
       <Animated.View
         style={[
@@ -191,7 +194,7 @@ const WalletScreen = () => {
               onPress={() => navigation.goBack()}
               activeOpacity={0.7}
             >
-              <Icon name="arrow-back" size={24} color="#000" />
+              <Icon name="arrow-back" size={24} color={colors.text} />
             </TouchableOpacity>
             <Text style={styles.headerTitle}>Wallet</Text>
             <TouchableOpacity
@@ -199,7 +202,7 @@ const WalletScreen = () => {
               onPress={() => Alert.alert('Transaction History', 'View full history')}
               activeOpacity={0.7}
             >
-              <Icon name="history" size={22} color="#F9C349" />
+              <Icon name="history" size={22} color={colors.accent} />
             </TouchableOpacity>
           </View>
 
@@ -217,7 +220,7 @@ const WalletScreen = () => {
               <View style={styles.balanceHeader}>
                 <Text style={styles.balanceLabel}>Available Balance</Text>
                 <View style={styles.balanceBadge}>
-                  <IconMCI name="wallet" size={16} color="#F9C349" />
+                  <IconMCI name="wallet" size={16} color={colors.accent} />
                   <Text style={styles.balanceBadgeText}>Wallet</Text>
                 </View>
               </View>
@@ -238,10 +241,10 @@ const WalletScreen = () => {
                   activeOpacity={0.8}
                 >
                   <LinearGradient
-                    colors={['#F9C349', '#F7B731']}
+                    colors={[colors.accent, '#F7B731']}
                     style={styles.actionGradient}
                   >
-                    <Icon name="add" size={20} color="#000" />
+                    <Icon name="add" size={20} color={colors.text} />
                     <Text style={styles.balanceActionText}>Add Funds</Text>
                   </LinearGradient>
                 </TouchableOpacity>
@@ -254,7 +257,7 @@ const WalletScreen = () => {
                   activeOpacity={0.8}
                 >
                   <View style={styles.withdrawGradient}>
-                    <Icon name="remove" size={20} color="#000" />
+                    <Icon name="remove" size={20} color={colors.text} />
                     <Text style={styles.balanceActionText}>Withdraw</Text>
                   </View>
                 </TouchableOpacity>
@@ -270,8 +273,8 @@ const WalletScreen = () => {
             style={styles.statsContainer}
           >
             <View style={styles.statCard}>
-              <View style={[styles.statIcon, { backgroundColor: '#FFF8E8' }]}>
-                <IconMCI name="cash" size={20} color="#F9C349" />
+              <View style={[styles.statIcon, { backgroundColor: colors.accent + '18' }]}>
+                <IconMCI name="cash" size={20} color={colors.accent} />
               </View>
               <View>
                 <Text style={styles.statLabel}>Total Spent</Text>
@@ -305,7 +308,7 @@ const WalletScreen = () => {
 
             {loading ? (
               <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#F9C349" />
+                <ActivityIndicator size="large" color={colors.accent} />
               </View>
             ) : transactions.length > 0 ? (
               transactions.slice(0, 5).map((transaction, index) => (
@@ -393,7 +396,7 @@ const WalletScreen = () => {
                     animateModal(false);
                   }}
                 >
-                  <Icon name="close" size={24} color="#000" />
+                  <Icon name="close" size={24} color={colors.text} />
                 </TouchableOpacity>
               </View>
 
@@ -404,7 +407,7 @@ const WalletScreen = () => {
                   value={amount}
                   onChangeText={setAmount}
                   placeholder="0.00"
-                  placeholderTextColor="#999"
+                  placeholderTextColor={colors.textSecondary}
                   keyboardType="numeric"
                   autoFocus
                 />
@@ -441,7 +444,7 @@ const WalletScreen = () => {
                   disabled={isSubmitting}
                 >
                   {isSubmitting ? (
-                    <ActivityIndicator size="small" color="#000" />
+                    <ActivityIndicator size="small" color={colors.text} />
                   ) : (
                     <Text style={styles.confirmButtonText}>Add Funds</Text>
                   )}
@@ -490,12 +493,12 @@ const WalletScreen = () => {
                     animateModal(false);
                   }}
                 >
-                  <Icon name="close" size={24} color="#000" />
+                  <Icon name="close" size={24} color={colors.text} />
                 </TouchableOpacity>
               </View>
 
               <View style={styles.balanceInfo}>
-                <IconMCI name="wallet" size={20} color="#F9C349" />
+                <IconMCI name="wallet" size={20} color={colors.accent} />
                 <Text style={styles.balanceInfoText}>Available: {formatCurrency(walletBalance)}</Text>
               </View>
 
@@ -506,7 +509,7 @@ const WalletScreen = () => {
                   value={amount}
                   onChangeText={setAmount}
                   placeholder="0.00"
-                  placeholderTextColor="#999"
+                  placeholderTextColor={colors.textSecondary}
                   keyboardType="numeric"
                   autoFocus
                 />
@@ -557,14 +560,17 @@ const WalletScreen = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors, isDark) => {
+  const cardBg = isDark ? colors.card : '#FFFFFF';
+  const insetBg = isDark ? colors.cardElevated : '#F5F5F5';
+  return StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: cardBg,
   },
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: cardBg,
     marginTop:34
   },
   scrollContent: {
@@ -585,7 +591,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 22,
     fontWeight: '700',
-    color: '#000',
+    color: colors.text,
     flex: 1,
     marginLeft: 12,
   },
@@ -597,7 +603,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     marginBottom: 20,
     borderWidth: 1,
-    borderColor: '#F9C349',
+    borderColor: colors.accent,
   },
   balanceGradient: {
     padding: 24,
@@ -609,26 +615,26 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   balanceLabel: {
-    color: '#888',
+    color: colors.textSecondary,
     fontSize: 14,
     fontWeight: '500',
   },
   balanceBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFF8E8',
+    backgroundColor: colors.accent + '18',
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
     gap: 4,
   },
   balanceBadgeText: {
-    color: '#F9C349',
+    color: colors.accent,
     fontSize: 11,
     fontWeight: '600',
   },
   balanceAmount: {
-    color: '#000',
+    color: colors.text,
     fontSize: 42,
     fontWeight: '800',
     marginVertical: 8,
@@ -655,14 +661,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 12,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: insetBg,
     gap: 8,
     borderWidth: 1,
-    borderColor: '#F0F0F0',
+    borderColor: colors.border,
     borderRadius: 25,
   },
   balanceActionText: {
-    color: '#000',
+    color: colors.text,
     fontSize: 14,
     fontWeight: '600',
   },
@@ -675,11 +681,11 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8F8F8',
+    backgroundColor: insetBg,
     padding: 14,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#F0F0F0',
+    borderColor: colors.border,
     gap: 12,
   },
   statIcon: {
@@ -690,11 +696,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   statLabel: {
-    color: '#888',
+    color: colors.textSecondary,
     fontSize: 12,
   },
   statValue: {
-    color: '#000',
+    color: colors.text,
     fontSize: 16,
     fontWeight: '700',
   },
@@ -708,12 +714,12 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   sectionTitle: {
-    color: '#000',
+    color: colors.text,
     fontSize: 18,
     fontWeight: '700',
   },
   seeAll: {
-    color: '#F9C349',
+    color: colors.accent,
     fontSize: 14,
     fontWeight: '600',
   },
@@ -725,12 +731,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#F8F8F8',
+    backgroundColor: insetBg,
     padding: 14,
     borderRadius: 12,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: '#F0F0F0',
+    borderColor: colors.border,
   },
   transactionLeft: {
     flexDirection: 'row',
@@ -746,12 +752,12 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   transactionTitle: {
-    color: '#000',
+    color: colors.text,
     fontSize: 14,
     fontWeight: '500',
   },
   transactionDate: {
-    color: '#888',
+    color: colors.textSecondary,
     fontSize: 12,
     marginTop: 2,
   },
@@ -767,20 +773,20 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: '#F8F8F8',
+    backgroundColor: insetBg,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#F0F0F0',
+    borderColor: colors.border,
   },
   emptyText: {
-    color: '#000',
+    color: colors.text,
     fontSize: 16,
     fontWeight: '600',
     marginTop: 12,
   },
   emptySubtext: {
-    color: '#888',
+    color: colors.textSecondary,
     fontSize: 14,
     marginTop: 4,
   },
@@ -801,7 +807,7 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   modalContent: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: cardBg,
     borderRadius: 24,
     padding: 24,
     width: width - 40,
@@ -815,10 +821,10 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#000',
+    color: colors.text,
   },
   modalSubtitle: {
-    color: '#888',
+    color: colors.textSecondary,
     fontSize: 14,
     marginTop: 2,
   },
@@ -828,36 +834,36 @@ const styles = StyleSheet.create({
   balanceInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFF8E8',
+    backgroundColor: colors.accent + '18',
     padding: 12,
     borderRadius: 12,
     marginBottom: 16,
     gap: 8,
   },
   balanceInfoText: {
-    color: '#000',
+    color: colors.text,
     fontSize: 14,
     fontWeight: '500',
   },
   amountContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F5F5F5',
+    backgroundColor: insetBg,
     borderRadius: 14,
     paddingHorizontal: 16,
     borderWidth: 1,
-    borderColor: '#F0F0F0',
+    borderColor: colors.border,
     marginBottom: 16,
   },
   currencySymbol: {
-    color: '#000',
+    color: colors.text,
     fontSize: 20,
     fontWeight: '700',
     marginRight: 8,
   },
   amountInput: {
     flex: 1,
-    color: '#000',
+    color: colors.text,
     fontSize: 24,
     paddingVertical: 14,
   },
@@ -869,24 +875,24 @@ const styles = StyleSheet.create({
   },
   quickAmount: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: insetBg,
     paddingVertical: 8,
     borderRadius: 10,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#F0F0F0',
+    borderColor: colors.border,
   },
   quickAmountActive: {
-    backgroundColor: '#FFF8E8',
-    borderColor: '#F9C349',
+    backgroundColor: colors.accent + '18',
+    borderColor: colors.accent,
   },
   quickAmountText: {
-    color: '#888',
+    color: colors.textSecondary,
     fontSize: 12,
     fontWeight: '500',
   },
   quickAmountTextActive: {
-    color: '#000',
+    color: colors.text,
     fontWeight: '700',
   },
   modalButtons: {
@@ -901,20 +907,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   cancelButton: {
-    backgroundColor: '#F5F5F5',
+    backgroundColor: insetBg,
     borderWidth: 1,
-    borderColor: '#F0F0F0',
+    borderColor: colors.border,
   },
   cancelButtonText: {
-    color: '#888',
+    color: colors.textSecondary,
     fontSize: 15,
     fontWeight: '600',
   },
   confirmButton: {
-    backgroundColor: '#F9C349',
+    backgroundColor: colors.accent,
   },
   confirmButtonText: {
-    color: '#000',
+    color: colors.text,
     fontSize: 15,
     fontWeight: '700',
   },
@@ -926,6 +932,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
   },
-});
+  });
+};
 
 export default WalletScreen;

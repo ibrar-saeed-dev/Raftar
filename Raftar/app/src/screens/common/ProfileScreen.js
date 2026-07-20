@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { useTheme } from '../../context/ThemeContext';
 import {
   View,
   Text,
@@ -35,6 +36,8 @@ import { updateProfile } from '../../redux/slices/userSlice';
 const { width, height } = Dimensions.get('window');
 
 const ProfileScreen = () => {
+  const { colors, isDark } = useTheme();
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   const navigation = useNavigation();
   const dispatch = useDispatch();
   const { user } = useSelector(state => state.auth);
@@ -321,9 +324,9 @@ const ProfileScreen = () => {
   ];
 
   const stats = [
-    { label: 'Total Rides', value: user?.stats?.totalRides?.toString() || '0', icon: 'car', color: '#F9C349', iconType: 'ionicon' },
-    { label: 'Rating', value: user?.stats?.rating?.toString() || '0', icon: 'star', color: '#F9C349' },
-    { label: 'Points', value: '2.3k', icon: 'trophy', color: '#F9C349', iconType: 'ionicon' }
+    { label: 'Total Rides', value: user?.stats?.totalRides?.toString() || '0', icon: 'car', color: colors.accent, iconType: 'ionicon' },
+    { label: 'Rating', value: user?.stats?.rating?.toString() || '0', icon: 'star', color: colors.accent },
+    { label: 'Points', value: '2.3k', icon: 'trophy', color: colors.accent, iconType: 'ionicon' }
   ];
 
   const getIcon = (icon, iconType, size, color) => {
@@ -343,7 +346,7 @@ const ProfileScreen = () => {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+      <StatusBar barStyle={colors.statusBarStyle} backgroundColor={colors.background} />
       
       <Animated.View 
         style={[
@@ -367,21 +370,21 @@ const ProfileScreen = () => {
               style={styles.backButton}
               onPress={() => navigation.goBack()}
             >
-              <Icon name="arrow-back" size={24} color="#000" />
+              <Icon name="arrow-back" size={24} color={colors.text} />
             </TouchableOpacity>
             <Text style={styles.headerTitle}>My Profile</Text>
             <TouchableOpacity 
               style={styles.moreButton}
               onPress={openSidebar}
             >
-              <Icon name="more-vert" size={24} color="#000" />
+              <Icon name="more-vert" size={24} color={colors.text} />
             </TouchableOpacity>
           </View>
 
           {/* Modern Cover Photo */}
           <View style={styles.coverContainer}>
             <LinearGradient
-              colors={['#F9C349', '#F8B82A', '#F5A623']}
+              colors={[colors.accent, colors.accent, '#F5A623']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.coverGradient}
@@ -393,7 +396,7 @@ const ProfileScreen = () => {
                   style={styles.coverBadgeContainer}
                 >
                   <View style={styles.coverBadge}>
-                    <Icon name="star" size={14} color="#F9C349" />
+                    <Icon name="star" size={14} color={colors.accent} />
                     <Text style={styles.coverBadgeText}>Premium Rider</Text>
                   </View>
                 </Animatable.View>
@@ -425,12 +428,12 @@ const ProfileScreen = () => {
                     />
                     {isImageLoading && (
                       <View style={styles.imageLoadingOverlay}>
-                        <ActivityIndicator size="large" color="#F9C349" />
+                        <ActivityIndicator size="large" color={colors.accent} />
                       </View>
                     )}
                   </View>
                   <View style={styles.cameraIcon}>
-                    <Icon name="camera-alt" size={14} color="#000" />
+                    <Icon name="camera-alt" size={14} color={colors.text} />
                   </View>
                 </TouchableOpacity>
 
@@ -445,11 +448,11 @@ const ProfileScreen = () => {
                     </View>
                   </View>
                   <View style={styles.userPhoneContainer}>
-                    <IconIonic name="call-outline" size={14} color="#888" />
+                    <IconIonic name="call-outline" size={14} color={colors.textSecondary} />
                     <Text style={styles.userPhone}>{user?.phoneNumber || 'N/A'}</Text>
                   </View>
                   <View style={styles.userBioContainer}>
-                    <IconIonic name="chatbubble-outline" size={14} color="#888" />
+                    <IconIonic name="chatbubble-outline" size={14} color={colors.textSecondary} />
                     <Text style={styles.userBio} numberOfLines={2}>
                       {profileData.bio}
                     </Text>
@@ -460,12 +463,12 @@ const ProfileScreen = () => {
               {/* User Meta Info */}
               <View style={styles.metaInfoContainer}>
                 <View style={styles.metaItem}>
-                  <Icon name="email" size={16} color="#F9C349" />
+                  <Icon name="email" size={16} color={colors.accent} />
                   <Text style={styles.metaText}>{user?.email || 'No email'}</Text>
                 </View>
                 <View style={styles.metaDivider} />
                 <View style={styles.metaItem}>
-                  <Icon name="credit-card" size={16} color="#F9C349" />
+                  <Icon name="credit-card" size={16} color={colors.accent} />
                   <Text style={styles.metaText}>{user?.cnic || 'No CNIC'}</Text>
                 </View>
               </View>
@@ -486,7 +489,7 @@ const ProfileScreen = () => {
                   style={styles.statIconWrapper}
                 >
                   <View style={styles.statIcon}>
-                    {getIcon(stat.icon, stat.iconType || 'material', 24, '#F9C349')}
+                    {getIcon(stat.icon, stat.iconType || 'material', 24, colors.accent)}
                   </View>
                 </LinearGradient>
                 <Text style={styles.statValue}>{stat.value}</Text>
@@ -504,7 +507,7 @@ const ProfileScreen = () => {
           >
             <View style={styles.sectionHeader}>
               <View style={styles.sectionTitleContainer}>
-                <Icon name="person" size={22} color="#F9C349" />
+                <Icon name="person" size={22} color={colors.accent} />
                 <Text style={styles.sectionTitle}>Personal Information</Text>
               </View>
               <TouchableOpacity 
@@ -512,7 +515,7 @@ const ProfileScreen = () => {
                 style={styles.editButtonContainer}
               >
                 <LinearGradient
-                  colors={isEditing ? ['#FF3B30', '#FF3B30'] : ['#F9C349', '#F8B82A']}
+                  colors={isEditing ? ['#FF3B30', '#FF3B30'] : [colors.accent, colors.accent]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 0 }}
                   style={[styles.editButtonGradient, isEditing && styles.editButtonActive]}
@@ -568,16 +571,16 @@ const ProfileScreen = () => {
                   disabled={loading}
                 >
                   <LinearGradient
-                    colors={['#F9C349', '#F8B82A']}
+                    colors={[colors.accent, colors.accent]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 0 }}
                     style={styles.saveButtonGradient}
                   >
                     {loading ? (
-                      <ActivityIndicator size="small" color="#000" />
+                      <ActivityIndicator size="small" color={colors.text} />
                     ) : (
                       <>
-                        <Icon name="save" size={20} color="#000" />
+                        <Icon name="save" size={20} color={colors.text} />
                         <Text style={styles.saveButtonText}>Save Changes</Text>
                       </>
                     )}
@@ -588,28 +591,28 @@ const ProfileScreen = () => {
               <View style={styles.infoCard}>
                 <View style={styles.infoRow}>
                   <View style={styles.infoLabelContainer}>
-                    <Icon name="person-outline" size={18} color="#888" />
+                    <Icon name="person-outline" size={18} color={colors.textSecondary} />
                     <Text style={styles.infoLabel}>Full Name</Text>
                   </View>
                   <Text style={styles.infoValue}>{user?.name}</Text>
                 </View>
                 <View style={styles.infoRow}>
                   <View style={styles.infoLabelContainer}>
-                    <Icon name="phone" size={18} color="#888" />
+                    <Icon name="phone" size={18} color={colors.textSecondary} />
                     <Text style={styles.infoLabel}>Phone</Text>
                   </View>
                   <Text style={styles.infoValue}>{user?.phoneNumber}</Text>
                 </View>
                 <View style={styles.infoRow}>
                   <View style={styles.infoLabelContainer}>
-                    <Icon name="email" size={18} color="#888" />
+                    <Icon name="email" size={18} color={colors.textSecondary} />
                     <Text style={styles.infoLabel}>Email</Text>
                   </View>
                   <Text style={styles.infoValue}>{user?.email || 'Not set'}</Text>
                 </View>
                 <View style={[styles.infoRow, styles.lastInfoRow]}>
                   <View style={styles.infoLabelContainer}>
-                    <Icon name="credit-card" size={18} color="#888" />
+                    <Icon name="credit-card" size={18} color={colors.textSecondary} />
                     <Text style={styles.infoLabel}>CNIC</Text>
                   </View>
                   <Text style={styles.infoValue}>{user?.cnic || 'Not set'}</Text>
@@ -654,7 +657,7 @@ const ProfileScreen = () => {
         >
           {/* Sidebar Header */}
           <LinearGradient
-            colors={['#F9C349', '#F8B82A']}
+            colors={[colors.accent, colors.accent]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
             style={styles.sidebarHeader}
@@ -663,7 +666,7 @@ const ProfileScreen = () => {
               style={styles.sidebarCloseButton}
               onPress={closeSidebar}
             >
-              <Icon name="close" size={24} color="#000" />
+              <Icon name="close" size={24} color={colors.text} />
             </TouchableOpacity>
             
             <View style={styles.sidebarUserInfo}>
@@ -679,7 +682,7 @@ const ProfileScreen = () => {
                   style={styles.sidebarAvatar}
                 />
                 <View style={styles.sidebarCameraIcon}>
-                  <Icon name="camera-alt" size={12} color="#000" />
+                  <Icon name="camera-alt" size={12} color={colors.text} />
                 </View>
               </TouchableOpacity>
               
@@ -730,7 +733,7 @@ const ProfileScreen = () => {
                     styles.sidebarMenuItemIcon,
                     item.isDanger && styles.sidebarMenuItemIconDanger
                   ]}>
-                    {getIcon(item.icon, item.iconType, 22, item.isDanger ? '#FF3B30' : '#F9C349')}
+                    {getIcon(item.icon, item.iconType, 22, item.isDanger ? '#FF3B30' : colors.accent)}
                   </View>
                   <View style={styles.sidebarMenuItemTextContainer}>
                     <Text style={[
@@ -754,7 +757,7 @@ const ProfileScreen = () => {
                     <Switch
                       value={item.switchValue}
                       onValueChange={item.onSwitchChange}
-                      trackColor={{ false: '#E0E0E0', true: '#F9C349' }}
+                      trackColor={{ false: '#E0E0E0', true: colors.accent }}
                       thumbColor={item.switchValue ? '#FFF' : '#999'}
                       ios_backgroundColor="#E0E0E0"
                     />
@@ -771,13 +774,13 @@ const ProfileScreen = () => {
             <Text style={styles.sidebarVersion}>Version 2.0.0</Text>
             <View style={styles.sidebarSocialIcons}>
               <TouchableOpacity style={styles.sidebarSocialIcon}>
-                <Icon name="facebook" size={20} color="#888" />
+                <Icon name="facebook" size={20} color={colors.textSecondary} />
               </TouchableOpacity>
               <TouchableOpacity style={styles.sidebarSocialIcon}>
-                <Icon name="twitter" size={20} color="#888" />
+                <Icon name="twitter" size={20} color={colors.textSecondary} />
               </TouchableOpacity>
               <TouchableOpacity style={styles.sidebarSocialIcon}>
-                <Icon name="instagram" size={20} color="#888" />
+                <Icon name="instagram" size={20} color={colors.textSecondary} />
               </TouchableOpacity>
             </View>
           </View>
@@ -787,14 +790,17 @@ const ProfileScreen = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors, isDark) => {
+  const cardBg = isDark ? colors.card : '#FFFFFF';
+  const insetBg = isDark ? colors.cardElevated : '#F5F5F5';
+  return StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: cardBg,
   },
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: colors.background,
     marginTop: 30
   },
   scrollContent: {
@@ -816,7 +822,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#000',
+    color: colors.text,
   },
   moreButton: {
     padding: 8,
@@ -858,14 +864,14 @@ const styles = StyleSheet.create({
   coverBadgeText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#000',
+    color: colors.text,
   },
   profileCardWrapper: {
     marginTop: -50,
     paddingHorizontal: 16,
   },
   profileCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: cardBg,
     borderRadius: 24,
     padding: 20,
     elevation: 4,
@@ -889,7 +895,7 @@ const styles = StyleSheet.create({
     height: 80,
     borderRadius: 40,
     padding: 3,
-    backgroundColor: '#F9C349',
+    backgroundColor: colors.accent,
   },
   profileImage: {
     width: 74,
@@ -913,7 +919,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 0,
     right: 0,
-    backgroundColor: '#F9C349',
+    backgroundColor: colors.accent,
     borderRadius: 14,
     width: 28,
     height: 28,
@@ -934,7 +940,7 @@ const styles = StyleSheet.create({
   userName: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#000',
+    color: colors.text,
   },
   verificationBadge: {
     width: 20,
@@ -951,7 +957,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   userPhone: {
-    color: '#888',
+    color: colors.textSecondary,
     fontSize: 13,
   },
   userBioContainer: {
@@ -960,7 +966,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   userBio: {
-    color: '#666',
+    color: colors.textSecondary,
     fontSize: 12,
     fontStyle: 'italic',
     flex: 1,
@@ -971,7 +977,7 @@ const styles = StyleSheet.create({
     marginTop: 16,
     paddingTop: 16,
     borderTopWidth: 1,
-    borderTopColor: '#F0F0F0',
+    borderTopColor: colors.border,
     gap: 16,
   },
   metaItem: {
@@ -983,10 +989,10 @@ const styles = StyleSheet.create({
   metaDivider: {
     width: 1,
     height: 24,
-    backgroundColor: '#F0F0F0',
+    backgroundColor: insetBg,
   },
   metaText: {
-    color: '#888',
+    color: colors.textSecondary,
     fontSize: 12,
   },
   statsContainer: {
@@ -995,7 +1001,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     marginTop: 24,
     marginBottom: 24,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: cardBg,
     paddingVertical: 20,
     borderRadius: 20,
     elevation: 4,
@@ -1021,17 +1027,17 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: cardBg,
     justifyContent: 'center',
     alignItems: 'center',
   },
   statValue: {
-    color: '#000',
+    color: colors.text,
     fontSize: 20,
     fontWeight: '700',
   },
   statLabel: {
-    color: '#888',
+    color: colors.textSecondary,
     fontSize: 11,
     marginTop: 2,
   },
@@ -1051,7 +1057,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   sectionTitle: {
-    color: '#000',
+    color: colors.text,
     fontSize: 18,
     fontWeight: '700',
   },
@@ -1071,7 +1077,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FF3B30',
   },
   editButton: {
-    color: '#000',
+    color: colors.text,
     fontSize: 13,
     fontWeight: '600',
   },
@@ -1094,12 +1100,12 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   saveButtonText: {
-    color: '#000',
+    color: colors.text,
     fontSize: 16,
     fontWeight: '600',
   },
   infoCard: {
-    backgroundColor: '#F8F9FA',
+    backgroundColor: colors.background,
     padding: 16,
     borderRadius: 16,
     borderWidth: 1,
@@ -1123,11 +1129,11 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   infoLabel: {
-    color: '#888',
+    color: colors.textSecondary,
     fontSize: 14,
   },
   infoValue: {
-    color: '#000',
+    color: colors.text,
     fontSize: 14,
     fontWeight: '500',
     maxWidth: '55%',
@@ -1152,7 +1158,7 @@ const styles = StyleSheet.create({
     right: 0,
     width: width * 0.82,
     height: '100%',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: cardBg,
     borderTopLeftRadius: 30,
     borderBottomLeftRadius: 30,
     overflow: 'hidden',
@@ -1194,7 +1200,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 0,
     right: 0,
-    backgroundColor: '#F9C349',
+    backgroundColor: colors.accent,
     borderRadius: 14,
     width: 24,
     height: 24,
@@ -1206,7 +1212,7 @@ const styles = StyleSheet.create({
   sidebarUserName: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#000',
+    color: colors.text,
     marginBottom: 2,
   },
   sidebarUserEmail: {
@@ -1226,7 +1232,7 @@ const styles = StyleSheet.create({
   sidebarStatValue: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#000',
+    color: colors.text,
   },
   sidebarStatLabel: {
     fontSize: 11,
@@ -1253,7 +1259,7 @@ const styles = StyleSheet.create({
   sidebarMenuItemDanger: {
     marginTop: 8,
     borderTopWidth: 1,
-    borderTopColor: '#F0F0F0',
+    borderTopColor: colors.border,
     paddingTop: 16,
   },
   sidebarMenuItemLeft: {
@@ -1266,12 +1272,12 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 10,
-    backgroundColor: '#FFF8E8',
+    backgroundColor: colors.accent + '18',
     justifyContent: 'center',
     alignItems: 'center',
   },
   sidebarMenuItemIconDanger: {
-    backgroundColor: '#FFF5F5',
+    backgroundColor: colors.danger + '15',
   },
   sidebarMenuItemTextContainer: {
     flex: 1,
@@ -1279,14 +1285,14 @@ const styles = StyleSheet.create({
   sidebarMenuItemText: {
     fontSize: 15,
     fontWeight: '500',
-    color: '#000',
+    color: colors.text,
   },
   sidebarMenuItemTextDanger: {
     color: '#FF3B30',
   },
   sidebarMenuItemValue: {
     fontSize: 12,
-    color: '#888',
+    color: colors.textSecondary,
     marginTop: 1,
   },
   sidebarMenuItemRight: {
@@ -1295,13 +1301,13 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   sidebarMenuBadge: {
-    backgroundColor: '#F9C349',
+    backgroundColor: colors.accent,
     borderRadius: 12,
     paddingHorizontal: 8,
     paddingVertical: 2,
   },
   sidebarMenuBadgeText: {
-    color: '#000',
+    color: colors.text,
     fontSize: 11,
     fontWeight: 'bold',
   },
@@ -1309,7 +1315,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingVertical: 16,
     borderTopWidth: 1,
-    borderTopColor: '#F0F0F0',
+    borderTopColor: colors.border,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -1325,6 +1331,7 @@ const styles = StyleSheet.create({
   sidebarSocialIcon: {
     padding: 4,
   },
-});
+  });
+};
 
 export default ProfileScreen;

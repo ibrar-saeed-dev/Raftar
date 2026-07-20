@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
+import { useTheme } from '../../context/ThemeContext';
 import {
   View,
   Text,
@@ -15,6 +16,8 @@ import Button from '../../components/common/Button';
 import { processPayment } from '../../redux/slices/paymentSlice';
 
 const PaymentScreen = () => {
+  const { colors, isDark } = useTheme();
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   const navigation = useNavigation();
   const route = useRoute();
   const dispatch = useDispatch();
@@ -30,7 +33,7 @@ const PaymentScreen = () => {
     { id: 'easypaisa', label: 'Easypaisa', icon: 'phone-android', color: '#FF9F43' },
     { id: 'jazzcash', label: 'JazzCash', icon: 'phone-android', color: '#A29BFE' },
     { id: 'raast', label: 'Raast', icon: 'account-balance', color: '#45B7D1' },
-    { id: 'wallet', label: 'Wallet', icon: 'account-balance-wallet', color: '#FFD700' }
+    { id: 'wallet', label: 'Wallet', icon: 'account-balance-wallet', color: colors.accent }
   ];
 
   const handlePayment = async () => {
@@ -76,7 +79,7 @@ const PaymentScreen = () => {
             </View>
             <Text style={styles.methodLabel}>{method.label}</Text>
             {selectedMethod === method.id && (
-              <Icon name="check-circle" size={24} color="#FFD700" />
+              <Icon name="check-circle" size={24} color={colors.accent} />
             )}
           </TouchableOpacity>
         ))}
@@ -125,10 +128,13 @@ const PaymentScreen = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors, isDark) => {
+  const cardBg = isDark ? colors.card : '#FFFFFF';
+  const insetBg = isDark ? colors.cardElevated : '#F5F5F5';
+  return StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#121212',
+    backgroundColor: colors.background,
     paddingHorizontal: 20,
     paddingTop: 20,
   },
@@ -145,7 +151,7 @@ const styles = StyleSheet.create({
   amount: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: '#FFD700',
+    color: colors.accent,
   },
   section: {
     marginBottom: 24,
@@ -159,7 +165,7 @@ const styles = StyleSheet.create({
   methodCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1E1E1E',
+    backgroundColor: colors.card,
     padding: 16,
     borderRadius: 12,
     marginBottom: 10,
@@ -167,8 +173,8 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   methodCardSelected: {
-    borderColor: '#FFD700',
-    backgroundColor: '#2A2A2A',
+    borderColor: colors.accent,
+    backgroundColor: colors.cardElevated,
   },
   methodIcon: {
     width: 44,
@@ -184,7 +190,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   walletInfo: {
-    backgroundColor: '#1E1E1E',
+    backgroundColor: colors.card,
     padding: 16,
     borderRadius: 12,
     marginBottom: 20,
@@ -200,7 +206,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   summary: {
-    backgroundColor: '#1E1E1E',
+    backgroundColor: colors.card,
     padding: 20,
     borderRadius: 12,
     marginBottom: 24,
@@ -216,10 +222,10 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 8,
     borderBottomWidth: 1,
-    borderBottomColor: '#2A2A2A',
+    borderBottomColor: colors.border,
   },
   summaryLabel: {
-    color: '#888',
+    color: colors.textSecondary,
     fontSize: 14,
   },
   summaryValue: {
@@ -233,7 +239,7 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     marginTop: 8,
     borderTopWidth: 2,
-    borderTopColor: '#2A2A2A',
+    borderTopColor: colors.border,
   },
   summaryTotalLabel: {
     color: '#FFF',
@@ -241,13 +247,14 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   summaryTotalValue: {
-    color: '#FFD700',
+    color: colors.accent,
     fontSize: 20,
     fontWeight: 'bold',
   },
   payButton: {
     marginBottom: 30,
   },
-});
+  });
+};
 
 export default PaymentScreen;

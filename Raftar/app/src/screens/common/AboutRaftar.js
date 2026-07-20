@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { useTheme } from '../../context/ThemeContext';
 import {
   View,
   Text,
@@ -24,6 +25,8 @@ import { useNavigation } from '@react-navigation/native';
 const { width, height } = Dimensions.get('window');
 
 const AboutRaftar = () => {
+  const { colors, isDark } = useTheme();
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   const navigation = useNavigation();
 
   // Animation values
@@ -125,14 +128,14 @@ const AboutRaftar = () => {
   ];
 
   const stats = [
-    { id: 1, value: '50K+', label: 'Happy Riders', icon: 'happy', color: '#F9C349' },
+    { id: 1, value: '50K+', label: 'Happy Riders', icon: 'happy', color: colors.accent },
     { id: 2, value: '100K+', label: 'Rides Completed', icon: 'car', color: '#4ECDC4' },
     { id: 3, value: '4.8', label: 'Average Rating', icon: 'star', color: '#FF6B6B' },
     { id: 4, value: '24/7', label: 'Support Available', icon: 'headset', color: '#45B7D1' }
   ];
 
   const achievements = [
-    { id: 1, icon: 'award', label: 'Best Ride App 2024', color: '#F9C349' },
+    { id: 1, icon: 'award', label: 'Best Ride App 2024', color: colors.accent },
     { id: 2, icon: 'verified', label: 'ISO Certified', color: '#4ECDC4' },
     { id: 3, icon: 'shield', label: 'Secure Platform', color: '#45B7D1' }
   ];
@@ -160,7 +163,7 @@ const AboutRaftar = () => {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+      <StatusBar barStyle={colors.statusBarStyle} backgroundColor={colors.background} />
 
       <Animated.View
         style={[
@@ -182,7 +185,7 @@ const AboutRaftar = () => {
               onPress={() => navigation.goBack()}
               activeOpacity={0.7}
             >
-              <Icon name="arrow-back" size={24} color="#000" />
+              <Icon name="arrow-back" size={24} color={colors.text} />
             </TouchableOpacity>
             <Text style={styles.headerTitle}>About Raftar</Text>
             <TouchableOpacity
@@ -190,7 +193,7 @@ const AboutRaftar = () => {
               onPress={() => Alert.alert('Share', 'Share Raftar with friends!')}
               activeOpacity={0.7}
             >
-              <Icon name="share" size={22} color="#000" />
+              <Icon name="share" size={22} color={colors.text} />
             </TouchableOpacity>
           </View>
 
@@ -217,7 +220,7 @@ const AboutRaftar = () => {
                         transform: [{ rotate: rotateInterpolate }],
                       }}
                     >
-                      <IconMCI name="car-multiple" size={50} color="#F9C349" />
+                      <IconMCI name="car-multiple" size={50} color={colors.accent} />
                     </Animated.View>
                   </View>
                   <Text style={styles.logoText}>Raftar</Text>
@@ -276,7 +279,7 @@ const AboutRaftar = () => {
                 colors={['#FFF8E8', '#FFFFFF']}
                 style={styles.missionGradient}
               >
-                <IconMCI name="rocket-launch" size={28} color="#F9C349" />
+                <IconMCI name="rocket-launch" size={28} color={colors.accent} />
                 <Text style={styles.missionText}>
                   Our mission is to revolutionize the way Pakistan travels by providing 
                   innovative mobility solutions that are safe, reliable, and sustainable.
@@ -333,7 +336,7 @@ const AboutRaftar = () => {
                     style={styles.featureGradient}
                   >
                     <View style={styles.featureIconContainer}>
-                      {getIcon(feature.icon, feature.iconType, 28, '#F9C349')}
+                      {getIcon(feature.icon, feature.iconType, 28, colors.accent)}
                     </View>
                     <Text style={styles.featureTitle}>{feature.title}</Text>
                     <Text style={styles.featureDescription}>{feature.description}</Text>
@@ -407,14 +410,17 @@ const AboutRaftar = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors, isDark) => {
+  const cardBg = isDark ? colors.card : '#FFFFFF';
+  const insetBg = isDark ? colors.cardElevated : '#F5F5F5';
+  return StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: cardBg,
   },
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: cardBg,
     marginTop:34
   },
   scrollContent: {
@@ -436,7 +442,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#000',
+    color: colors.text,
     flex: 1,
     marginLeft: 4,
   },
@@ -453,7 +459,7 @@ const styles = StyleSheet.create({
     padding: 30,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#F9C349',
+    borderColor: colors.accent,
     borderRadius: 20,
   },
   logoContainer: {
@@ -465,39 +471,39 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: '#FFF8E8',
+    backgroundColor: colors.accent + '18',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: '#F9C349',
+    borderColor: colors.accent,
   },
   logoText: {
     fontSize: 40,
     fontWeight: '800',
-    color: '#F9C349',
+    color: colors.accent,
     letterSpacing: 1.5,
   },
   logoBadge: {
-    backgroundColor: '#F9C349',
+    backgroundColor: colors.accent,
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
     alignSelf: 'flex-start',
   },
   logoBadgeText: {
-    color: '#000',
+    color: colors.text,
     fontSize: 12,
     fontWeight: '700',
   },
   tagline: {
     fontSize: 18,
-    color: '#666',
+    color: colors.textSecondary,
     marginTop: 12,
     fontWeight: '600',
   },
   taglineSub: {
     fontSize: 14,
-    color: '#888',
+    color: colors.textSecondary,
     marginTop: 4,
   },
   quickStatsContainer: {
@@ -509,12 +515,12 @@ const styles = StyleSheet.create({
   },
   quickStatCard: {
     minWidth: 90,
-    backgroundColor: '#F8F8F8',
+    backgroundColor: insetBg,
     padding: 14,
     borderRadius: 14,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#F0F0F0',
+    borderColor: colors.border,
     marginRight: 12,
   },
   quickStatIcon: {
@@ -528,11 +534,11 @@ const styles = StyleSheet.create({
   quickStatValue: {
     fontSize: 18,
     fontWeight: '800',
-    color: '#000',
+    color: colors.text,
   },
   quickStatLabel: {
     fontSize: 11,
-    color: '#888',
+    color: colors.textSecondary,
     marginTop: 2,
   },
   descriptionSection: {
@@ -547,17 +553,17 @@ const styles = StyleSheet.create({
   sectionHeaderLine: {
     width: 4,
     height: 24,
-    backgroundColor: '#F9C349',
+    backgroundColor: colors.accent,
     borderRadius: 2,
   },
   sectionTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#000',
+    color: colors.text,
   },
   descriptionText: {
     fontSize: 15,
-    color: '#666',
+    color: colors.textSecondary,
     lineHeight: 24,
     marginBottom: 14,
   },
@@ -571,7 +577,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 14,
     borderWidth: 1,
-    borderColor: '#F9C349',
+    borderColor: colors.accent,
     borderRadius: 14,
   },
   missionText: {
@@ -589,12 +595,12 @@ const styles = StyleSheet.create({
   },
   achievementCard: {
     flex: 1,
-    backgroundColor: '#F8F8F8',
+    backgroundColor: insetBg,
     padding: 14,
     borderRadius: 12,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#F0F0F0',
+    borderColor: colors.border,
   },
   achievementIcon: {
     width: 44,
@@ -606,7 +612,7 @@ const styles = StyleSheet.create({
   },
   achievementLabel: {
     fontSize: 12,
-    color: '#666',
+    color: colors.textSecondary,
     textAlign: 'center',
     fontWeight: '500',
   },
@@ -624,7 +630,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#F0F0F0',
+    borderColor: colors.border,
   },
   featureGradient: {
     padding: 16,
@@ -634,23 +640,23 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#FFF8E8',
+    backgroundColor: colors.accent + '18',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: '#F9C349',
+    borderColor: colors.accent,
   },
   featureTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#000',
+    color: colors.text,
     marginBottom: 4,
     textAlign: 'center',
   },
   featureDescription: {
     fontSize: 12,
-    color: '#888',
+    color: colors.textSecondary,
     lineHeight: 18,
     textAlign: 'center',
   },
@@ -661,12 +667,12 @@ const styles = StyleSheet.create({
   contactTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#000',
+    color: colors.text,
     marginBottom: 4,
   },
   contactSubtitle: {
     fontSize: 14,
-    color: '#888',
+    color: colors.textSecondary,
     marginBottom: 16,
   },
   socialLinks: {
@@ -695,23 +701,24 @@ const styles = StyleSheet.create({
   footerDivider: {
     width: 60,
     height: 3,
-    backgroundColor: '#F9C349',
+    backgroundColor: colors.accent,
     borderRadius: 2,
     marginBottom: 12,
   },
   footerText: {
     fontSize: 14,
-    color: '#666',
+    color: colors.textSecondary,
     fontWeight: '500',
   },
   footerSubtext: {
     fontSize: 13,
-    color: '#888',
+    color: colors.textSecondary,
     marginTop: 4,
   },
   bottomSpacer: {
     height: 10,
   },
-});
+  });
+};
 
 export default AboutRaftar;

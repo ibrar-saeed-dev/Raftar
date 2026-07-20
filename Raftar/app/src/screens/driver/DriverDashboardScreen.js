@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { useTheme } from '../../context/ThemeContext';
 import {
   View,
   Text,
@@ -19,6 +20,8 @@ import { useDispatch, useSelector } from 'react-redux';
 import { LinearGradient } from 'expo-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import IconMC from 'react-native-vector-icons/MaterialCommunityIcons';
+import IconIonic from 'react-native-vector-icons/Ionicons';
+import SidebarMenu from '../../components/common/SidebarMenu';
 import MapView, { Marker, Circle, PROVIDER_GOOGLE } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -29,21 +32,27 @@ import { useSocket } from '../../context/SocketContext';
 const { width, height } = Dimensions.get('window');
 
 // Yellow Theme Colors
-const YELLOW_PRIMARY = '#F8B82A';
-const YELLOW_SECONDARY = '#F9C349';
-const WHITE = '#FFFFFF';
-const BLACK = '#000000';
-const GRAY_DARK = '#333333';
-const GRAY_MEDIUM = '#666666';
-const GRAY_LIGHT = '#F5F5F5';
-const GRAY_BG = '#F8F9FA';
+const getThemePalette = (colors, isDark) => ({
+  YELLOW_PRIMARY: colors.accent,
+  YELLOW_SECONDARY: colors.accent,
+  WHITE: isDark ? colors.card : '#FFFFFF',
+  BLACK: colors.text,
+  GRAY_DARK: colors.text,
+  GRAY_MEDIUM: colors.textSecondary,
+  GRAY_LIGHT: isDark ? colors.cardElevated : '#F5F5F5',
+  GRAY_BG: colors.background,
+});
 
 const DriverDashboardScreen = () => {
+  const { colors, isDark } = useTheme();
+  const { YELLOW_PRIMARY, YELLOW_SECONDARY, WHITE, BLACK, GRAY_DARK, GRAY_MEDIUM, GRAY_LIGHT, GRAY_BG } = useMemo(() => getThemePalette(colors, isDark), [colors, isDark]);
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   const navigation = useNavigation();
   const dispatch = useDispatch();
   const { driver, stats, loading } = useSelector(state => state.driver);
   const { user } = useSelector(state => state.auth);
   const [refreshing, setRefreshing] = useState(false);
+  const [sidebarVisible, setSidebarVisible] = useState(false);
   const [recentRides, setRecentRides] = useState([]);
   const [earnings, setEarnings] = useState(null);
   const [activeRide, setActiveRide] = useState(null);
@@ -396,9 +405,16 @@ const DriverDashboardScreen = () => {
     );
   }
 
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good morning';
+    if (hour < 17) return 'Good afternoon';
+    return 'Good evening';
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor={WHITE} />
+      <StatusBar barStyle={colors.statusBarStyle} backgroundColor={colors.background} />
       
       <View style={styles.container}>
         <ScrollView
@@ -414,17 +430,27 @@ const DriverDashboardScreen = () => {
         >
           {/* Header */}
           <View style={styles.header}>
-            <View>
-              <Text style={styles.headerTitle}>Raftar </Text>
+            <View style={styles.headerLeft}>
+              <Text style={styles.greeting}>{getGreeting()},</Text>
+              <Text style={styles.driverName}>{user?.name || 'Driver'}</Text>
             </View>
             <View style={styles.headerRight}>
-              <TouchableOpacity style={styles.notificationButton}>
-                <View style={styles.notificationBadge}>
-                  <Text style={styles.notificationBadgeText}>3</Text>
-                </View>
-                <Icon name="notifications-none" size={26} color={GRAY_DARK} />
+              <TouchableOpacity
+                style={styles.notificationButton}
+                onPress={() => navigation.navigate('Notifications')}
+                activeOpacity={0.7}
+              >
+                <IconIonic name="notifications-outline" size={22} color={colors.text} />
               </TouchableOpacity>
-              
+              <TouchableOpacity
+                style={styles.avatarButton}
+                onPress={() => setSidebarVisible(true)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.avatarText}>
+                  {(user?.name || 'D').charAt(0).toUpperCase()}
+                </Text>
+              </TouchableOpacity>
             </View>
           </View>
 
@@ -727,11 +753,20 @@ const DriverDashboardScreen = () => {
           </View>
         </View>
       </Modal>
+
+      <SidebarMenu
+        visible={sidebarVisible}
+        onClose={() => setSidebarVisible(false)}
+      />
     </SafeAreaView>
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors, isDark) => {
+  const { YELLOW_PRIMARY, YELLOW_SECONDARY, WHITE, BLACK, GRAY_DARK, GRAY_MEDIUM, GRAY_LIGHT, GRAY_BG } = getThemePalette(colors, isDark);
+  const cardBg = isDark ? colors.card : '#FFFFFF';
+  const insetBg = isDark ? colors.cardElevated : '#F5F5F5';
+  return StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: WHITE,
@@ -759,13 +794,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingTop: 16,
-    paddingBottom: 12,
-    backgroundColor: WHITE,
+    paddingBottom: 20,
+    backgroundColor: colors.background,
+  },
+  headerLeft: {
+    flex: 1,
   },
   headerTitle: {
     fontSize: 24,
     fontWeight: '800',
-    color: '#000000',
+    color: colors.text,
     letterSpacing: 0.5,
   },
   greeting: {
@@ -785,12 +823,27 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   notificationButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: GRAY_LIGHT,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: cardBg,
+    borderWidth: 1,
+    borderColor: colors.border,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  avatarButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: colors.accent,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarText: {
+    color: colors.accentText,
+    fontSize: 16,
+    fontWeight: '700',
   },
   notificationBadge: {
     position: 'absolute',
@@ -835,7 +888,7 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#F0F0F0',
+    borderColor: colors.border,
     shadowColor: BLACK,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04,
@@ -962,7 +1015,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#F0F0F0',
+    borderColor: colors.border,
     position: 'relative',
   },
   map: {
@@ -1019,7 +1072,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#F0F0F0',
+    borderColor: colors.border,
     shadowColor: BLACK,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04,
@@ -1078,7 +1131,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#F0F0F0',
+    borderColor: colors.border,
     shadowColor: BLACK,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04,
@@ -1124,7 +1177,7 @@ const styles = StyleSheet.create({
     padding: 20,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#F0F0F0',
+    borderColor: colors.border,
     shadowColor: BLACK,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04,
@@ -1245,7 +1298,7 @@ const styles = StyleSheet.create({
   },
   modalDivider: {
     height: 1,
-    backgroundColor: '#F0F0F0',
+    backgroundColor: insetBg,
     marginBottom: 16,
   },
   modalDetails: {
@@ -1324,7 +1377,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#E0E0E0',
+    borderColor: colors.border,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1348,6 +1401,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: WHITE,
   },
-});
+  });
+};
 
 export default DriverDashboardScreen;

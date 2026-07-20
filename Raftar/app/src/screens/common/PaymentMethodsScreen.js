@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { useTheme } from '../../context/ThemeContext';
 import {
   View,
   Text,
@@ -25,6 +26,8 @@ import { getPaymentMethods, addPaymentMethod, removePaymentMethod } from '../../
 const { width, height } = Dimensions.get('window');
 
 const PaymentMethodsScreen = () => {
+  const { colors, isDark } = useTheme();
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   const navigation = useNavigation();
   const dispatch = useDispatch();
   const { paymentMethods = [], loading = false } = useSelector(state => state.payment || { paymentMethods: [], loading: false });
@@ -200,7 +203,7 @@ const PaymentMethodsScreen = () => {
   const getMethodColor = (type) => {
     switch (type) {
       case 'card':
-        return '#F9C349';
+        return colors.accent;
       case 'easypaisa':
         return '#4ECDC4';
       case 'jazzcash':
@@ -242,9 +245,9 @@ const PaymentMethodsScreen = () => {
   if (loading) {
     return (
       <SafeAreaView style={styles.safeArea}>
-        <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+        <StatusBar barStyle={colors.statusBarStyle} backgroundColor={colors.background} />
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#F9C349" />
+          <ActivityIndicator size="large" color={colors.accent} />
           <Text style={styles.loadingText}>Loading payment methods...</Text>
         </View>
       </SafeAreaView>
@@ -253,7 +256,7 @@ const PaymentMethodsScreen = () => {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+      <StatusBar barStyle={colors.statusBarStyle} backgroundColor={colors.background} />
       
       <Animated.View 
         style={[
@@ -274,7 +277,7 @@ const PaymentMethodsScreen = () => {
               style={styles.backButton}
               onPress={() => navigation.goBack()}
             >
-              <Icon name="arrow-back" size={24} color="#000" />
+              <Icon name="arrow-back" size={24} color={colors.text} />
             </TouchableOpacity>
             <Text style={styles.title}>Payment Methods</Text>
             <TouchableOpacity 
@@ -283,7 +286,7 @@ const PaymentMethodsScreen = () => {
               activeOpacity={0.8}
             >
               <View style={styles.addButtonInner}>
-                <Icon name="add" size={20} color="#000" />
+                <Icon name="add" size={20} color={colors.text} />
                 <Text style={styles.addButtonText}>Add</Text>
               </View>
             </TouchableOpacity>
@@ -294,8 +297,8 @@ const PaymentMethodsScreen = () => {
             <Text style={styles.quickAddTitle}>Quick Add</Text>
             <View style={styles.quickAddGrid}>
               <TouchableOpacity style={styles.quickAddItem} onPress={handleAddCard}>
-                <View style={[styles.quickAddIcon, { backgroundColor: '#FFF8E8' }]}>
-                  <Icon name="credit-card" size={28} color="#F9C349" />
+                <View style={[styles.quickAddIcon, { backgroundColor: colors.accent + '18' }]}>
+                  <Icon name="credit-card" size={28} color={colors.accent} />
                 </View>
                 <Text style={styles.quickAddLabel}>Card</Text>
               </TouchableOpacity>
@@ -369,7 +372,7 @@ const PaymentMethodsScreen = () => {
                   onPress={handleAddCard}
                 >
                   <Text style={styles.emptyButtonText}>Add Payment Method</Text>
-                  <Icon name="arrow-forward" size={18} color="#000" />
+                  <Icon name="arrow-forward" size={18} color={colors.text} />
                 </TouchableOpacity>
               </View>
             )}
@@ -377,7 +380,7 @@ const PaymentMethodsScreen = () => {
 
           {/* Security Note */}
           <Animatable.View animation="fadeInUp" duration={600} delay={300} style={styles.securityNote}>
-            <Icon name="security" size={20} color="#F9C349" />
+            <Icon name="security" size={20} color={colors.accent} />
             <Text style={styles.securityText}>
               Your payment information is secure and encrypted
             </Text>
@@ -421,7 +424,7 @@ const PaymentMethodsScreen = () => {
                   style={styles.modalCloseButton}
                   onPress={handleCloseModal}
                 >
-                  <Icon name="close" size={24} color="#000" />
+                  <Icon name="close" size={24} color={colors.text} />
                 </TouchableOpacity>
               </View>
 
@@ -434,7 +437,7 @@ const PaymentMethodsScreen = () => {
                   ]}
                   onPress={() => setSelectedType('card')}
                 >
-                  <Icon name="credit-card" size={20} color={selectedType === 'card' ? '#F9C349' : '#888'} />
+                  <Icon name="credit-card" size={20} color={selectedType === 'card' ? colors.accent : '#888'} />
                   <Text style={[
                     styles.typeOptionText,
                     selectedType === 'card' && styles.typeOptionTextActive
@@ -473,11 +476,11 @@ const PaymentMethodsScreen = () => {
                 <View style={styles.inputGroup}>
                   <Text style={styles.inputLabel}>Card Holder Name</Text>
                   <View style={styles.inputContainer}>
-                    <Icon name="person" size={20} color="#888" />
+                    <Icon name="person" size={20} color={colors.textSecondary} />
                     <TextInput
                       style={styles.input}
                       placeholder="John Doe"
-                      placeholderTextColor="#999"
+                      placeholderTextColor={colors.textSecondary}
                       value={cardHolder}
                       onChangeText={setCardHolder}
                     />
@@ -487,11 +490,11 @@ const PaymentMethodsScreen = () => {
                 <View style={styles.inputGroup}>
                   <Text style={styles.inputLabel}>Card Number</Text>
                   <View style={styles.inputContainer}>
-                    <Icon name="credit-card" size={20} color="#888" />
+                    <Icon name="credit-card" size={20} color={colors.textSecondary} />
                     <TextInput
                       style={styles.input}
                       placeholder="1234 5678 9012 3456"
-                      placeholderTextColor="#999"
+                      placeholderTextColor={colors.textSecondary}
                       value={formatCardNumber(cardNumber)}
                       onChangeText={(text) => setCardNumber(text.replace(/\s/g, ''))}
                       keyboardType="numeric"
@@ -504,11 +507,11 @@ const PaymentMethodsScreen = () => {
                   <View style={[styles.inputGroup, { flex: 1, marginRight: 12 }]}>
                     <Text style={styles.inputLabel}>Expiry Date</Text>
                     <View style={styles.inputContainer}>
-                      <Icon name="calendar-today" size={20} color="#888" />
+                      <Icon name="calendar-today" size={20} color={colors.textSecondary} />
                       <TextInput
                         style={styles.input}
                         placeholder="MM/YY"
-                        placeholderTextColor="#999"
+                        placeholderTextColor={colors.textSecondary}
                         value={formatExpiry(expiryDate)}
                         onChangeText={(text) => setExpiryDate(text.replace(/\D/g, ''))}
                         keyboardType="numeric"
@@ -519,11 +522,11 @@ const PaymentMethodsScreen = () => {
                   <View style={[styles.inputGroup, { flex: 1 }]}>
                     <Text style={styles.inputLabel}>CVV</Text>
                     <View style={styles.inputContainer}>
-                      <Icon name="lock" size={20} color="#888" />
+                      <Icon name="lock" size={20} color={colors.textSecondary} />
                       <TextInput
                         style={styles.input}
                         placeholder="123"
-                        placeholderTextColor="#999"
+                        placeholderTextColor={colors.textSecondary}
                         value={cvv}
                         onChangeText={setCvv}
                         keyboardType="numeric"
@@ -550,7 +553,7 @@ const PaymentMethodsScreen = () => {
                   disabled={isSubmitting}
                 >
                   {isSubmitting ? (
-                    <ActivityIndicator size="small" color="#000" />
+                    <ActivityIndicator size="small" color={colors.text} />
                   ) : (
                     <Text style={styles.saveButtonText}>Add Payment</Text>
                   )}
@@ -564,14 +567,17 @@ const PaymentMethodsScreen = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors, isDark) => {
+  const cardBg = isDark ? colors.card : '#FFFFFF';
+  const insetBg = isDark ? colors.cardElevated : '#F5F5F5';
+  return StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: cardBg,
   },
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: cardBg,
     marginTop:34
   },
   scrollContent: {
@@ -584,10 +590,10 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: cardBg,
   },
   loadingText: {
-    color: '#888',
+    color: colors.textSecondary,
     fontSize: 14,
     marginTop: 12,
     fontWeight: '500',
@@ -604,12 +610,12 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 22,
     fontWeight: '700',
-    color: '#000',
+    color: colors.text,
     flex: 1,
     marginLeft: 12,
   },
   addButton: {
-    backgroundColor: '#F9C349',
+    backgroundColor: colors.accent,
     borderRadius: 20,
     paddingHorizontal: 14,
     paddingVertical: 8,
@@ -620,7 +626,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   addButtonText: {
-    color: '#000',
+    color: colors.text,
     fontSize: 14,
     fontWeight: '600',
   },
@@ -630,7 +636,7 @@ const styles = StyleSheet.create({
   quickAddTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#888',
+    color: colors.textSecondary,
     marginBottom: 12,
   },
   quickAddGrid: {
@@ -640,11 +646,11 @@ const styles = StyleSheet.create({
   quickAddItem: {
     flex: 1,
     alignItems: 'center',
-    backgroundColor: '#F8F8F8',
+    backgroundColor: insetBg,
     paddingVertical: 16,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#F0F0F0',
+    borderColor: colors.border,
   },
   quickAddIcon: {
     width: 48,
@@ -655,7 +661,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   quickAddLabel: {
-    color: '#000',
+    color: colors.text,
     fontSize: 12,
     fontWeight: '500',
   },
@@ -665,19 +671,19 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#000',
+    color: colors.text,
     marginBottom: 12,
   },
   methodCard: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#F8F8F8',
+    backgroundColor: insetBg,
     padding: 16,
     borderRadius: 16,
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: '#F0F0F0',
+    borderColor: colors.border,
   },
   methodInfo: {
     flexDirection: 'row',
@@ -696,7 +702,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   methodName: {
-    color: '#000',
+    color: colors.text,
     fontSize: 16,
     fontWeight: '600',
   },
@@ -707,17 +713,17 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   methodLast4: {
-    color: '#888',
+    color: colors.textSecondary,
     fontSize: 13,
   },
   defaultBadge: {
-    backgroundColor: '#F9C349',
+    backgroundColor: colors.accent,
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 8,
   },
   defaultBadgeText: {
-    color: '#000',
+    color: colors.text,
     fontSize: 10,
     fontWeight: '700',
   },
@@ -732,20 +738,20 @@ const styles = StyleSheet.create({
     width: 100,
     height: 100,
     borderRadius: 50,
-    backgroundColor: '#F8F8F8',
+    backgroundColor: insetBg,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#F0F0F0',
+    borderColor: colors.border,
   },
   emptyTitle: {
-    color: '#000',
+    color: colors.text,
     fontSize: 20,
     fontWeight: '700',
     marginTop: 16,
   },
   emptyText: {
-    color: '#888',
+    color: colors.textSecondary,
     fontSize: 14,
     textAlign: 'center',
     marginTop: 8,
@@ -755,7 +761,7 @@ const styles = StyleSheet.create({
   emptyButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F9C349',
+    backgroundColor: colors.accent,
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 25,
@@ -763,7 +769,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   emptyButtonText: {
-    color: '#000',
+    color: colors.text,
     fontSize: 14,
     fontWeight: '600',
   },
@@ -774,13 +780,13 @@ const styles = StyleSheet.create({
     gap: 8,
     marginTop: 16,
     paddingVertical: 12,
-    backgroundColor: '#FFF8E8',
+    backgroundColor: colors.accent + '18',
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#F9C349',
+    borderColor: colors.accent,
   },
   securityText: {
-    color: '#666',
+    color: colors.textSecondary,
     fontSize: 13,
     fontWeight: '500',
   },
@@ -801,7 +807,7 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   modalContainer: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: cardBg,
     borderRadius: 24,
     padding: 24,
     width: width - 40,
@@ -821,14 +827,14 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#000',
+    color: colors.text,
   },
   modalCloseButton: {
     padding: 4,
   },
   typeSelector: {
     flexDirection: 'row',
-    backgroundColor: '#F5F5F5',
+    backgroundColor: insetBg,
     borderRadius: 12,
     padding: 4,
     marginBottom: 20,
@@ -843,7 +849,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   typeOptionActive: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: cardBg,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
@@ -851,12 +857,12 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   typeOptionText: {
-    color: '#888',
+    color: colors.textSecondary,
     fontSize: 12,
     fontWeight: '500',
   },
   typeOptionTextActive: {
-    color: '#000',
+    color: colors.text,
     fontWeight: '700',
   },
   modalForm: {
@@ -866,7 +872,7 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   inputLabel: {
-    color: '#000',
+    color: colors.text,
     fontSize: 13,
     fontWeight: '600',
     marginBottom: 6,
@@ -874,18 +880,18 @@ const styles = StyleSheet.create({
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F5F5F5',
+    backgroundColor: insetBg,
     borderRadius: 12,
     paddingHorizontal: 14,
     borderWidth: 1,
-    borderColor: '#F0F0F0',
+    borderColor: colors.border,
     height: 48,
     gap: 10,
   },
   input: {
     flex: 1,
     fontSize: 14,
-    color: '#000',
+    color: colors.text,
     height: '100%',
   },
   inputRow: {
@@ -903,23 +909,24 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   cancelButton: {
-    backgroundColor: '#F5F5F5',
+    backgroundColor: insetBg,
     borderWidth: 1,
-    borderColor: '#F0F0F0',
+    borderColor: colors.border,
   },
   cancelButtonText: {
-    color: '#888',
+    color: colors.textSecondary,
     fontSize: 15,
     fontWeight: '600',
   },
   saveButton: {
-    backgroundColor: '#F9C349',
+    backgroundColor: colors.accent,
   },
   saveButtonText: {
-    color: '#000',
+    color: colors.text,
     fontSize: 15,
     fontWeight: '700',
   },
-});
+  });
+};
 
 export default PaymentMethodsScreen;

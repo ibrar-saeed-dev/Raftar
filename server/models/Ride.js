@@ -67,6 +67,11 @@ const rideSchema = new mongoose.Schema({
         enum: ['Point']
       },
       coordinates: [Number]
+    },
+    status: {
+      type: String,
+      enum: ['pending', 'arrived', 'completed'],
+      default: 'pending'
     }
   }],
   fare: {
@@ -81,7 +86,7 @@ const rideSchema = new mongoose.Schema({
   },
   vehicleType: {
     type: String,
-    enum: ['bike', 'rickshaw', 'car']
+    enum: ['bike', 'rickshaw', 'car', 'ac_car', 'luxury_car']
   },
   bids: [{
     driverId: {

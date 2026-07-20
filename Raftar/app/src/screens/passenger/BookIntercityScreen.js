@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { useTheme } from '../../context/ThemeContext';
 import {
   View,
   Text,
@@ -25,6 +26,8 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 import IconIonic from 'react-native-vector-icons/Ionicons';
 import IconFeather from 'react-native-vector-icons/Feather';
 import IconFontAwesome from 'react-native-vector-icons/FontAwesome5';
+import IconMC from 'react-native-vector-icons/MaterialCommunityIcons';
+import { VEHICLE_TYPES } from '../../utils/constants';
 import CustomPlacesAutocomplete from '../../components/common/CustomPlacesAutocomplete';
 import MapView, { Marker, Polyline } from 'react-native-maps';
 import * as Location from 'expo-location';
@@ -39,6 +42,8 @@ import Button from '../../components/common/Button';
 const { width, height } = Dimensions.get('window');
 
 const BookIntercityScreen = () => {
+  const { colors, isDark } = useTheme();
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   const navigation = useNavigation();
   const dispatch = useDispatch();
   const { user } = useSelector(state => state.auth);
@@ -267,44 +272,7 @@ const BookIntercityScreen = () => {
     ]).start();
   };
 
-  const vehicleTypes = [
-    { 
-      id: 'bike', 
-      label: 'Bike', 
-      icon: 'motorcycle',
-      iconType: 'fontawesome',
-      basePrice: 100,
-      pricePerKm: 8,
-      capacity: '2 Persons',
-      color: '#f9c349',
-      bgColor: '#f9c34915',
-      description: 'Fast & economical'
-    },
-    { 
-      id: 'rickshaw', 
-      label: 'Rickshaw', 
-      icon: 'truck',
-      iconType: 'fontawesome',
-      basePrice: 150,
-      pricePerKm: 12,
-      capacity: '3 Persons',
-      color: '#f9c349',
-      bgColor: '#f9c34915',
-      description: 'Budget friendly'
-    },
-    { 
-      id: 'car', 
-      label: 'Car', 
-      icon: 'car',
-      iconType: 'fontawesome',
-      basePrice: 200,
-      pricePerKm: 15,
-      capacity: '4 Persons',
-      color: '#f9c349',
-      bgColor: '#f9c34915',
-      description: 'Comfortable ride'
-    }
-  ];
+  const vehicleTypes = VEHICLE_TYPES;
 
   const calculateFare = async () => {
     if (!pickup || !dropoff) return;
@@ -378,7 +346,7 @@ const BookIntercityScreen = () => {
   const getIcon = (icon, iconType, size, color) => {
     switch (iconType) {
       case 'material': return <Icon name={icon} size={size} color={color} />;
-      case 'material-community': return <IconIonic name={icon} size={size} color={color} />;
+      case 'material-community': return <IconMC name={icon} size={size} color={color} />;
       case 'fontawesome': return <IconFontAwesome name={icon} size={size} color={color} />;
       case 'feather': return <IconFeather name={icon} size={size} color={color} />;
       default: return <Icon name={icon} size={size} color={color} />;
@@ -409,7 +377,7 @@ const BookIntercityScreen = () => {
         >
           <View style={styles.rideCardHeader}>
             <View style={styles.rideDateTime}>
-              <IconFeather name="calendar" size={14} color="#666" />
+              <IconFeather name="calendar" size={14} color={colors.textSecondary} />
               <Text style={styles.rideDateText}>
                 {item.scheduledTime ? new Date(item.scheduledTime).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'No Date'}
               </Text>
@@ -447,7 +415,7 @@ const BookIntercityScreen = () => {
               <IconFontAwesome 
                 name={item.vehicleType === 'bike' ? 'motorcycle' : item.vehicleType === 'rickshaw' ? 'truck' : 'car'} 
                 size={12} 
-                color="#f9c349" 
+                color={colors.accent} 
               />
               <Text style={styles.vehicleTagText}>{(item.vehicleType || 'Car').toUpperCase()}</Text>
             </View>
@@ -513,7 +481,7 @@ const BookIntercityScreen = () => {
 
       {listLoading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#f9c349" />
+          <ActivityIndicator size="large" color={colors.accent} />
         </View>
       ) : (
         <FlatList
@@ -566,12 +534,12 @@ const BookIntercityScreen = () => {
             activeOpacity={0.8}
           >
             <View style={styles.modeCardIcon}>
-              <IconFontAwesome name="car" size={40} color="#f9c349" />
+              <IconFontAwesome name="car" size={40} color={colors.accent} />
             </View>
             <Text style={styles.modeCardTitle}>Private Ride</Text>
             <Text style={styles.modeCardDesc}>Book a complete vehicle for your intercity travel</Text>
             <View style={styles.modeCardArrow}>
-              <IconFeather name="arrow-right" size={20} color="#f9c349" />
+              <IconFeather name="arrow-right" size={20} color={colors.accent} />
             </View>
           </TouchableOpacity>
         </Animatable.View>
@@ -583,12 +551,12 @@ const BookIntercityScreen = () => {
             activeOpacity={0.8}
           >
             <View style={styles.modeCardIcon}>
-              <IconFontAwesome name="users" size={40} color="#f9c349" />
+              <IconFontAwesome name="users" size={40} color={colors.accent} />
             </View>
             <Text style={styles.modeCardTitle}>Carpool</Text>
             <Text style={styles.modeCardDesc}>Share seats with others to save cost</Text>
             <View style={styles.modeCardArrow}>
-              <IconFeather name="arrow-right" size={20} color="#f9c349" />
+              <IconFeather name="arrow-right" size={20} color={colors.accent} />
             </View>
           </TouchableOpacity>
         </Animatable.View>
@@ -614,7 +582,7 @@ const BookIntercityScreen = () => {
         <Animatable.View animation="fadeIn" duration={600} style={styles.mapContainer}>
           {locationLoading ? (
             <View style={styles.mapLoading}>
-              <ActivityIndicator size="large" color="#f9c349" />
+              <ActivityIndicator size="large" color={colors.accent} />
             </View>
           ) : (
             <MapView
@@ -637,7 +605,7 @@ const BookIntercityScreen = () => {
               {dropoff?.location?.coordinates && (
                 <Marker coordinate={{ latitude: dropoff.location.coordinates[1], longitude: dropoff.location.coordinates[0] }}>
                   <View style={styles.dropoffMarker}>
-                    <IconFeather name="flag" size={16} color="#f9c349" />
+                    <IconFeather name="flag" size={16} color={colors.accent} />
                   </View>
                 </Marker>
               )}
@@ -657,14 +625,14 @@ const BookIntercityScreen = () => {
           <View style={styles.locationHeader}>
             <Text style={styles.locationTitle}>Where to?</Text>
             <TouchableOpacity style={styles.locationAction} onPress={getCurrentLocation}>
-              <IconFeather name="navigation" size={16} color="#f9c349" />
+              <IconFeather name="navigation" size={16} color={colors.accent} />
               <Text style={styles.locationActionText}>Current</Text>
             </TouchableOpacity>
           </View>
 
           <View style={[styles.locationInputWrapper, { zIndex: 20, elevation: 20 }]}>
             <View style={styles.locationDot}>
-              <View style={[styles.dot, { backgroundColor: '#f9c349' }]} />
+              <View style={[styles.dot, { backgroundColor: colors.accent }]} />
             </View>
             <View style={styles.locationInputContainer}>
               <CustomPlacesAutocomplete
@@ -697,7 +665,7 @@ const BookIntercityScreen = () => {
                     style={styles.mapPickerBtn}
                     onPress={() => openMapPicker('pickup')}
                   >
-                    <IconFeather name="map-pin" size={20} color="#f9c349" />
+                    <IconFeather name="map-pin" size={20} color={colors.accent} />
                   </TouchableOpacity>
                 )}
               />
@@ -752,11 +720,11 @@ const BookIntercityScreen = () => {
             <Text style={styles.scheduleLabel}>Schedule Time</Text>
             <View style={styles.scheduleButtons}>
               <TouchableOpacity style={styles.scheduleBtn} onPress={() => setShowDatePicker(true)}>
-                <IconFeather name="calendar" size={18} color="#f9c349" />
+                <IconFeather name="calendar" size={18} color={colors.accent} />
                 <Text style={styles.scheduleBtnText}>{schedule.toLocaleDateString()}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.scheduleBtn} onPress={() => setShowTimePicker(true)}>
-                <IconFeather name="clock" size={18} color="#f9c349" />
+                <IconFeather name="clock" size={18} color={colors.accent} />
                 <Text style={styles.scheduleBtnText}>
                   {schedule.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </Text>
@@ -813,7 +781,7 @@ const BookIntercityScreen = () => {
                   <View style={[
                     styles.vehicleIconContainer, 
                     isSelected && styles.vehicleIconSelected,
-                    { backgroundColor: isSelected ? vehicle.bgColor : '#f5f5f5' }
+                    { backgroundColor: isSelected ? vehicle.color + '15' : '#f5f5f5' }
                   ]}>
                     {getIcon(
                       vehicle.icon, 
@@ -832,13 +800,13 @@ const BookIntercityScreen = () => {
                     styles.vehiclePrice,
                     isSelected && { color: vehicle.color }
                   ]}>
-                    From Rs.{vehicle.basePrice}
+                    From Rs.{vehicle.price}
                   </Text>
-                  <Text style={styles.vehicleCapacity}>{vehicle.capacity}</Text>
+                  <Text style={styles.vehicleCapacity}>{vehicle.capacityLabel}</Text>
                   <Text style={styles.vehicleDescription}>{vehicle.description}</Text>
                   {isSelected && (
                     <View style={styles.vehicleSelectedBadge}>
-                      <IconFeather name="check-circle" size={20} color="#f9c349" />
+                      <IconFeather name="check-circle" size={20} color={colors.accent} />
                     </View>
                   )}
                 </TouchableOpacity>
@@ -857,11 +825,11 @@ const BookIntercityScreen = () => {
             >
               <View style={[styles.fareModeContent, fareMode === 'ai' && styles.fareModeContentSelected]}>
                 <View style={styles.fareModeIcon}>
-                  <IconFontAwesome name="robot" size={24} color={fareMode === 'ai' ? '#f9c349' : '#999'} />
+                  <IconFontAwesome name="robot" size={24} color={fareMode === 'ai' ? colors.accent : '#999'} />
                 </View>
-                <Text style={[styles.fareModeText, fareMode === 'ai' && { color: '#f9c349' }]}>AI Price</Text>
+                <Text style={[styles.fareModeText, fareMode === 'ai' && { color: colors.accent }]}>AI Price</Text>
                 {estimatedFare && (
-                  <Text style={[styles.fareAmount, fareMode === 'ai' && { color: '#f9c349' }]}>
+                  <Text style={[styles.fareAmount, fareMode === 'ai' && { color: colors.accent }]}>
                     Rs.{estimatedFare?.total ?? estimatedFare}
                   </Text>
                 )}
@@ -878,13 +846,13 @@ const BookIntercityScreen = () => {
             >
               <View style={[styles.fareModeContent, fareMode === 'offer' && styles.fareModeContentSelected]}>
                 <View style={styles.fareModeIcon}>
-                  <IconFeather name="tag" size={24} color={fareMode === 'offer' ? '#f9c349' : '#999'} />
+                  <IconFeather name="tag" size={24} color={fareMode === 'offer' ? colors.accent : '#999'} />
                 </View>
-                <Text style={[styles.fareModeText, fareMode === 'offer' && { color: '#f9c349' }]}>Offer Price</Text>
+                <Text style={[styles.fareModeText, fareMode === 'offer' && { color: colors.accent }]}>Offer Price</Text>
                 <TextInput 
                   style={[styles.offerInput, fareMode === 'offer' && styles.offerInputActive]} 
                   placeholder="Enter amount"
-                  placeholderTextColor="#999"
+                  placeholderTextColor={colors.textSecondary}
                   keyboardType="numeric" 
                   value={offerPrice} 
                   onChangeText={setOfferPrice}
@@ -941,7 +909,7 @@ const BookIntercityScreen = () => {
           />
           
           <View style={styles.mapPickerCenterPin}>
-            <IconFeather name="map-pin" size={36} color={mapPickerType === 'pickup' ? '#f9c349' : '#ff6b6b'} />
+            <IconFeather name="map-pin" size={36} color={mapPickerType === 'pickup' ? colors.accent : '#ff6b6b'} />
           </View>
           
           <View style={styles.mapPickerBottom}>
@@ -968,7 +936,7 @@ const BookIntercityScreen = () => {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
+      <StatusBar barStyle={colors.statusBarStyle} backgroundColor={colors.background} />
       <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         {viewMode === 'list' && renderListView()}
         {viewMode === 'mode_select' && renderModeSelect()}
@@ -978,9 +946,12 @@ const BookIntercityScreen = () => {
   );
 };
 
-const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#ffffff' },
-  container: { flex: 1, backgroundColor: '#ffffff' },
+const createStyles = (colors, isDark) => {
+  const cardBg = isDark ? colors.card : '#FFFFFF';
+  const insetBg = isDark ? colors.cardElevated : '#F5F5F5';
+  return StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: cardBg },
+  container: { flex: 1, backgroundColor: cardBg },
   
   // Header Styles
   header: { 
@@ -1018,7 +989,7 @@ const styles = StyleSheet.create({
   },
 
   // List View Styles
-  listContainer: { flex: 1, backgroundColor: '#ffffff' },
+  listContainer: { flex: 1, backgroundColor: cardBg },
   tabContainer: { 
     flexDirection: 'row', 
     paddingHorizontal: 20, 
@@ -1033,10 +1004,10 @@ const styles = StyleSheet.create({
     marginHorizontal: 4,
   },
   activeTab: { 
-    backgroundColor: '#f9c349',
+    backgroundColor: colors.accent,
   },
   tabText: { 
-    color: '#999', 
+    color: colors.textSecondary, 
     fontWeight: '600',
     fontSize: 14,
   },
@@ -1057,7 +1028,7 @@ const styles = StyleSheet.create({
   },
   
   recentRideCard: { 
-    backgroundColor: '#ffffff', 
+    backgroundColor: cardBg, 
     borderRadius: 16, 
     padding: 16,
     shadowColor: '#000',
@@ -1069,7 +1040,7 @@ const styles = StyleSheet.create({
     borderColor: '#f0f0f0',
   },
   acceptedRideCard: {
-    borderColor: '#f9c349',
+    borderColor: colors.accent,
     borderWidth: 1.5,
   },
   rideCardHeader: {
@@ -1084,7 +1055,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   rideDateText: {
-    color: '#666',
+    color: colors.textSecondary,
     fontSize: 13,
     fontWeight: '500',
   },
@@ -1097,10 +1068,10 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   acceptedStatus: {
-    backgroundColor: '#f9c34920',
+    backgroundColor: colors.accent + '20',
   },
   pendingStatus: {
-    backgroundColor: '#ffd70020',
+    backgroundColor: colors.accent + '20',
   },
   statusDot: {
     width: 6,
@@ -1108,10 +1079,10 @@ const styles = StyleSheet.create({
     borderRadius: 3,
   },
   acceptedDot: {
-    backgroundColor: '#f9c349',
+    backgroundColor: colors.accent,
   },
   pendingDot: {
-    backgroundColor: '#ffd700',
+    backgroundColor: colors.accent,
   },
   rideStatusText: {
     fontSize: 11,
@@ -1119,10 +1090,10 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   acceptedStatusText: {
-    color: '#f9c349',
+    color: colors.accent,
   },
   pendingStatusText: {
-    color: '#ffd700',
+    color: colors.accent,
   },
   rideLocations: {
     marginBottom: 12,
@@ -1140,7 +1111,7 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#f9c349',
+    backgroundColor: colors.accent,
   },
   dropoffDot: {
     width: 8,
@@ -1174,7 +1145,7 @@ const styles = StyleSheet.create({
     alignItems: 'baseline',
   },
   currencySymbol: {
-    color: '#f9c349',
+    color: colors.accent,
     fontSize: 14,
     fontWeight: '700',
     marginRight: 2,
@@ -1194,7 +1165,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   vehicleTagText: {
-    color: '#666',
+    color: colors.textSecondary,
     fontSize: 11,
     fontWeight: '600',
   },
@@ -1230,11 +1201,11 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   bidLabel: {
-    color: '#999',
+    color: colors.textSecondary,
     fontSize: 12,
   },
   acceptBidButton: {
-    backgroundColor: '#f9c349',
+    backgroundColor: colors.accent,
     paddingHorizontal: 16,
     paddingVertical: 6,
     borderRadius: 8,
@@ -1257,7 +1228,7 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   emptySubtitle: {
-    color: '#999',
+    color: colors.textSecondary,
     fontSize: 14,
     marginTop: 8,
   },
@@ -1269,12 +1240,12 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f9c349',
+    backgroundColor: colors.accent,
     paddingHorizontal: 24,
     paddingVertical: 14,
     borderRadius: 30,
     gap: 8,
-    shadowColor: '#f9c349',
+    shadowColor: colors.accent,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 12,
@@ -1294,7 +1265,7 @@ const styles = StyleSheet.create({
     gap: 20,
   },
   modeCard: {
-    backgroundColor: '#ffffff',
+    backgroundColor: cardBg,
     borderRadius: 20,
     padding: 24,
     borderWidth: 1,
@@ -1309,7 +1280,7 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: '#f9c34915',
+    backgroundColor: colors.accent + '15',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 12,
@@ -1321,7 +1292,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   modeCardDesc: {
-    color: '#999',
+    color: colors.textSecondary,
     fontSize: 14,
     lineHeight: 20,
   },
@@ -1366,7 +1337,7 @@ const styles = StyleSheet.create({
     width: 12, 
     height: 12, 
     borderRadius: 6, 
-    backgroundColor: '#f9c349', 
+    backgroundColor: colors.accent, 
     borderWidth: 2, 
     borderColor: '#fff' 
   },
@@ -1382,7 +1353,7 @@ const styles = StyleSheet.create({
   },
 
   locationSection: { 
-    backgroundColor: '#ffffff', 
+    backgroundColor: cardBg, 
     margin: 20, 
     borderRadius: 16, 
     padding: 16,
@@ -1409,13 +1380,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row', 
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#f9c34915',
+    backgroundColor: colors.accent + '15',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,
   },
   locationActionText: { 
-    color: '#f9c349', 
+    color: colors.accent, 
     fontWeight: '600',
     fontSize: 13,
   },
@@ -1451,7 +1422,7 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   scheduleLabel: {
-    color: '#666',
+    color: colors.textSecondary,
     fontSize: 13,
     fontWeight: '600',
     marginBottom: 8,
@@ -1494,7 +1465,7 @@ const styles = StyleSheet.create({
   },
   vehicleCard: { 
     width: 150, 
-    backgroundColor: '#ffffff', 
+    backgroundColor: cardBg, 
     borderRadius: 16, 
     padding: 16, 
     marginRight: 12,
@@ -1508,9 +1479,9 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   vehicleCardSelected: { 
-    borderColor: '#f9c349',
+    borderColor: colors.accent,
     borderWidth: 2,
-    shadowColor: '#f9c349',
+    shadowColor: colors.accent,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,
     shadowRadius: 8,
@@ -1526,7 +1497,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   vehicleIconSelected: {
-    backgroundColor: '#f9c34915',
+    backgroundColor: colors.accent + '15',
   },
   vehicleLabel: { 
     color: '#1a1a1a', 
@@ -1535,7 +1506,7 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   vehiclePrice: { 
-    color: '#999', 
+    color: colors.textSecondary, 
     fontSize: 13,
     fontWeight: '600',
   },
@@ -1564,13 +1535,13 @@ const styles = StyleSheet.create({
     flex: 1, 
     height: 140, 
     borderRadius: 16, 
-    backgroundColor: '#ffffff',
+    backgroundColor: cardBg,
     borderWidth: 1,
     borderColor: '#f0f0f0',
     overflow: 'hidden',
   },
   fareModeSelected: { 
-    borderColor: '#f9c349',
+    borderColor: colors.accent,
     borderWidth: 2,
   },
   fareModeContent: { 
@@ -1580,7 +1551,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   fareModeContentSelected: {
-    backgroundColor: '#f9c34908',
+    backgroundColor: colors.accent + '08',
   },
   fareModeIcon: {
     marginBottom: 8,
@@ -1588,7 +1559,7 @@ const styles = StyleSheet.create({
   fareModeText: { 
     fontSize: 14, 
     fontWeight: '600', 
-    color: '#666',
+    color: colors.textSecondary,
     marginBottom: 4,
   },
   fareAmount: { 
@@ -1611,9 +1582,9 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   offerInputActive: {
-    backgroundColor: '#f9c34915',
+    backgroundColor: colors.accent + '15',
     borderWidth: 1,
-    borderColor: '#f9c349',
+    borderColor: colors.accent,
   },
 
   bookButtonContainer: { 
@@ -1621,14 +1592,14 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   bookButton: { 
-    backgroundColor: '#f9c349', 
+    backgroundColor: colors.accent, 
     borderRadius: 16, 
     paddingVertical: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 12,
-    shadowColor: '#f9c349',
+    shadowColor: colors.accent,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 12,
@@ -1644,7 +1615,7 @@ const styles = StyleSheet.create({
   // Map Picker Modal
   mapPickerContainer: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: cardBg,
   },
   mapPickerHeader: {
     flexDirection: 'row',
@@ -1671,7 +1642,7 @@ const styles = StyleSheet.create({
     marginLeft: -18,
   },
   mapPickerBottom: {
-    backgroundColor: '#ffffff',
+    backgroundColor: cardBg,
     padding: 20,
     borderTopWidth: 1,
     borderTopColor: '#f0f0f0',
@@ -1697,16 +1668,17 @@ const styles = StyleSheet.create({
     backgroundColor: '#f5f5f5',
   },
   mapPickerCancelText: {
-    color: '#666',
+    color: colors.textSecondary,
     fontWeight: '600',
   },
   mapPickerConfirmBtn: {
-    backgroundColor: '#f9c349',
+    backgroundColor: colors.accent,
   },
   mapPickerConfirmText: {
     color: '#fff',
     fontWeight: '700',
   },
-});
+  });
+};
 
 export default BookIntercityScreen;

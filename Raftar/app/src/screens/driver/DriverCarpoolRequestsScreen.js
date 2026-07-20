@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useTheme } from '../../context/ThemeContext';
 import {
   View,
   Text,
@@ -14,6 +15,8 @@ import api from '../../services/api';
 import CarpoolMapPreview from '../../components/common/CarpoolMapPreview';
 
 const DriverCarpoolRequestsScreen = () => {
+  const { colors, isDark } = useTheme();
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const navigation = useNavigation();
@@ -94,7 +97,7 @@ const DriverCarpoolRequestsScreen = () => {
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color="#FFD700" />
+        <ActivityIndicator size="large" color={colors.accent} />
       </View>
     );
   }
@@ -118,10 +121,13 @@ const DriverCarpoolRequestsScreen = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors, isDark) => {
+  const cardBg = isDark ? colors.card : '#FFFFFF';
+  const insetBg = isDark ? colors.cardElevated : '#F5F5F5';
+  return StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#121212'
+    backgroundColor: colors.background
   },
   center: {
     flex: 1,
@@ -133,12 +139,12 @@ const styles = StyleSheet.create({
     padding: 16
   },
   card: {
-    backgroundColor: '#1E1E1E',
+    backgroundColor: colors.card,
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#333'
+    borderColor: colors.border
   },
   header: {
     flexDirection: 'row',
@@ -152,7 +158,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold'
   },
   status: {
-    color: '#FFD700',
+    color: colors.accent,
     fontSize: 12,
     fontWeight: 'bold'
   },
@@ -173,15 +179,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 12,
     borderTopWidth: 1,
-    borderTopColor: '#333',
+    borderTopColor: colors.border,
     paddingTop: 12
   },
   timeText: {
-    color: '#888',
+    color: colors.textSecondary,
     fontSize: 12
   },
   acceptButton: {
-    backgroundColor: '#FFD700',
+    backgroundColor: colors.accent,
     paddingHorizontal: 20,
     paddingVertical: 8,
     borderRadius: 20
@@ -191,10 +197,11 @@ const styles = StyleSheet.create({
     fontWeight: 'bold'
   },
   emptyText: {
-    color: '#888',
+    color: colors.textSecondary,
     fontSize: 16,
     textAlign: 'center'
   }
-});
+  });
+};
 
 export default DriverCarpoolRequestsScreen;

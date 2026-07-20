@@ -1,17 +1,18 @@
-const { calculateDistance } = require('./mapService');
+const { calculateRoute } = require('./mapService');
 
 /**
  * Calculate AI-based fare for a ride
  * @param {Object} pickup - Pickup location
  * @param {Object} dropoff - Dropoff location
  * @param {string} vehicleType - Type of vehicle
+ * @param {Array} waypoints - Intermediate stops
  * @param {Object} options - Additional options
  * @returns {Object} - Fare details
  */
-exports.calculateAIFare = async (pickup, dropoff, vehicleType, options = {}) => {
+exports.calculateAIFare = async (pickup, dropoff, vehicleType, waypoints = [], options = {}) => {
   try {
-    // Calculate distance
-    const distanceResult = await calculateDistance(pickup, dropoff);
+    // Calculate distance including waypoints
+    const distanceResult = await calculateRoute(pickup.location, dropoff.location, waypoints.map(w => w.location));
     const distance = distanceResult.distance || 0;
     const duration = distanceResult.duration || 0;
 
@@ -20,6 +21,8 @@ exports.calculateAIFare = async (pickup, dropoff, vehicleType, options = {}) => 
       bike: 50,
       rickshaw: 80,
       car: 120,
+      ac_car: 150,
+      luxury_car: 250,
       cargo: 150
     };
 
@@ -28,6 +31,8 @@ exports.calculateAIFare = async (pickup, dropoff, vehicleType, options = {}) => 
       bike: 15,
       rickshaw: 25,
       car: 35,
+      ac_car: 45,
+      luxury_car: 70,
       cargo: 40
     };
 
@@ -36,6 +41,8 @@ exports.calculateAIFare = async (pickup, dropoff, vehicleType, options = {}) => 
       bike: 2,
       rickshaw: 3,
       car: 4,
+      ac_car: 6,
+      luxury_car: 10,
       cargo: 5
     };
 

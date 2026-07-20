@@ -1,5 +1,5 @@
 import React from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { useSelector } from 'react-redux';
 import AuthNavigator from './AuthNavigator';
@@ -10,6 +10,7 @@ import IncomingCallScreen from '../screens/common/IncomingCallScreen';
 import InCallScreen from '../screens/common/InCallScreen';
 import SharedRideViewScreen from '../screens/common/SharedRideViewScreen';
 import * as Linking from 'expo-linking';
+import { useTheme } from '../context/ThemeContext';
 
 const prefix = Linking.createURL('/');
 const linking = {
@@ -25,15 +26,28 @@ const Stack = createStackNavigator();
 
 const AppNavigator = () => {
   const { isAuthenticated, loading } = useSelector(state => state.auth);
+  const { isDark, colors } = useTheme();
 
   if (loading) {
     return null; // Show splash screen
   }
 
+  const customTheme = {
+    ...(isDark ? DarkTheme : DefaultTheme),
+    colors: {
+      ...(isDark ? DarkTheme.colors : DefaultTheme.colors),
+      background: colors.background,
+      card: colors.card,
+      text: colors.text,
+      border: colors.border,
+      primary: colors.accent,
+    },
+  };
+
   return (
     <>
-      <StatusBar barStyle="light-content" backgroundColor="#121212" />
-      <NavigationContainer linking={linking}>
+      <StatusBar barStyle={colors.statusBarStyle} backgroundColor={colors.background} />
+      <NavigationContainer linking={linking} theme={customTheme}>
         <Stack.Navigator screenOptions={{ headerShown: false }}>
           {!isAuthenticated ? (
             <Stack.Screen name="Auth" component={AuthNavigator} />

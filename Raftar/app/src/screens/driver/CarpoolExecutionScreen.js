@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { useTheme } from '../../context/ThemeContext';
 import {
   View,
   Text,
@@ -25,16 +26,21 @@ import RatingComponent from '../../components/common/RatingComponent';
 const { width, height } = Dimensions.get('window');
 
 // Yellow Theme Colors
-const YELLOW_PRIMARY = '#F8B82A';
-const YELLOW_SECONDARY = '#F9C349';
-const WHITE = '#FFFFFF';
-const BLACK = '#000000';
-const GRAY_DARK = '#333333';
-const GRAY_MEDIUM = '#666666';
-const GRAY_LIGHT = '#F5F5F5';
-const GRAY_BG = '#F8F9FA';
+const getThemePalette = (colors, isDark) => ({
+  YELLOW_PRIMARY: colors.accent,
+  YELLOW_SECONDARY: colors.accent,
+  WHITE: isDark ? colors.card : '#FFFFFF',
+  BLACK: colors.text,
+  GRAY_DARK: colors.text,
+  GRAY_MEDIUM: colors.textSecondary,
+  GRAY_LIGHT: isDark ? colors.cardElevated : '#F5F5F5',
+  GRAY_BG: colors.background,
+});
 
 const CarpoolExecutionScreen = () => {
+  const { colors, isDark } = useTheme();
+  const { YELLOW_PRIMARY, YELLOW_SECONDARY, WHITE, BLACK, GRAY_DARK, GRAY_MEDIUM, GRAY_LIGHT, GRAY_BG } = useMemo(() => getThemePalette(colors, isDark), [colors, isDark]);
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   const route = useRoute();
   const navigation = useNavigation();
   const { carpool } = route.params;
@@ -227,7 +233,7 @@ const CarpoolExecutionScreen = () => {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor={WHITE} />
+      <StatusBar barStyle={colors.statusBarStyle} backgroundColor={WHITE} />
       
       <View style={styles.container}>
         {/* Header */}
@@ -330,7 +336,11 @@ const CarpoolExecutionScreen = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors, isDark) => {
+  const { YELLOW_PRIMARY, YELLOW_SECONDARY, WHITE, BLACK, GRAY_DARK, GRAY_MEDIUM, GRAY_LIGHT, GRAY_BG } = getThemePalette(colors, isDark);
+  const cardBg = isDark ? colors.card : '#FFFFFF';
+  const insetBg = isDark ? colors.cardElevated : '#F5F5F5';
+  return StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: WHITE,
@@ -347,7 +357,7 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
     backgroundColor: WHITE,
     borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
+    borderBottomColor: colors.border,
   },
   backButton: {
     width: 40,
@@ -382,7 +392,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#F0F0F0',
+    borderColor: colors.border,
     position: 'relative',
     backgroundColor: GRAY_LIGHT,
   },
@@ -478,7 +488,7 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#F0F0F0',
+    borderColor: colors.border,
   },
   passengerHeader: {
     flexDirection: 'row',
@@ -567,7 +577,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: '#F0F0F0',
+    borderTopColor: colors.border,
   },
   emptyContainer: {
     alignItems: 'center',
@@ -584,6 +594,7 @@ const styles = StyleSheet.create({
     color: GRAY_MEDIUM,
     marginTop: 4,
   },
-});
+  });
+};
 
 export default CarpoolExecutionScreen;

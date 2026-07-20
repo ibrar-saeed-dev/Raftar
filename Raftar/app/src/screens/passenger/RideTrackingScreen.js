@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { useTheme } from '../../context/ThemeContext';
 import {
   View,
   Text,
@@ -28,6 +29,8 @@ import * as Location from 'expo-location';
 import * as Linking from 'expo-linking';
 
 const RideTrackingScreen = () => {
+  const { colors, isDark } = useTheme();
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   const route = useRoute();
   const navigation = useNavigation();
   const dispatch = useDispatch();
@@ -45,6 +48,7 @@ const RideTrackingScreen = () => {
   const [counterOffers, setCounterOffers] = useState([]);
   const [routeCoords, setRouteCoords] = useState([]);
   const [rideCompletedData, setRideCompletedData] = useState(null);
+  const mapRef = useRef(null);
   
   const [isLocallyShared, setIsLocallyShared] = useState(false);
   const isShared = !!currentRide?.shareToken || isLocallyShared;
@@ -102,10 +106,62 @@ const RideTrackingScreen = () => {
   }, []);
 
   useEffect(() => {
-    if (currentRide && (currentRide.status === 'accepted' || currentRide.status === 'started')) {
+    if (currentRide && (currentRide.status === 'searching' || currentRide.status === 'accepted' || currentRide.status === 'started')) {
       fetchRoute();
     }
   }, [currentRide?.status]);
+
+  useEffect(() => {
+    if (mapRef.current && currentRide) {
+      const points = [];
+      if (routeCoords.length > 0) {
+        points.push(...routeCoords);
+      } else {
+        if (currentRide.pickup?.location) {
+          points.push({
+            latitude: currentRide.pickup.location.coordinates[1],
+            longitude: currentRide.pickup.location.coordinates[0],
+          });
+        }
+        if (currentRide.dropoff?.location) {
+          points.push({
+            latitude: currentRide.dropoff.location.coordinates[1],
+            longitude: currentRide.dropoff.location.coordinates[0],
+          });
+        }
+      }
+      
+      if (driverLocation?.coordinates) {
+        points.push({
+          latitude: driverLocation.coordinates[1],
+          longitude: driverLocation.coordinates[0],
+        });
+      }
+
+      if (currentRide?.status === 'searching' && counterOffers.length > 0) {
+        counterOffers.forEach(offer => {
+          if (offer.driver?.location?.coordinates && offer.driver.location.coordinates.length >= 2) {
+            points.push({
+              latitude: offer.driver.location.coordinates[1],
+              longitude: offer.driver.location.coordinates[0],
+            });
+          }
+        });
+      }
+
+      if (points.length > 1) {
+        // Small delay to allow layout to settle before fitting
+        setTimeout(() => {
+          if (mapRef.current) {
+            mapRef.current.fitToCoordinates(points, {
+              edgePadding: { top: 80, right: 50, bottom: 400, left: 50 },
+              animated: true,
+            });
+          }
+        }, 300);
+      }
+    }
+  }, [routeCoords, currentRide?.pickup, currentRide?.dropoff, counterOffers.length]);
 
   useEffect(() => {
     if (isShared && currentRide && (currentRide.status === 'searching' || currentRide.status === 'accepted' || currentRide.status === 'started')) {
@@ -164,20 +220,49 @@ const RideTrackingScreen = () => {
     const [startLng, startLat] = currentRide.pickup.location.coordinates;
     const [endLng, endLat] = currentRide.dropoff.location.coordinates;
 
+    let waypointsParam = '';
+    if (currentRide.waypoints && currentRide.waypoints.length > 0) {
+      waypointsParam = `&waypoints=${currentRide.waypoints.map(w => `${w.location.coordinates[1]},${w.location.coordinates[0]}`).join('|')}`;
+    }
+
     try {
-      const resp = await fetch(`https://maps.googleapis.com/maps/api/directions/json?origin=${startLat},${startLng}&destination=${endLat},${endLng}&key=${GOOGLE_MAPS_API_KEY}`);
+      const resp = await fetch(`https://maps.googleapis.com/maps/api/directions/json?origin=${startLat},${startLng}&destination=${endLat},${endLng}${waypointsParam}&key=${GOOGLE_MAPS_API_KEY}`);
       const respJson = await resp.json();
       if (respJson.routes?.length) {
         const points = decodePolyline(respJson.routes[0].overview_polyline.points);
         setRouteCoords(points);
+        if (mapRef.current) {
+          mapRef.current.fitToCoordinates(points, {
+            edgePadding: { top: 80, right: 50, bottom: 400, left: 50 },
+            animated: true,
+          });
+        }
       } else {
-        setRouteCoords([
+        const fallbackPoints = [
           { latitude: startLat, longitude: startLng },
           { latitude: endLat, longitude: endLng }
-        ]);
+        ];
+        setRouteCoords(fallbackPoints);
+        if (mapRef.current) {
+          mapRef.current.fitToCoordinates(fallbackPoints, {
+            edgePadding: { top: 80, right: 50, bottom: 400, left: 50 },
+            animated: true,
+          });
+        }
       }
     } catch (error) {
       console.log('Error fetching directions:', error);
+      const fallbackPoints = [
+        { latitude: startLat, longitude: startLng },
+        { latitude: endLat, longitude: endLng }
+      ];
+      setRouteCoords(fallbackPoints);
+      if (mapRef.current) {
+        mapRef.current.fitToCoordinates(fallbackPoints, {
+          edgePadding: { top: 80, right: 50, bottom: 400, left: 50 },
+          animated: true,
+        });
+      }
     }
   };
 
@@ -369,7 +454,7 @@ const RideTrackingScreen = () => {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#FFD700" />
+        <ActivityIndicator size="large" color="#f9c043" />
       </View>
     );
   }
@@ -433,6 +518,7 @@ const RideTrackingScreen = () => {
       </TouchableOpacity>
 
       <MapView
+        ref={mapRef}
         style={styles.map}
         initialRegion={{
           latitude: currentRide?.pickup?.location?.coordinates[1] || 0,
@@ -443,50 +529,103 @@ const RideTrackingScreen = () => {
       >
         {driverLocation?.coordinates && driverLocation.coordinates.length >= 2 && (
           <Marker
+            key="driver-marker"
             coordinate={{
               latitude: driverLocation.coordinates[1],
               longitude: driverLocation.coordinates[0],
             }}
+            anchor={{ x: 0.5, y: 0.5 }}
+            zIndex={100}
+            tracksViewChanges={false}
           >
-            <View style={styles.driverMarker}>
-              <Icon name="directions-car" size={30} color="#FFD700" />
+            <View style={styles.driverCarMarker}>
+              <Icon name="directions-car" size={20} color={colors.text} />
             </View>
           </Marker>
         )}
         
         {currentRide?.pickup?.location && (
           <Marker
+            key="pickup-marker"
             coordinate={{
               latitude: currentRide.pickup.location.coordinates[1],
               longitude: currentRide.pickup.location.coordinates[0],
             }}
-            pinColor="#4ECDC4"
+            anchor={{ x: 0.5, y: 1 }}
+            tracksViewChanges={false}
           >
-            <View style={styles.pickupMarker}>
-              <Icon name="location-on" size={24} color="#4ECDC4" />
+            <View style={styles.customPin}>
+              <View style={[styles.pinIconWrapper, { backgroundColor: '#4ECDC4' }]}>
+                <View style={styles.pinInnerDot} />
+              </View>
+              <View style={[styles.pinTriangle, { borderTopColor: '#4ECDC4' }]} />
             </View>
           </Marker>
         )}
         
         {currentRide?.dropoff?.location && (
           <Marker
+            key="dropoff-marker"
             coordinate={{
               latitude: currentRide.dropoff.location.coordinates[1],
               longitude: currentRide.dropoff.location.coordinates[0],
             }}
-            pinColor="#FF6B6B"
+            anchor={{ x: 0.5, y: 1 }}
+            tracksViewChanges={false}
           >
-            <View style={styles.dropoffMarker}>
-              <Icon name="flag" size={24} color="#FF6B6B" />
+            <View style={styles.customPin}>
+              <View style={[styles.pinIconWrapper, { backgroundColor: '#FF6B6B' }]}>
+                <Icon name="flag" size={14} color="#FFF" />
+              </View>
+              <View style={[styles.pinTriangle, { borderTopColor: '#FF6B6B' }]} />
             </View>
           </Marker>
         )}
+
+        {currentRide?.waypoints && currentRide.waypoints.map((wp, idx) => (
+          <Marker
+            key={`waypoint-${idx}`}
+            coordinate={{
+              latitude: wp.location.coordinates[1],
+              longitude: wp.location.coordinates[0],
+            }}
+            anchor={{ x: 0.5, y: 1 }}
+            tracksViewChanges={false}
+          >
+            <View style={styles.customPin}>
+              <View style={[styles.pinIconWrapper, { backgroundColor: '#FF9F43' }]}>
+                <Icon name="stop" size={14} color="#FFF" />
+              </View>
+              <View style={[styles.pinTriangle, { borderTopColor: '#FF9F43' }]} />
+            </View>
+          </Marker>
+        ))}
+
+        {currentRide?.status === 'searching' && counterOffers.map((offer, idx) => {
+          if (!offer.driver?.location?.coordinates || offer.driver.location.coordinates.length < 2) return null;
+          return (
+            <Marker
+              key={`offer-${offer.driver.id || idx}`}
+              coordinate={{
+                latitude: offer.driver.location.coordinates[1],
+                longitude: offer.driver.location.coordinates[0],
+              }}
+              anchor={{ x: 0.5, y: 0.5 }}
+              zIndex={90}
+              tracksViewChanges={false}
+            >
+              <View style={[styles.driverCarMarker, { borderColor: '#f9c043' }]}>
+                <Icon name="directions-car" size={16} color={colors.text} />
+              </View>
+            </Marker>
+          );
+        })}
         
         {routeCoords.length > 0 && (
           <Polyline
             coordinates={routeCoords}
-            strokeWidth={4}
-            strokeColor="#4ECDC4"
+            strokeWidth={5}
+            strokeColor="#f9c043"
           />
         )}
       </MapView>
@@ -507,7 +646,7 @@ const RideTrackingScreen = () => {
                   <Text style={styles.fareLabel}>Your offer:</Text>
                   <Text style={styles.originalFareAmount}>Rs. {currentRide?.fare?.offered || 0}</Text>
                 </View>
-                <Icon name="arrow-forward" size={20} color="#888" />
+                <Icon name="arrow-forward" size={20} color={colors.textSecondary} />
                 <View style={styles.fareBox}>
                   <Text style={styles.fareLabel}>Driver's counter:</Text>
                   <Text style={styles.counterOfferAmount}>Rs. {offer.amount}</Text>
@@ -551,10 +690,10 @@ const RideTrackingScreen = () => {
           </View>
           <View style={styles.rideActions}>
             <TouchableOpacity style={styles.actionButton} onPress={handleShareRide} disabled={loadingShare}>
-              {loadingShare ? <ActivityIndicator size="small" color="#FFD700" /> : <Icon name="share" size={24} color="#FFD700" />}
+              {loadingShare ? <ActivityIndicator size="small" color={colors.text} /> : <Icon name="share" size={24} color={colors.text} />}
             </TouchableOpacity>
             <TouchableOpacity style={styles.actionButton} onPress={handleSOS}>
-              <Icon name="warning" size={24} color="#FF6B6B" />
+              <Icon name="warning" size={24} color="#D32F2F" />
             </TouchableOpacity>
           </View>
         </View>
@@ -569,7 +708,7 @@ const RideTrackingScreen = () => {
                 <View style={styles.driverDetailsText}>
                   <Text style={styles.driverName}>{currentRide.driverId.userId?.name || 'Driver'}</Text>
                   <View style={styles.ratingContainer}>
-                    <Icon name="star" size={14} color="#FFD700" />
+                    <Icon name="star" size={14} color="#f9c043" />
                     <Text style={styles.driverRating}>{currentRide.driverId.stats?.rating || '5.0'}</Text>
                   </View>
                 </View>
@@ -592,7 +731,7 @@ const RideTrackingScreen = () => {
                 </View>
               </View>
               <View style={styles.vehicleDetailsRow}>
-                <Icon name="directions-car" size={16} color="#888" />
+                <Icon name="directions-car" size={16} color={colors.textSecondary} />
                 <Text style={styles.vehicleDetailsText}>
                   {currentRide.driverId.vehicleDetails?.color || ''} {currentRide.driverId.vehicleDetails?.brand || ''} {currentRide.driverId.vehicleDetails?.model || 'Vehicle'} • {currentRide.driverId.vehicleDetails?.plateNumber || 'N/A'}
                 </Text>
@@ -605,6 +744,14 @@ const RideTrackingScreen = () => {
             <Icon name="location-on" size={20} color="#4ECDC4" />
             <Text style={styles.detailText}>{currentRide?.pickup?.address}</Text>
           </View>
+          
+          {currentRide?.waypoints && currentRide.waypoints.map((wp, idx) => (
+            <View key={idx} style={styles.detailRow}>
+              <Icon name="stop-circle" size={20} color="#FF9F43" />
+              <Text style={styles.detailText}>{wp.address}</Text>
+            </View>
+          ))}
+
           <View style={styles.detailRow}>
             <Icon name="flag" size={20} color="#FF6B6B" />
             <Text style={styles.detailText}>{currentRide?.dropoff?.address}</Text>
@@ -664,13 +811,13 @@ const RideTrackingScreen = () => {
               <TextInput
                 style={styles.input}
                 placeholder="Type a message..."
-                placeholderTextColor="#666"
+                placeholderTextColor={colors.textSecondary}
                 value={message}
                 onChangeText={setMessage}
                 multiline
               />
               <TouchableOpacity onPress={handleSendMessage}>
-                <Icon name="send" size={24} color="#FFD700" />
+                <Icon name="send" size={24} color="#f9c043" />
               </TouchableOpacity>
             </View>
           </View>
@@ -681,40 +828,70 @@ const RideTrackingScreen = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors, isDark) => {
+  const cardBg = isDark ? colors.card : '#FFFFFF';
+  const insetBg = isDark ? colors.cardElevated : '#F5F5F5';
+  return StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#121212',
+    backgroundColor: colors.background,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#121212',
+    backgroundColor: colors.background,
   },
   map: {
     flex: 1,
   },
-  driverMarker: {
-    backgroundColor: '#FFD700',
-    padding: 8,
+  driverCarMarker: {
+    backgroundColor: cardBg,
+    padding: 6,
     borderRadius: 20,
     borderWidth: 2,
-    borderColor: '#FFF',
+    borderColor: '#111',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 4,
   },
-  pickupMarker: {
-    backgroundColor: '#4ECDC4',
-    padding: 8,
-    borderRadius: 20,
-    borderWidth: 2,
-    borderColor: '#FFF',
+  customPin: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  dropoffMarker: {
-    backgroundColor: '#FF6B6B',
-    padding: 8,
-    borderRadius: 20,
+  pinIconWrapper: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
     borderWidth: 2,
     borderColor: '#FFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  pinInnerDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: cardBg,
+  },
+  pinTriangle: {
+    width: 0,
+    height: 0,
+    backgroundColor: 'transparent',
+    borderStyle: 'solid',
+    borderLeftWidth: 6,
+    borderRightWidth: 6,
+    borderTopWidth: 8,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    marginTop: -2,
   },
   floatingBackButton: {
     position: 'absolute',
@@ -733,7 +910,7 @@ const styles = StyleSheet.create({
     bottom: 20,
     left: 20,
     right: 20,
-    backgroundColor: '#1E1E1E',
+    backgroundColor: '#f9c043', // Changed to Yellow
     borderRadius: 15,
     padding: 20,
     elevation: 5,
@@ -749,12 +926,12 @@ const styles = StyleSheet.create({
     marginBottom: 15,
   },
   rideStatus: {
-    color: '#FFD700',
+    color: colors.text, // Better contrast on yellow
     fontSize: 16,
     fontWeight: 'bold',
   },
   rideFare: {
-    color: '#FFF',
+    color: colors.text, // Better contrast on yellow
     fontSize: 20,
     fontWeight: 'bold',
   },
@@ -763,6 +940,9 @@ const styles = StyleSheet.create({
   },
   actionButton: {
     marginLeft: 15,
+    backgroundColor: 'rgba(0,0,0,0.1)',
+    borderRadius: 20,
+    padding: 6,
   },
   driverInfoContainer: {
     marginBottom: 15,
@@ -776,13 +956,13 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#FFD700',
+    backgroundColor: '#000', // Contrast with yellow card
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
   },
   driverAvatarText: {
-    color: '#121212',
+    color: '#f9c043',
     fontSize: 18,
     fontWeight: 'bold',
   },
@@ -790,7 +970,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   driverName: {
-    color: '#FFF',
+    color: colors.text, // Contrast with yellow
     fontSize: 16,
     fontWeight: 'bold',
     marginBottom: 2,
@@ -800,7 +980,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   driverRating: {
-    color: '#888',
+    color: colors.text, // Contrast with yellow
     fontSize: 12,
     marginLeft: 4,
   },
@@ -812,7 +992,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#2A2A2A',
+    backgroundColor: '#000', // Contrast with yellow
     justifyContent: 'center',
     alignItems: 'center',
     marginLeft: 10,
@@ -820,19 +1000,19 @@ const styles = StyleSheet.create({
   vehicleDetailsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#2A2A2A',
+    backgroundColor: 'rgba(0,0,0,0.05)', // Subtle contrast on yellow
     padding: 8,
     borderRadius: 8,
     marginBottom: 10,
   },
   vehicleDetailsText: {
-    color: '#AAA',
+    color: colors.text, // Contrast with yellow
     fontSize: 12,
     marginLeft: 8,
   },
   driverDivider: {
     height: 1,
-    backgroundColor: '#333',
+    backgroundColor: 'rgba(0,0,0,0.1)', // Subtle line on yellow
     marginBottom: 10,
   },
   rideDetails: {
@@ -844,12 +1024,12 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   detailText: {
-    color: '#FFF',
+    color: colors.text, // Contrast with yellow
     marginLeft: 10,
     fontSize: 14,
   },
   cancelButton: {
-    backgroundColor: '#FF6B6B',
+    backgroundColor: '#000', // Contrast with yellow
     padding: 12,
     borderRadius: 10,
     alignItems: 'center',
@@ -869,7 +1049,7 @@ const styles = StyleSheet.create({
   },
   chatContentWrapper: {
     height: '50%',
-    backgroundColor: '#1E1E1E',
+    backgroundColor: colors.card,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     padding: 15,
@@ -896,11 +1076,11 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   sentMessage: {
-    backgroundColor: '#FFD700',
+    backgroundColor: '#f9c043',
     alignSelf: 'flex-end',
   },
   receivedMessage: {
-    backgroundColor: '#2A2A2A',
+    backgroundColor: colors.cardElevated,
     alignSelf: 'flex-start',
   },
   messageText: {
@@ -908,14 +1088,14 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   messageTime: {
-    color: '#888',
+    color: colors.textSecondary,
     fontSize: 10,
     marginTop: 5,
   },
   chatInput: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#2A2A2A',
+    backgroundColor: colors.cardElevated,
     borderRadius: 25,
     paddingHorizontal: 15,
     paddingVertical: 5,
@@ -935,28 +1115,26 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
   },
   counterOfferCard: {
-    backgroundColor: '#1E1E1E',
+    backgroundColor: '#f9c043', // Yellow card
     borderRadius: 12,
     padding: 15,
     marginHorizontal: 10,
-    borderWidth: 2,
-    borderColor: '#FFD700',
     width: 280,
     elevation: 5,
   },
   counterOfferTitle: {
-    color: '#888',
+    color: colors.text, // Contrast on yellow
     fontSize: 12,
     marginBottom: 4,
     textTransform: 'uppercase',
   },
   counterOfferName: {
-    color: '#FFF',
+    color: colors.text,
     fontSize: 16,
     fontWeight: 'bold',
   },
   counterOfferVehicle: {
-    color: '#AAA',
+    color: '#444',
     fontSize: 12,
     marginBottom: 10,
   },
@@ -964,7 +1142,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#2A2A2A',
+    backgroundColor: 'rgba(0,0,0,0.1)', // Translucent dark on yellow
     borderRadius: 8,
     padding: 10,
     marginBottom: 15,
@@ -973,17 +1151,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   fareLabel: {
-    color: '#888',
+    color: colors.text,
     fontSize: 10,
     marginBottom: 4,
   },
   originalFareAmount: {
-    color: '#FFF',
+    color: '#555',
     fontSize: 16,
     textDecorationLine: 'line-through',
   },
   counterOfferAmount: {
-    color: '#FFD700',
+    color: colors.text,
     fontSize: 18,
     fontWeight: 'bold',
   },
@@ -993,27 +1171,29 @@ const styles = StyleSheet.create({
   },
   rejectOfferButton: {
     flex: 1,
-    backgroundColor: '#2A2A2A',
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#000',
     paddingVertical: 10,
     borderRadius: 8,
     alignItems: 'center',
     marginRight: 5,
   },
   rejectOfferText: {
-    color: '#FFF',
+    color: colors.text,
     fontWeight: 'bold',
     fontSize: 14,
   },
   acceptOfferButton: {
     flex: 1,
-    backgroundColor: '#FFD700',
+    backgroundColor: '#000', // Black button on yellow card
     paddingVertical: 10,
     borderRadius: 8,
     alignItems: 'center',
     marginLeft: 5,
   },
   acceptOfferText: {
-    color: '#121212',
+    color: '#FFF',
     fontWeight: 'bold',
     fontSize: 14,
   },
@@ -1025,7 +1205,7 @@ const styles = StyleSheet.create({
     zIndex: 1000,
   },
   completedCard: {
-    backgroundColor: '#1E1E1E',
+    backgroundColor: colors.card,
     borderRadius: 20,
     padding: 24,
     width: '85%',
@@ -1038,7 +1218,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   completedDetails: {
-    backgroundColor: '#2A2A2A',
+    backgroundColor: colors.cardElevated,
     borderRadius: 12,
     padding: 20,
     width: '100%',
@@ -1049,12 +1229,12 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   completedLabel: {
-    color: '#888',
+    color: colors.textSecondary,
     fontSize: 14,
     marginBottom: 5,
   },
   completedFare: {
-    color: '#FFD700',
+    color: '#f9c043',
     fontSize: 32,
     fontWeight: 'bold',
   },
@@ -1083,7 +1263,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   completedDoneButton: {
-    backgroundColor: '#FFD700',
+    backgroundColor: '#f9c043',
     width: '100%',
     paddingVertical: 14,
     borderRadius: 12,
@@ -1094,6 +1274,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   }
-});
+  });
+};
 
 export default RideTrackingScreen;

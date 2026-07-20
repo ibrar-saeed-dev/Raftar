@@ -1,79 +1,106 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
-  ScrollView,
-  Image,
-  Dimensions,
   SafeAreaView,
   StatusBar,
   Animated,
-  RefreshControl,
-  FlatList,
   ActivityIndicator,
   Alert,
   Platform,
-  TextInput,
+  Modal,
+  KeyboardAvoidingView,
+  ScrollView,
 } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
+
+import CustomPlacesAutocomplete from '../../components/common/CustomPlacesAutocomplete';
+import MapView from 'react-native-maps';
+import SidebarMenu from '../../components/common/SidebarMenu';
+
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import IconIonic from 'react-native-vector-icons/Ionicons';
-import IconFA from 'react-native-vector-icons/FontAwesome5';
 import IconMCI from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useNavigation } from '@react-navigation/native';
-import { LinearGradient } from 'expo-linear-gradient';
-import * as Animatable from 'react-native-animatable';
 import * as Location from 'expo-location';
 import api from '../../services/api';
-
-const { width, height } = Dimensions.get('window');
+import { useTheme } from '../../context/ThemeContext';
 
 const HomeScreen = () => {
   const navigation = useNavigation();
   const dispatch = useDispatch();
   const { user } = useSelector(state => state.auth);
+  const { currentRide } = useSelector(state => state.ride);
+  const { colors, isDark } = useTheme();
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
+
   const [location, setLocation] = useState(null);
   const [errorMsg, setErrorMsg] = useState(null);
-  const [refreshing, setRefreshing] = useState(false);
-  const [activeService, setActiveService] = useState(null);
+  const [sidebarVisible, setSidebarVisible] = useState(false);
+  const [locationModalVisible, setLocationModalVisible] = useState(false);
+  const [focusedInput, setFocusedInput] = useState(null);
 
   const [pickup, setPickup] = useState(null);
   const [destination, setDestination] = useState(null);
+  const [hasAutoNavigated, setHasAutoNavigated] = useState(false);
   const [locationLoading, setLocationLoading] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [recentRides, setRecentRides] = useState([]);
+  const pickupRef = useRef(null);
+  const destinationRef = useRef(null);
+  const [mapPickerVisible, setMapPickerVisible] = useState(false);
+  const [mapPickerType, setMapPickerType] = useState('pickup');
+  const [mapPickerCoords, setMapPickerCoords] = useState(null);
+  const [mapPickerAddress, setMapPickerAddress] = useState('Loading address...');
+  const pickerMapRef = useRef(null);
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(30)).current;
-  const scaleAnim = useRef(new Animated.Value(0.95)).current;
-
-  // Modern Yellow Theme Colors
-  const YELLOW_PRIMARY = '#F9C349';
-  const YELLOW_DARK = '#F8B82A';
-  const YELLOW_LIGHT = '#FFF3D6';
-  const YELLOW_GRADIENT_START = '#F8B82A';
-  const YELLOW_GRADIENT_END = '#F9C349';
-  const BLACK_PRIMARY = '#1A1A2E';
-  const GRAY_LIGHT = '#F5F5F5';
-  const GRAY_MEDIUM = '#E0E0E0';
-  const WHITE = '#FFFFFF';
 
   useEffect(() => {
-    animateEntrance();
+    if (pickup && destination && !hasAutoNavigated) {
+      setHasAutoNavigated(true);
+      setLocationModalVisible(false);
+      navigation.navigate('BookRide', {
+        pickup: pickup,
+        destination: destination
+      });
+    } else if (!pickup || !destination) {
+      setHasAutoNavigated(false);
+    }
+  }, [pickup, destination, hasAutoNavigated, navigation]);
+
+  useEffect(() => {
+    if (locationModalVisible) {
+      if (pickup) {
+        setTimeout(() => {
+          pickupRef.current?.setAddressText(pickup.address);
+        }, 100);
+      } else {
+        getCurrentLocation();
+      }
+    }
+  }, [locationModalVisible, pickup]);
+
+  useEffect(() => {
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 400,
+      useNativeDriver: true,
+    }).start();
     getCurrentLocation();
     checkActiveRides();
+    fetchRecentRides();
   }, []);
 
   const checkActiveRides = async () => {
     try {
       const response = await api.get('/rides/active');
       if (response.data?.success && response.data.rides?.length > 0) {
-        const activeRide = response.data.rides.find(r => r.status === 'accepted' || r.status === 'started');
+        const activeRide = response.data.rides.find(r => r.status === 'searching' || r.status === 'accepted' || r.status === 'started');
         if (activeRide) {
-          console.log('[HomeScreen] Found active in-progress ride:', activeRide._id, 'Status:', activeRide.status);
+          console.log('[HomeScreen] Found active ride:', activeRide._id, 'Status:', activeRide.status);
           dispatch({ type: 'ride/getRideDetails/fulfilled', payload: { ride: activeRide } });
-          navigation.navigate('RideTracking', { rideId: activeRide._id });
         } else {
           dispatch({ type: 'ride/clearCurrentRide' });
         }
@@ -85,9 +112,29 @@ const HomeScreen = () => {
     }
   };
 
+  const fetchRecentRides = async () => {
+    try {
+      const response = await api.get('/history/passenger');
+      const history = response.data?.history || [];
+      const seen = new Set();
+      const recents = [];
+      for (const ride of history) {
+        const address = ride.dropoff?.address;
+        if (!address || seen.has(address)) continue;
+        seen.add(address);
+        recents.push(ride);
+        if (recents.length === 3) break;
+      }
+      setRecentRides(recents);
+    } catch (error) {
+      // Recent places are optional — fail silently
+      console.log('[HomeScreen] Recent rides unavailable:', error.message);
+    }
+  };
+
   useEffect(() => {
     const socketService = require('../../services/socket').default;
-    
+
     const handleJoinAccepted = (data) => {
       Alert.alert('Carpool Update', 'Your carpool request was accepted!');
     };
@@ -114,27 +161,6 @@ const HomeScreen = () => {
     };
   }, [navigation]);
 
-  const animateEntrance = () => {
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 1000,
-        useNativeDriver: true,
-      }),
-      Animated.timing(slideAnim, {
-        toValue: 0,
-        duration: 800,
-        useNativeDriver: true,
-      }),
-      Animated.spring(scaleAnim, {
-        toValue: 1,
-        friction: 6,
-        tension: 50,
-        useNativeDriver: true,
-      })
-    ]).start();
-  };
-
   const getCurrentLocation = async () => {
     setLocationLoading(true);
     try {
@@ -147,7 +173,7 @@ const HomeScreen = () => {
 
       let loc = await Location.getCurrentPositionAsync({});
       setLocation(loc);
-      
+
       let addressStr = 'Current Location';
       try {
         let geo = await Location.reverseGeocodeAsync({
@@ -157,7 +183,7 @@ const HomeScreen = () => {
         if (geo.length > 0) {
           addressStr = `${geo[0].name || geo[0].street || ''}, ${geo[0].city || ''}`.replace(/^, /, '');
         }
-      } catch(e) {}
+      } catch (e) { }
 
       setPickup({
         address: addressStr,
@@ -166,6 +192,7 @@ const HomeScreen = () => {
           coordinates: [loc.coords.longitude, loc.coords.latitude]
         }
       });
+      pickupRef.current?.setAddressText(addressStr);
     } catch (error) {
       console.error('Location error:', error);
     } finally {
@@ -173,600 +200,1030 @@ const HomeScreen = () => {
     }
   };
 
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await getCurrentLocation();
-    setRefreshing(false);
+  const openMapPicker = async (type) => {
+    setMapPickerType(type);
+    setMapPickerVisible(true);
+    let coords = type === 'pickup' && pickup ?
+      { latitude: pickup.location.coordinates[1], longitude: pickup.location.coordinates[0] } :
+      type === 'destination' && destination ?
+        { latitude: destination.location.coordinates[1], longitude: destination.location.coordinates[0] } : null;
+
+    if (!coords) {
+      try {
+        let loc = await Location.getCurrentPositionAsync({});
+        coords = loc.coords;
+      } catch (e) {
+        coords = { latitude: 33.6844, longitude: 73.0479 };
+      }
+    }
+    setMapPickerCoords(coords);
+    setMapPickerAddress('Loading address...');
+  };
+
+  const onPickerRegionChangeComplete = async (region) => {
+    setMapPickerCoords(region);
+    try {
+      let geo = await Location.reverseGeocodeAsync({
+        latitude: region.latitude,
+        longitude: region.longitude
+      });
+      if (geo.length > 0) {
+        setMapPickerAddress(`${geo[0].name || geo[0].street || ''}, ${geo[0].city || ''}`.replace(/^, /, ''));
+      } else {
+        setMapPickerAddress('Unknown Location');
+      }
+    } catch (e) {
+      setMapPickerAddress('Unknown Location');
+    }
+  };
+
+  const confirmMapPicker = () => {
+    if (!mapPickerCoords) return;
+    const data = {
+      address: mapPickerAddress,
+      location: {
+        type: 'Point',
+        coordinates: [mapPickerCoords.longitude, mapPickerCoords.latitude]
+      }
+    };
+    if (mapPickerType === 'pickup') {
+      setPickup(data);
+      pickupRef.current?.setAddressText(data.address);
+    } else {
+      setDestination(data);
+      destinationRef.current?.setAddressText(data.address);
+    }
+    setMapPickerVisible(false);
   };
 
   const handleWhereToPress = () => {
+    setLocationModalVisible(false);
     navigation.navigate('BookRide', {
       pickup: pickup,
       destination: destination
     });
   };
 
-  const handlePickupPress = () => {
-    navigation.navigate('BookRide', {
-      pickup: pickup,
-      destination: destination,
-      focusField: 'pickup'
-    });
-  };
-
-  const handleDestinationPress = () => {
-    navigation.navigate('BookRide', {
-      pickup: pickup,
-      destination: destination,
-      focusField: 'destination'
-    });
-  };
-
-  const getPickupDisplay = () => {
-    if (pickup) {
-      return pickup.address.length > 30 ? pickup.address.substring(0, 30) + '...' : pickup.address;
+  const handleRecentPress = (ride) => {
+    const coords = ride.dropoff?.location?.coordinates;
+    if (coords?.length === 2) {
+      const data = {
+        address: ride.dropoff.address,
+        location: {
+          type: 'Point',
+          coordinates: coords
+        }
+      };
+      setDestination(data);
+      if (destinationRef.current) {
+        destinationRef.current.setAddressText(data.address);
+      }
+      
+      if (pickup) {
+        navigation.navigate('BookRide', { pickup: pickup, destination: data });
+      } else {
+        setLocationModalVisible(true);
+      }
+    } else {
+      navigation.navigate('BookRide', { pickup: pickup, destination: null });
     }
-    return 'Select pickup location';
   };
 
-  const getDestinationDisplay = () => {
-    if (destination) {
-      return destination.address.length > 30 ? destination.address.substring(0, 30) + '...' : destination.address;
-    }
-    return 'Where to?';
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good morning';
+    if (hour < 17) return 'Good afternoon';
+    return 'Good evening';
   };
 
-  const serviceOptions = [
+  const serviceOptions = useMemo(() => [
     {
       id: 'ride',
-      title: 'Ride',
-      icon: 'car-sports',
-      iconType: 'material-community',
+      title: 'Book a Ride',
+      icon: 'car-outline',
+      iconType: 'ionicon',
       screen: 'BookRide',
-      description: 'Go anywhere',
-      iconBg: YELLOW_LIGHT,
-      iconColor: YELLOW_PRIMARY,
+      description: 'City trips',
+      bgColor: isDark ? '#2A200B' : '#FFF7E0',
+      iconColor: isDark ? '#F5A623' : '#F5A623',
     },
     {
       id: 'carpool',
       title: 'Carpool',
-      icon: 'people',
+      icon: 'people-outline',
       iconType: 'ionicon',
       screen: 'BookCarpool',
       description: 'Share & save',
-      iconBg: '#E8F5E9',
-      iconColor: '#4CAF50',
+      bgColor: isDark ? '#0D271F' : '#E1F5EE',
+      iconColor: isDark ? '#1D9E75' : '#1D9E75',
     },
     {
       id: 'parcel',
-      title: 'Parcel',
-      icon: 'package-variant-closed',
-      iconType: 'material-community',
+      title: 'Send Parcel',
+      icon: 'cube-outline',
+      iconType: 'ionicon',
       screen: 'SendParcel',
-      description: 'Send items',
-      iconBg: '#FFF3E0',
-      iconColor: '#FF9800',
+      description: 'Deliver items',
+      bgColor: isDark ? '#2D1B15' : '#FAECE7',
+      iconColor: isDark ? '#D85A30' : '#D85A30',
     },
     {
       id: 'intercity',
       title: 'Intercity',
-      icon: 'bus',
-      iconType: 'material-community',
+      icon: 'bus-outline',
+      iconType: 'ionicon',
       screen: 'BookIntercity',
       description: 'City to city',
-      iconBg: '#F3E5F5',
-      iconColor: '#9C27B0',
+      bgColor: isDark ? '#15212D' : '#E6F1FB',
+      iconColor: isDark ? '#378ADD' : '#378ADD',
     }
-  ];
+  ], [isDark]);
 
   const getIcon = (icon, iconType, size, color) => {
     switch (iconType) {
-      case 'material':
-        return <Icon name={icon} size={size} color={color} />;
       case 'ionicon':
         return <IconIonic name={icon} size={size} color={color} />;
       case 'material-community':
         return <IconMCI name={icon} size={size} color={color} />;
-      case 'fontawesome':
-        return <IconFA name={icon} size={size} color={color} />;
       default:
         return <Icon name={icon} size={size} color={color} />;
     }
   };
 
-  const renderServiceCard = ({ item, index }) => (
-    <Animatable.View 
-      animation="fadeInUp" 
-      duration={500} 
-      delay={index * 100}
-      style={styles.serviceCardWrapper}
-    >
-      <TouchableOpacity
-        activeOpacity={0.85}
-        style={styles.serviceCard}
-        onPress={() => {
-          setActiveService(item.id);
-          navigation.navigate(item.screen);
-        }}
-      >
-        <View style={styles.serviceCardContent}>
-          <View style={[styles.serviceIconContainer, { backgroundColor: item.iconBg }]}>
-            {getIcon(item.icon, item.iconType, 28, item.iconColor)}
-          </View>
-          <Text style={styles.serviceTitle}>{item.title}</Text>
-          <Text style={styles.serviceDescription}>{item.description}</Text>
-        </View>
-      </TouchableOpacity>
-    </Animatable.View>
-  );
-
-  const handleNotificationPress = () => {
-    navigation.navigate('Notifications');
-  };
-
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
-      
-      <Animated.View style={[
-        styles.container,
-        {
-          opacity: fadeAnim,
-          transform: [
-            { translateY: slideAnim },
-            { scale: scaleAnim }
-          ]
-        }
-      ]}>
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl 
-              refreshing={refreshing} 
-              onRefresh={onRefresh} 
-              tintColor={YELLOW_PRIMARY}
-              colors={[YELLOW_PRIMARY]}
-            />
-          }
+      <StatusBar barStyle={colors.statusBarStyle} backgroundColor={colors.background} />
+
+      <Animated.ScrollView 
+        style={[styles.container, { opacity: fadeAnim }]}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 40 }}
+      >
+        {/* Header */}
+        <View style={styles.header}>
+          <View style={styles.headerLeft}>
+            <Text style={styles.greeting}>{getGreeting()},</Text>
+            <Text style={styles.userName}>{user?.name || 'there'}</Text>
+          </View>
+          <View style={styles.headerRight}>
+            <TouchableOpacity
+              style={styles.headerIconButton}
+              onPress={() => navigation.navigate('Notifications')}
+              activeOpacity={0.7}
+            >
+              <IconIonic name="notifications-outline" size={22} color={colors.text} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.avatarButton}
+              onPress={() => setSidebarVisible(true)}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.avatarText}>
+                {(user?.name || 'U').charAt(0).toUpperCase()}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* (Active ride moved below) */}
+        {/* Location Card — the "Where to?" trigger */}
+        <TouchableOpacity 
+          style={styles.whereToTrigger} 
+          activeOpacity={0.9}
+          onPress={() => setLocationModalVisible(true)}
         >
-          {/* Modern Yellow Header */}
-          <LinearGradient
-            colors={[YELLOW_GRADIENT_START, YELLOW_GRADIENT_END]}
-            style={styles.headerGradient}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
+          <View style={styles.whereToTriggerContent}>
+            <IconIonic name="search" size={24} color={colors.textSecondary} />
+            <Text style={styles.whereToTriggerText}>Where to?</Text>
+          </View>
+          <View style={styles.whereToTriggerTiming}>
+            <IconIonic name="time" size={16} color={colors.textSecondary} style={{marginRight: 4}} />
+            <Text style={styles.whereToTriggerTimingText}>Now</Text>
+            <IconIonic name="chevron-down" size={16} color={colors.textSecondary} />
+          </View>
+        </TouchableOpacity>
+
+        {/* Active Ride Banner */}
+        {currentRide && (currentRide.status === 'searching' || currentRide.status === 'accepted' || currentRide.status === 'started') && (
+          <TouchableOpacity
+            style={styles.activeRideBanner}
+            onPress={() => navigation.navigate('RideTracking', { rideId: currentRide._id })}
+            activeOpacity={0.8}
           >
-            <View style={styles.headerContainer}>
-              <View style={styles.headerLeft}>
-                <View style={styles.logoContainer}>
-                  <IconMCI name="car-sports" size={28} color="#FFFFFF" />
-                  <Text style={styles.headerTitle}>Raftar</Text>
-                </View>
-                
+            <View style={styles.activeRideBannerContent}>
+              <View style={styles.activeRideIcon}>
+                <IconIonic name="car-outline" size={20} color={colors.accent} />
               </View>
-              <View style={styles.headerRight}>
-                <TouchableOpacity 
-                  style={styles.headerIconButton}
-                  onPress={handleNotificationPress}
+              <View style={{ flex: 1, paddingRight: 10 }}>
+                <Text style={styles.activeRideBannerTitle}>
+                  {currentRide.status === 'searching' ? 'Searching for Driver...' : 'Active Ride'}
+                </Text>
+                <Text style={styles.activeRideBannerStatus} numberOfLines={1}>
+                  To: {currentRide.dropoff?.address || 'Destination'}
+                </Text>
+              </View>
+            </View>
+            <IconIonic name="chevron-forward" size={20} color={colors.textSecondary} />
+          </TouchableOpacity>
+        )}
+
+        {/* Services */}
+        <View style={styles.sectionContainer}>
+          <Text style={styles.sectionTitle}>Services</Text>
+          <View style={styles.servicesGrid}>
+            {serviceOptions.map((service) => (
+              <TouchableOpacity
+                key={service.id}
+                activeOpacity={0.8}
+                style={styles.serviceCard}
+                onPress={() => {
+                  if (service.id === 'ride') {
+                    setLocationModalVisible(true);
+                  } else {
+                    navigation.navigate(service.screen);
+                  }
+                }}
+              >
+                <View style={[styles.serviceIconContainer, { backgroundColor: service.bgColor }]}>
+                  {getIcon(service.icon, service.iconType, 28, service.iconColor)}
+                </View>
+                <Text style={styles.serviceTitle}>{service.title}</Text>
+                <Text style={styles.serviceDescription}>{service.description}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        {/* Recent places */}
+        {recentRides.length > 0 && (
+          <View style={styles.sectionContainer}>
+            <Text style={styles.sectionTitle}>Recent</Text>
+            <View style={styles.recentCard}>
+              {recentRides.map((ride, index) => (
+                <TouchableOpacity
+                  key={ride._id}
+                  style={[
+                    styles.recentItem,
+                    index < recentRides.length - 1 && styles.recentItemDivider
+                  ]}
+                  onPress={() => handleRecentPress(ride)}
                   activeOpacity={0.7}
                 >
-                  <IconIonic name="notifications-outline" size={24} color="#FFFFFF" />
-                  <View style={styles.notificationDot} />
+                  <View style={styles.recentIconContainer}>
+                    <IconIonic name="time-outline" size={18} color={colors.textSecondary} />
+                  </View>
+                  <View style={styles.recentTextContainer}>
+                    <Text style={styles.recentAddress} numberOfLines={1}>
+                      {ride.dropoff?.address}
+                    </Text>
+                    <Text style={styles.recentSubtitle} numberOfLines={1}>
+                      {ride.createdAt
+                        ? new Date(ride.createdAt).toLocaleDateString('en-PK', { day: '2-digit', month: 'short' })
+                        : 'Past ride'}
+                    </Text>
+                  </View>
+                  <IconIonic name="chevron-forward" size={18} color={isDark ? '#444' : '#CCC'} />
                 </TouchableOpacity>
-               
-              </View>
-            </View>
-
-            
-
-           
-          </LinearGradient>
-
-          
-
-          {/* Location Card - Modern Design */}
-          <View style={styles.locationCard}>
-            <View style={styles.locationCardHeader}>
-              <Text style={styles.locationCardTitle}>Your Trip</Text>
-              <TouchableOpacity onPress={getCurrentLocation}>
-                <Text style={styles.locationCardAction}>Use Current</Text>
-              </TouchableOpacity>
-            </View>
-
-            <TouchableOpacity 
-              style={styles.locationItem}
-              onPress={handlePickupPress}
-              activeOpacity={0.7}
-            >
-              <View style={[styles.locationDot, { backgroundColor: YELLOW_PRIMARY }]} />
-              <View style={styles.locationContent}>
-                <Text style={styles.locationLabel}>Pickup</Text>
-                <Text style={styles.locationText} numberOfLines={1}>
-                  {locationLoading ? 'Loading...' : getPickupDisplay()}
-                </Text>
-              </View>
-              {pickup && (
-                <TouchableOpacity 
-                  style={styles.clearButton}
-                  onPress={() => setPickup(null)}
-                >
-                  <IconIonic name="close-circle" size={20} color="#999" />
-                </TouchableOpacity>
-              )}
-            </TouchableOpacity>
-
-            <View style={styles.locationDivider} />
-
-            <TouchableOpacity 
-              style={styles.locationItem}
-              onPress={handleDestinationPress}
-              activeOpacity={0.7}
-            >
-              <View style={[styles.locationDot, { backgroundColor: '#FF6B6B' }]} />
-              <View style={styles.locationContent}>
-                <Text style={styles.locationLabel}>Destination</Text>
-                <Text style={[styles.locationText, !destination && styles.locationPlaceholder]}>
-                  {getDestinationDisplay()}
-                </Text>
-              </View>
-              {destination && (
-                <TouchableOpacity 
-                  style={styles.clearButton}
-                  onPress={() => setDestination(null)}
-                >
-                  <IconIonic name="close-circle" size={20} color="#999" />
-                </TouchableOpacity>
-              )}
-            </TouchableOpacity>
-
-            {pickup && destination && (
-              <TouchableOpacity 
-                style={styles.bookNowButton}
-                onPress={handleWhereToPress}
-              >
-                <LinearGradient
-                  colors={[YELLOW_GRADIENT_START, YELLOW_GRADIENT_END]}
-                  style={styles.bookNowGradient}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                >
-                  <Text style={styles.bookNowText}>Find a Ride</Text>
-                  <Icon name="arrow-forward" size={20} color="#FFFFFF" />
-                </LinearGradient>
-              </TouchableOpacity>
-            )}
-          </View>
-
-          {/* Services Section */}
-          <View style={styles.sectionContainer}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Our Services</Text>
-              <TouchableOpacity>
-                <Text style={styles.sectionSeeAll}>See All</Text>
-              </TouchableOpacity>
-            </View>
-            <View style={styles.servicesGrid}>
-              {serviceOptions.map((service, index) => (
-                <View key={service.id} style={styles.serviceGridItem}>
-                  {renderServiceCard({ item: service, index })}
-                </View>
               ))}
             </View>
           </View>
+        )}
+      </Animated.ScrollView>
 
-          {/* Promo Banner - Yellow Theme */}
-          <View style={styles.promoContainer}>
-            <LinearGradient
-              colors={[YELLOW_GRADIENT_START, YELLOW_GRADIENT_END]}
-              style={styles.promoBanner}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
+      <SidebarMenu
+        visible={sidebarVisible}
+        onClose={() => setSidebarVisible(false)}
+      />
+
+      {/* Ride Booking Location Modal */}
+      <Modal visible={locationModalVisible} animationType="slide" transparent={true}>
+        <KeyboardAvoidingView
+          style={styles.locationModalOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          <View style={styles.locationModalContent}>
+            <View style={styles.locationModalHeaderRow}>
+              <Text style={styles.locationModalTitle}>Plan your ride</Text>
+              <TouchableOpacity onPress={() => setLocationModalVisible(false)} style={styles.closeModalBtn}>
+                <IconIonic name="close" size={24} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView 
+              style={styles.locationCardModal}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
             >
-              <View style={styles.promoContent}>
-                <View style={styles.promoTextContainer}>
-                  <Text style={styles.promoTitle}>🚗 First Ride Free</Text>
-                  <Text style={styles.promoDescription}>Get your first ride absolutely free. Use code FIRSTFREE</Text>
-                  <TouchableOpacity style={styles.promoButton}>
-                    <Text style={styles.promoButtonText}>Claim Offer</Text>
-                    <Icon name="arrow-forward" size={16} color={YELLOW_PRIMARY} />
-                  </TouchableOpacity>
+              <View style={styles.locationHeader}>
+                <Text style={styles.locationTitle}>Where to?</Text>
+                <TouchableOpacity style={styles.locationAction} onPress={getCurrentLocation}>
+                  {locationLoading ? (
+                    <ActivityIndicator size="small" color={isDark ? '#D4A373' : '#8A6D1A'} />
+                  ) : (
+                    <IconIonic name="locate-outline" size={16} color={isDark ? '#D4A373' : '#8A6D1A'} />
+                  )}
+                  <Text style={styles.locationActionText}>Current</Text>
+                </TouchableOpacity>
+              </View>
+
+              <View style={[styles.locationInputWrapper, { zIndex: 99 }]}>
+                <View style={styles.locationDot}>
+                  <View style={[styles.dot, { backgroundColor: colors.pickup }]} />
+                  <View style={styles.dotLine} />
                 </View>
-                <View style={styles.promoIconContainer}>
-                  <IconMCI name="rocket-launch" size={48} color="#FFFFFF" />
+                <View style={styles.locationInputContainer}>
+                  <CustomPlacesAutocomplete
+                    ref={pickupRef}
+                    placeholder="Pickup Location"
+                    onPress={(data, details = null) => {
+                      setPickup({
+                        address: data.description,
+                        location: {
+                          type: 'Point',
+                          coordinates: [
+                            details.geometry.location.lng,
+                            details.geometry.location.lat
+                          ]
+                        },
+                        placeId: data.place_id
+                      });
+                    }}
+                    textInputProps={{
+                      onFocus: () => setFocusedInput('pickup'),
+                      onBlur: () => setFocusedInput(null)
+                    }}
+                    styles={{
+                      textInputContainer: [styles.inputContainer, focusedInput === 'pickup' && styles.inputContainerFocused],
+                      textInput: styles.textInput,
+                      container: styles.autocompleteContainer,
+                      listView: styles.autocompleteList,
+                      row: styles.autocompleteRow,
+                      description: styles.autocompleteDescription
+                    }}
+                    placeholderTextColor={colors.textSecondary}
+                    renderRightButton={() => (
+                      <TouchableOpacity onPress={() => openMapPicker('pickup')} style={styles.mapIconBtn}>
+                        <IconIonic name="map-outline" size={20} color={colors.pickup} />
+                      </TouchableOpacity>
+                    )}
+                  />
                 </View>
               </View>
-            </LinearGradient>
-          </View>
 
-          <View style={styles.bottomSpacer} />
-        </ScrollView>
-      </Animated.View>
+              <View style={[styles.locationInputWrapper, { zIndex: 98 }]}>
+                <View style={styles.locationDot}>
+                  <View style={[styles.dot, { backgroundColor: colors.dropoff }]} />
+                </View>
+                <View style={styles.locationInputContainer}>
+                  <CustomPlacesAutocomplete
+                    ref={destinationRef}
+                    placeholder="Where to?"
+                    onPress={(data, details = null) => {
+                      setDestination({
+                        address: data.description,
+                        location: {
+                          type: 'Point',
+                          coordinates: [
+                            details.geometry.location.lng,
+                            details.geometry.location.lat
+                          ]
+                        },
+                        placeId: data.place_id
+                      });
+                    }}
+                    textInputProps={{
+                      onFocus: () => setFocusedInput('destination'),
+                      onBlur: () => setFocusedInput(null)
+                    }}
+                    styles={{
+                      textInputContainer: [styles.inputContainer, focusedInput === 'destination' && styles.inputContainerFocused],
+                      textInput: styles.textInput,
+                      container: styles.autocompleteContainer,
+                      listView: styles.autocompleteList,
+                      row: styles.autocompleteRow,
+                      description: styles.autocompleteDescription
+                    }}
+                    placeholderTextColor={colors.textSecondary}
+                    renderRightButton={() => (
+                      <TouchableOpacity onPress={() => openMapPicker('destination')} style={styles.mapIconBtn}>
+                        <IconIonic name="map-outline" size={20} color={colors.dropoff} />
+                      </TouchableOpacity>
+                    )}
+                  />
+                </View>
+              </View>
+
+              {recentRides.length > 0 && (
+                <View style={{ marginTop: 16 }}>
+                  <Text style={[styles.sectionTitle, { fontSize: 15, marginBottom: 10, paddingHorizontal: 0 }]}>Recent Destinations</Text>
+                  <View style={styles.recentCard}>
+                    {recentRides.map((ride, index) => (
+                      <TouchableOpacity
+                        key={ride._id}
+                        style={[
+                          styles.recentItem,
+                          index < recentRides.length - 1 && styles.recentItemDivider
+                        ]}
+                        onPress={() => {
+                          const coords = ride.dropoff?.location?.coordinates;
+                          if (coords?.length === 2) {
+                            const destData = {
+                              address: ride.dropoff.address,
+                              location: {
+                                type: 'Point',
+                                coordinates: coords
+                              }
+                            };
+                            setDestination(destData);
+                            destinationRef.current?.setAddressText(destData.address);
+                            if (pickup) {
+                              setLocationModalVisible(false);
+                              navigation.navigate('BookRide', { pickup, destination: destData });
+                            }
+                          }
+                        }}
+                        activeOpacity={0.7}
+                      >
+                        <View style={styles.recentIconContainerModal}>
+                          <IconIonic name="time-outline" size={18} color={colors.textSecondary} />
+                        </View>
+                        <View style={styles.recentTextContainer}>
+                          <Text style={styles.recentAddress} numberOfLines={1}>
+                            {ride.dropoff?.address}
+                          </Text>
+                          <Text style={styles.recentSubtitle} numberOfLines={1}>
+                            {ride.createdAt
+                              ? new Date(ride.createdAt).toLocaleDateString('en-PK', { day: '2-digit', month: 'short' })
+                              : 'Past ride'}
+                          </Text>
+                        </View>
+                        <IconIonic name="chevron-forward" size={18} color={isDark ? '#444' : '#CCC'} />
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              )}
+
+            </ScrollView>
+
+            <TouchableOpacity 
+              style={[styles.modalContinueBtn, (!pickup || !destination) && styles.modalContinueBtnDisabled]} 
+              onPress={handleWhereToPress}
+              disabled={!pickup || !destination}
+            >
+              <Text style={[styles.modalContinueText, (!pickup || !destination) && styles.modalContinueTextDisabled]}>Continue</Text>
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Map Picker Modal */}
+      <Modal visible={mapPickerVisible} animationType="slide">
+        <View style={styles.pickerModalContainer}>
+          <View style={styles.pickerModalHeader}>
+            <TouchableOpacity onPress={() => setMapPickerVisible(false)} style={styles.pickerBackBtn}>
+              <IconIonic name="arrow-back" size={24} color={colors.text} />
+            </TouchableOpacity>
+            <Text style={styles.pickerModalTitle}>Select {mapPickerType === 'pickup' ? 'Pickup' : 'Dropoff'}</Text>
+            <View style={{ width: 32 }} />
+          </View>
+          {mapPickerCoords && (
+            <MapView
+              key={`${mapPickerType}-${mapPickerVisible}`}
+              ref={pickerMapRef}
+              style={styles.pickerMap}
+              initialRegion={{
+                latitude: mapPickerCoords.latitude,
+                longitude: mapPickerCoords.longitude,
+                latitudeDelta: 0.002,
+                longitudeDelta: 0.002,
+              }}
+              onRegionChangeComplete={onPickerRegionChangeComplete}
+              showsUserLocation
+            />
+          )}
+          <View style={styles.pickerCenterPin}>
+            <IconIonic name="location" size={44} color={mapPickerType === 'pickup' ? colors.pickup : colors.dropoff} />
+          </View>
+          <View style={styles.pickerBottomCard}>
+            <Text style={styles.pickerAddressLabel}>Selected Location</Text>
+            <Text style={styles.pickerAddressText}>{mapPickerAddress}</Text>
+            <TouchableOpacity style={styles.pickerConfirmBtn} onPress={confirmMapPicker}>
+              <Text style={styles.pickerConfirmText}>Confirm Location</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
 
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#F8F9FA',
-  },
-  container: {
-    flex: 1,
-    backgroundColor: '#F8F9FA',
-    marginTop:34
-  },
-  headerGradient: {
-    paddingTop: 12,
-    paddingBottom: 24,
-    borderBottomLeftRadius: 30,
-    borderBottomRightRadius: 30,
-  },
-  headerContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 8,
-    paddingBottom:30
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  logoContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: '#FFFFFF',
-    letterSpacing: 0.5,
-  },
- 
-  
-  
-  headerIconButton: {
-    padding: 6,
-    position: 'relative',
-  },
-  notificationDot: {
-    position: 'absolute',
-    top: 4,
-    right: 4,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#FF4444',
-    borderWidth: 1.5,
-    borderColor: '#FFFFFF',
-  },
- 
-  
- 
-  locationCard: {
-    backgroundColor: '#FFFFFF',
-    marginHorizontal: 20,
-    marginTop: -27,
-    marginBottom: 20,
-    borderRadius: 20,
-    paddingHorizontal: 4,
-    paddingVertical: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
-    elevation: 4,
-  },
-  locationCardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingTop: 14,
-    paddingBottom: 8,
-  },
-  locationCardTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#1A1A2E',
-  },
-  locationCardAction: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#FFB800',
-  },
-  locationItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  locationDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    marginRight: 14,
-    borderWidth: 2,
-    borderColor: '#FFF',
-  },
-  locationContent: {
-    flex: 1,
-  },
-  locationLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#999',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 2,
-  },
-  locationText: {
-    fontSize: 15,
-    color: '#1A1A2E',
-    fontWeight: '500',
-  },
-  locationPlaceholder: {
-    color: '#999',
-    fontWeight: '400',
-  },
-  locationDivider: {
-    height: 1,
-    backgroundColor: '#F0F0F0',
-    marginHorizontal: 16,
-  },
-  clearButton: {
-    padding: 2,
-    marginLeft: 8,
-  },
-  bookNowButton: {
-    marginHorizontal: 16,
-    marginVertical: 12,
-    borderRadius: 14,
-    overflow: 'hidden',
-  },
-  bookNowGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 14,
-    gap: 8,
-  },
-  bookNowText: {
-    fontSize: 16,
-    color: '#FFFFFF',
-    fontWeight: '700',
-  },
-  sectionContainer: {
-    paddingHorizontal: 20,
-    marginBottom: 12,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 14,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1A1A2E',
-  },
-  sectionSeeAll: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#FFB800',
-  },
-  servicesGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-  },
-  serviceGridItem: {
-    width: '48%',
-    marginBottom: 14,
-  },
-  serviceCardWrapper: {
-    flex: 1,
-  },
-  serviceCard: {
-    flex: 1,
-    borderRadius: 16,
-    overflow: 'hidden',
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#F0F0F0',
-    shadowColor: '#000',
+const createStyles = (colors, isDark) => {
+  // Per design spec: light mode uses white cards lifted by a soft shadow;
+  // dark mode uses #1A1A1A cards where shadows are invisible, so border only.
+  const cardBg = isDark ? colors.card : colors.background;
+  const insetBg = isDark ? colors.cardElevated : colors.card;
+  const softShadow = {
+    shadowColor: colors.text,
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    elevation: 2,
-  },
-  serviceCardContent: {
-    padding: 20,
-    alignItems: 'center',
-    minHeight: 130,
-    justifyContent: 'center',
-  },
-  serviceIconContainer: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  serviceTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    marginBottom: 1,
-    textAlign: 'center',
-    color: '#1A1A2E',
-  },
-  serviceDescription: {
-    fontSize: 11,
-    textAlign: 'center',
-    fontWeight: '400',
-    color: '#888',
-  },
-  promoContainer: {
-    paddingHorizontal: 20,
-    marginBottom: 20,
-  },
-  promoBanner: {
-    borderRadius: 20,
-    padding: 20,
-    overflow: 'hidden',
-  },
-  promoContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  promoTextContainer: {
-    flex: 1,
-    marginRight: 12,
-  },
-  promoTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    marginBottom: 4,
-  },
-  promoDescription: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.9)',
-    marginBottom: 10,
-    lineHeight: 16,
-  },
-  promoButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 20,
-    alignSelf: 'flex-start',
-    gap: 4,
-  },
-  promoButtonText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#FFB800',
-  },
-  promoIconContainer: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  bottomSpacer: {
-    height: 30,
-  },
-});
+    shadowOpacity: isDark ? 0 : 0.06,
+    shadowRadius: 8,
+    elevation: isDark ? 0 : 2,
+  };
+
+  return StyleSheet.create({
+    safeArea: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+      paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) : 0,
+    },
+    header: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingHorizontal: 20,
+      paddingTop: 16,
+      paddingBottom: 24,
+    },
+    headerLeft: {
+      flex: 1,
+    },
+    greeting: {
+      fontSize: 14,
+      color: colors.textSecondary,
+    },
+    userName: {
+      fontSize: 24,
+      fontWeight: '700',
+      color: colors.text,
+      marginTop: 2,
+    },
+    headerRight: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+    },
+    headerIconButton: {
+      width: 42,
+      height: 42,
+      borderRadius: 21,
+      backgroundColor: cardBg,
+      borderWidth: 1,
+      borderColor: colors.border,
+      justifyContent: 'center',
+      alignItems: 'center',
+      ...softShadow,
+    },
+    avatarButton: {
+      width: 42,
+      height: 42,
+      borderRadius: 21,
+      backgroundColor: colors.accent,
+      justifyContent: 'center',
+      alignItems: 'center',
+      ...softShadow,
+    },
+    avatarText: {
+      color: colors.accentText,
+      fontSize: 16,
+      fontWeight: '700',
+    },
+    activeRideBanner: {
+      backgroundColor: cardBg,
+      marginHorizontal: 20,
+      marginBottom: 20,
+      padding: 16,
+      borderRadius: 16,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      borderWidth: 1,
+      borderColor: colors.accent,
+      ...softShadow,
+    },
+    activeRideBannerContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flex: 1,
+    },
+    activeRideIcon: {
+      width: 38,
+      height: 38,
+      borderRadius: 19,
+      backgroundColor: colors.accent + '15',
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginRight: 12,
+    },
+    activeRideBannerTitle: {
+      color: colors.text,
+      fontWeight: '600',
+      fontSize: 14,
+    },
+    activeRideBannerStatus: {
+      color: colors.textSecondary,
+      fontSize: 12,
+      textTransform: 'capitalize',
+    },
+    locationModalOverlay: {
+      flex: 1,
+      justifyContent: 'flex-end',
+      backgroundColor: 'rgba(0,0,0,0.5)',
+    },
+    locationModalContent: {
+      backgroundColor: colors.background,
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+      padding: 20,
+      paddingBottom: Platform.OS === 'ios' ? 40 : 20,
+      minHeight: 400,
+    },
+    locationModalHeaderRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 20,
+    },
+    locationModalTitle: {
+      fontSize: 20,
+      fontWeight: '700',
+      color: colors.text,
+    },
+    closeModalBtn: {
+      padding: 4,
+      backgroundColor: insetBg,
+      borderRadius: 20,
+    },
+    whereToTrigger: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      backgroundColor: cardBg,
+      marginHorizontal: 20,
+      marginBottom: 28,
+      paddingHorizontal: 16,
+      paddingVertical: 18,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: isDark ? colors.border : '#FDECA6',
+      shadowColor: isDark ? colors.text : '#F5A623',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: isDark ? 0 : 0.08,
+      shadowRadius: 12,
+      elevation: isDark ? 0 : 4,
+    },
+    whereToTriggerContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+    },
+    whereToTriggerText: {
+      fontSize: 18,
+      fontWeight: '600',
+      color: colors.textSecondary,
+    },
+    whereToTriggerTiming: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: cardBg,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 20,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    whereToTriggerTimingText: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: colors.text,
+      marginRight: 4,
+    },
+    locationCardModal: {
+      flex: 1,
+    },
+    locationCard: {
+      backgroundColor: cardBg,
+      marginHorizontal: 20,
+      marginBottom: 28,
+      padding: 16,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: colors.border,
+      shadowColor: colors.text,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: isDark ? 0 : 0.08,
+      shadowRadius: 12,
+      elevation: isDark ? 0 : 3,
+    },
+    locationHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 16,
+    },
+    locationTitle: {
+      fontSize: 19,
+      fontWeight: '700',
+      color: colors.text,
+    },
+    locationAction: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      backgroundColor: isDark ? '#2A2211' : '#FFF7E0',
+      borderRadius: 20,
+    },
+    locationActionText: {
+      color: isDark ? '#D4A373' : '#8A6D1A',
+      fontSize: 13,
+      fontWeight: '600',
+    },
+    inputContainerFocused: {
+      borderColor: '#FFC107',
+      borderWidth: 1.5,
+    },
+    modalContinueBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: '#FFC107',
+      borderRadius: 14,
+      paddingVertical: 16,
+      marginTop: 16,
+      width: '100%',
+    },
+    modalContinueBtnDisabled: {
+      backgroundColor: isDark ? '#333' : colors.border,
+    },
+    modalContinueText: {
+      fontSize: 16,
+      color: colors.text,
+      fontWeight: '700',
+    },
+    modalContinueTextDisabled: {
+      color: isDark ? '#666' : colors.textSecondary,
+    },
+    recentIconContainerModal: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      backgroundColor: isDark ? '#222' : colors.border,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginRight: 12,
+    },
+    locationInputWrapper: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+    },
+    locationDot: {
+      width: 20,
+      alignItems: 'center',
+      marginRight: 10,
+      paddingTop: 16,
+    },
+    dot: {
+      width: 10,
+      height: 10,
+      borderRadius: 5,
+    },
+    dotLine: {
+      width: 2,
+      height: 22,
+      backgroundColor: colors.border,
+      marginTop: 4,
+    },
+    locationInputContainer: {
+      flex: 1,
+    },
+    inputContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: insetBg,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+      marginBottom: 10,
+    },
+    textInput: {
+      color: colors.text,
+      flex: 1,
+      paddingHorizontal: 14,
+      paddingVertical: 13,
+      fontSize: 14,
+      backgroundColor: 'transparent',
+    },
+    autocompleteContainer: {
+      flex: 1,
+      zIndex: 999,
+    },
+    autocompleteList: {
+      backgroundColor: cardBg,
+      borderRadius: 12,
+      marginTop: 4,
+      maxHeight: 200,
+      width: '100%',
+      borderWidth: 1,
+      borderColor: colors.border,
+      ...softShadow,
+    },
+    autocompleteRow: {
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    autocompleteDescription: {
+      color: colors.text,
+      fontSize: 14,
+    },
+    mapIconBtn: {
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingHorizontal: 14,
+      height: 46,
+    },
+    primaryButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.accent,
+      borderRadius: 14,
+      paddingVertical: 15,
+      marginTop: 8,
+      gap: 8,
+    },
+    primaryButtonText: {
+      fontSize: 16,
+      color: colors.accentText,
+      fontWeight: '700',
+    },
+    sectionContainer: {
+      paddingHorizontal: 20,
+      marginBottom: 28,
+    },
+    sectionTitle: {
+      fontSize: 17,
+      fontWeight: '700',
+      color: colors.text,
+      marginBottom: 14,
+    },
+    servicesGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      justifyContent: 'space-between',
+    },
+    serviceCard: {
+      width: '48%',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: cardBg,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: colors.border,
+      paddingVertical: 16,
+      paddingHorizontal: 12,
+      marginBottom: 14,
+      minHeight: 110,
+      ...softShadow,
+    },
+    serviceIconContainer: {
+      width: 64,
+      height: 64,
+      borderRadius: 32,
+      backgroundColor: insetBg,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginBottom: 10,
+    },
+    serviceTitle: {
+      fontSize: 15,
+      fontWeight: '600',
+      color: colors.text,
+      textAlign: 'center',
+    },
+    serviceDescription: {
+      fontSize: 12,
+      color: colors.textSecondary,
+      marginTop: 2,
+      textAlign: 'center',
+    },
+    recentCard: {
+      backgroundColor: cardBg,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: colors.border,
+      ...softShadow,
+    },
+    recentItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+    },
+    recentItemDivider: {
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    recentIconContainer: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      backgroundColor: insetBg,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginRight: 12,
+    },
+    recentTextContainer: {
+      flex: 1,
+      marginRight: 8,
+    },
+    recentAddress: {
+      fontSize: 14,
+      fontWeight: '500',
+      color: colors.text,
+    },
+    recentSubtitle: {
+      fontSize: 12,
+      color: colors.textSecondary,
+      marginTop: 2,
+    },
+    pickerModalContainer: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    pickerModalHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      padding: 16,
+      backgroundColor: colors.background,
+      paddingTop: 50,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    pickerBackBtn: {
+      padding: 4,
+    },
+    pickerModalTitle: {
+      fontSize: 18,
+      fontWeight: '600',
+      color: colors.text,
+    },
+    pickerMap: {
+      flex: 1,
+    },
+    pickerCenterPin: {
+      position: 'absolute',
+      top: '50%',
+      left: '50%',
+      marginLeft: -22,
+      marginTop: -44,
+      zIndex: 10,
+      backgroundColor: cardBg,
+      borderRadius: 28,
+      padding: 4,
+      ...softShadow,
+    },
+    pickerBottomCard: {
+      backgroundColor: colors.background,
+      padding: 20,
+      paddingBottom: 40,
+      borderTopLeftRadius: 20,
+      borderTopRightRadius: 20,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+    },
+    pickerAddressLabel: {
+      color: colors.textSecondary,
+      fontSize: 12,
+      marginBottom: 8,
+      fontWeight: '500',
+    },
+    pickerAddressText: {
+      color: colors.text,
+      fontSize: 16,
+      fontWeight: '600',
+      marginBottom: 20,
+    },
+    pickerConfirmBtn: {
+      backgroundColor: colors.accent,
+      padding: 16,
+      borderRadius: 14,
+      alignItems: 'center',
+    },
+    pickerConfirmText: {
+      color: colors.accentText,
+      fontSize: 16,
+      fontWeight: '600',
+    },
+  });
+};
 
 export default HomeScreen;

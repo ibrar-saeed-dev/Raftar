@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { useTheme } from '../../context/ThemeContext';
 import {
   View,
   Text,
@@ -31,16 +32,21 @@ import { GOOGLE_MAPS_API_KEY } from '../../config/constants';
 const { width, height } = Dimensions.get('window');
 
 // Yellow Theme Colors
-const YELLOW_PRIMARY = '#F8B82A';
-const YELLOW_SECONDARY = '#F9C349';
-const WHITE = '#FFFFFF';
-const BLACK = '#000000';
-const GRAY_DARK = '#333333';
-const GRAY_MEDIUM = '#666666';
-const GRAY_LIGHT = '#F5F5F5';
-const GRAY_BG = '#F8F9FA';
+const getThemePalette = (colors, isDark) => ({
+  YELLOW_PRIMARY: colors.accent,
+  YELLOW_SECONDARY: colors.accent,
+  WHITE: isDark ? colors.card : '#FFFFFF',
+  BLACK: colors.text,
+  GRAY_DARK: colors.text,
+  GRAY_MEDIUM: colors.textSecondary,
+  GRAY_LIGHT: isDark ? colors.cardElevated : '#F5F5F5',
+  GRAY_BG: colors.background,
+});
 
 const CreateCarpoolScreen = () => {
+  const { colors, isDark } = useTheme();
+  const { YELLOW_PRIMARY, YELLOW_SECONDARY, WHITE, BLACK, GRAY_DARK, GRAY_MEDIUM, GRAY_LIGHT, GRAY_BG } = useMemo(() => getThemePalette(colors, isDark), [colors, isDark]);
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   const navigation = useNavigation();
   const route = useRoute();
   const dispatch = useDispatch();
@@ -151,7 +157,7 @@ const CreateCarpoolScreen = () => {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor={WHITE} />
+      <StatusBar barStyle={colors.statusBarStyle} backgroundColor={WHITE} />
       
       <KeyboardAvoidingView 
         style={styles.container}
@@ -418,7 +424,11 @@ const CreateCarpoolScreen = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors, isDark) => {
+  const { YELLOW_PRIMARY, YELLOW_SECONDARY, WHITE, BLACK, GRAY_DARK, GRAY_MEDIUM, GRAY_LIGHT, GRAY_BG } = getThemePalette(colors, isDark);
+  const cardBg = isDark ? colors.card : '#FFFFFF';
+  const insetBg = isDark ? colors.cardElevated : '#F5F5F5';
+  return StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: WHITE,
@@ -440,7 +450,7 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
     backgroundColor: WHITE,
     borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
+    borderBottomColor: colors.border,
   },
   backButton: {
     width: 40,
@@ -473,7 +483,7 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#F0F0F0',
+    borderColor: colors.border,
     shadowColor: BLACK,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04,
@@ -531,7 +541,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontSize: 14,
     borderWidth: 1,
-    borderColor: '#F0F0F0',
+    borderColor: colors.border,
   },
   autocompleteContainer: {
     flex: 1,
@@ -546,7 +556,7 @@ const styles = StyleSheet.create({
     zIndex: 1000,
     maxHeight: 200,
     borderWidth: 1,
-    borderColor: '#F0F0F0',
+    borderColor: colors.border,
     shadowColor: BLACK,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
@@ -557,7 +567,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
+    borderBottomColor: colors.border,
   },
   autocompleteDescription: {
     color: BLACK,
@@ -665,7 +675,7 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#E0E0E0',
+    borderColor: colors.border,
   },
   toggleBadgeActive: {
     backgroundColor: YELLOW_PRIMARY,
@@ -694,7 +704,7 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#F0F0F0',
+    borderColor: colors.border,
     shadowColor: BLACK,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04,
@@ -718,7 +728,7 @@ const styles = StyleSheet.create({
   },
   summaryDivider: {
     height: 1,
-    backgroundColor: '#F0F0F0',
+    backgroundColor: insetBg,
     marginVertical: 6,
   },
   createButtonContainer: {
@@ -749,6 +759,7 @@ const styles = StyleSheet.create({
   bottomSpacer: {
     height: 40,
   },
-});
+  });
+};
 
 export default CreateCarpoolScreen;

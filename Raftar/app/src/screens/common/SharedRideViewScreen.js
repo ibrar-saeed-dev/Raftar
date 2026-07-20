@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { useTheme } from '../../context/ThemeContext';
 import {
   View,
   Text,
@@ -18,6 +19,8 @@ import { API_URL, GOOGLE_MAPS_API_KEY } from '../../config/constants';
 const { width } = Dimensions.get('window');
 
 const SharedRideViewScreen = () => {
+  const { colors, isDark } = useTheme();
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   const route = useRoute();
   const navigation = useNavigation();
   const { token } = route.params || {};
@@ -138,7 +141,7 @@ const SharedRideViewScreen = () => {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#FFD700" />
+        <ActivityIndicator size="large" color={colors.accent} />
         <Text style={styles.loadingText}>Loading Ride Details...</Text>
       </View>
     );
@@ -188,7 +191,7 @@ const SharedRideViewScreen = () => {
         {driverLocation && (
           <Marker coordinate={driverLocation} title="Driver">
             <View style={styles.vehicleMarker}>
-              <Icon name="directions-car" size={20} color="#FFD700" />
+              <Icon name="directions-car" size={20} color={colors.accent} />
             </View>
           </Marker>
         )}
@@ -227,13 +230,13 @@ const SharedRideViewScreen = () => {
               <View style={styles.driverDetailsText}>
                 <Text style={styles.driverName}>{ride.driver.name}</Text>
                 <View style={styles.ratingContainer}>
-                  <Icon name="star" size={14} color="#FFD700" />
+                  <Icon name="star" size={14} color={colors.accent} />
                   <Text style={styles.driverRating}>{ride.driver.rating || '5.0'}</Text>
                 </View>
               </View>
             </View>
             <View style={styles.vehicleDetailsRow}>
-              <Icon name="directions-car" size={16} color="#888" />
+              <Icon name="directions-car" size={16} color={colors.textSecondary} />
               <Text style={styles.vehicleDetailsText}>
                 {ride.driver.vehicleDetails?.color || ''} {ride.driver.vehicleDetails?.brand || ''} {ride.driver.vehicleDetails?.model || 'Vehicle'} • {ride.driver.vehicleDetails?.plateNumber || 'N/A'}
               </Text>
@@ -256,16 +259,19 @@ const SharedRideViewScreen = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors, isDark) => {
+  const cardBg = isDark ? colors.card : '#FFFFFF';
+  const insetBg = isDark ? colors.cardElevated : '#F5F5F5';
+  return StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#121212',
+    backgroundColor: colors.background,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#121212',
+    backgroundColor: colors.background,
   },
   loadingText: {
     color: '#FFF',
@@ -289,7 +295,7 @@ const styles = StyleSheet.create({
     borderColor: '#FFF',
   },
   vehicleMarker: {
-    backgroundColor: '#1E1E1E',
+    backgroundColor: colors.card,
     padding: 8,
     borderRadius: 20,
     borderWidth: 2,
@@ -305,7 +311,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: '#1E1E1E',
+    backgroundColor: colors.card,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 20,
@@ -334,7 +340,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   driverInfoContainer: {
-    backgroundColor: '#2A2A2A',
+    backgroundColor: colors.cardElevated,
     borderRadius: 16,
     padding: 16,
     marginBottom: 15,
@@ -348,13 +354,13 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#333',
+    backgroundColor: colors.cardElevated,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
   },
   driverAvatarText: {
-    color: '#FFD700',
+    color: colors.accent,
     fontSize: 20,
     fontWeight: 'bold',
   },
@@ -372,7 +378,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   driverRating: {
-    color: '#888',
+    color: colors.textSecondary,
     fontSize: 14,
     marginLeft: 4,
   },
@@ -382,15 +388,15 @@ const styles = StyleSheet.create({
     marginTop: 8,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: '#333',
+    borderTopColor: colors.border,
   },
   vehicleDetailsText: {
-    color: '#888',
+    color: colors.textSecondary,
     fontSize: 14,
     marginLeft: 8,
   },
   routeDetails: {
-    backgroundColor: '#2A2A2A',
+    backgroundColor: colors.cardElevated,
     borderRadius: 16,
     padding: 16,
   },
@@ -405,6 +411,7 @@ const styles = StyleSheet.create({
     marginLeft: 12,
     flex: 1,
   },
-});
+  });
+};
 
 export default SharedRideViewScreen;

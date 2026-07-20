@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { useTheme } from '../../context/ThemeContext';
 import {
   View,
   Text,
@@ -40,6 +41,8 @@ import CarpoolMapPreview from '../../components/common/CarpoolMapPreview';
 const { width, height } = Dimensions.get('window');
 
 const BookCarpoolScreen = () => {
+  const { colors, isDark } = useTheme();
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   const navigation = useNavigation();
   const route = useRoute();
   const dispatch = useDispatch();
@@ -396,13 +399,13 @@ const BookCarpoolScreen = () => {
                 <View>
                   <Text style={styles.carpoolName}>{item.driverId?.userId?.name || 'Driver'}</Text>
                   <View style={styles.ratingContainer}>
-                    <Icon name="star" size={12} color="#F9C349" />
+                    <Icon name="star" size={12} color={colors.accent} />
                     <Text style={styles.ratingText}>{item.driverId?.stats?.rating || 0}</Text>
                   </View>
                 </View>
               </View>
               <View style={[styles.seatsBadge, isFull && styles.seatsBadgeFull]}>
-                <IconMC name="account-group" size={16} color={isFull ? '#999' : '#F9C349'} />
+                <IconMC name="account-group" size={16} color={isFull ? '#999' : colors.accent} />
                 <Text style={[styles.seatsText, isFull && styles.seatsTextFull]}>
                   {item.carpool.seatsAvailable}
                 </Text>
@@ -419,7 +422,7 @@ const BookCarpoolScreen = () => {
               <View style={styles.routeLineContainer}>
                 <View style={styles.routeLine} />
                 <View style={styles.routeTime}>
-                  <Icon name="access-time" size={12} color="#999" />
+                  <Icon name="access-time" size={12} color={colors.textSecondary} />
                   <Text style={styles.routeTimeText}>
                     {item.timeWindow?.start ? new Date(item.timeWindow.start).toLocaleTimeString([], { 
                       hour: '2-digit', 
@@ -439,13 +442,13 @@ const BookCarpoolScreen = () => {
             <View style={styles.carpoolFooter}>
               <View style={styles.carpoolMeta}>
                 <View style={styles.metaItem}>
-                  <Icon name="event" size={14} color="#999" />
+                  <Icon name="event" size={14} color={colors.textSecondary} />
                   <Text style={styles.metaText}>
                     {item.timeWindow?.start ? new Date(item.timeWindow.start).toLocaleDateString() : 'N/A'}
                   </Text>
                 </View>
                 <View style={styles.metaItem}>
-                  <Icon name="person" size={14} color="#999" />
+                  <Icon name="person" size={14} color={colors.textSecondary} />
                   <Text style={styles.metaText}>
                     {item.passengers?.length || 0} riders
                   </Text>
@@ -546,9 +549,9 @@ const BookCarpoolScreen = () => {
             </Text>
             <View style={[
               styles.rideStatus,
-              { backgroundColor: item.status === 'searching' ? '#F9C349' : '#4ECDC4' }
+              { backgroundColor: item.status === 'searching' ? colors.accent : '#4ECDC4' }
             ]}>
-              <Text style={[styles.rideStatusText, item.status === 'searching' && { color: '#000' }]}>
+              <Text style={[styles.rideStatusText, item.status === 'searching' && { color: colors.text }]}>
                 {item.status.toUpperCase()}
               </Text>
             </View>
@@ -604,11 +607,11 @@ const BookCarpoolScreen = () => {
     <View style={styles.listContainer}>
       <View style={styles.listHeader}>
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <Icon name="arrow-back" size={24} color="#000" />
+          <Icon name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
         <Text style={styles.listHeaderTitle}>{isIntercity ? 'Intercity Carpools' : 'My Carpools'}</Text>
         <TouchableOpacity style={styles.notificationButton}>
-          <Icon name="notifications-none" size={24} color="#000" />
+          <Icon name="notifications-none" size={24} color={colors.text} />
           <View style={styles.notificationDot} />
         </TouchableOpacity>
       </View>
@@ -640,7 +643,7 @@ const BookCarpoolScreen = () => {
 
       {listLoading ? (
         <View style={styles.loadingCenter}>
-          <ActivityIndicator size="large" color="#F9C349" />
+          <ActivityIndicator size="large" color={colors.accent} />
         </View>
       ) : (
         <FlatList
@@ -671,10 +674,10 @@ const BookCarpoolScreen = () => {
           activeOpacity={0.8}
         >
           <LinearGradient
-            colors={['#F9C349', '#F5A623']}
+            colors={[colors.accent, '#F5A623']}
             style={styles.createNewGradient}
           >
-            <Icon name="add" size={24} color="#000" />
+            <Icon name="add" size={24} color={colors.text} />
             <Text style={styles.createNewText}>Create New Carpool</Text>
           </LinearGradient>
         </TouchableOpacity>
@@ -684,7 +687,7 @@ const BookCarpoolScreen = () => {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+      <StatusBar barStyle={colors.statusBarStyle} backgroundColor={colors.background} />
       
       <KeyboardAvoidingView 
         style={styles.container}
@@ -705,7 +708,7 @@ const BookCarpoolScreen = () => {
                 style={styles.backButton}
                 onPress={() => setViewMode('list')}
               >
-                <Icon name="arrow-back" size={24} color="#000" />
+                <Icon name="arrow-back" size={24} color={colors.text} />
               </TouchableOpacity>
               <Text style={styles.createHeaderTitle}>{isIntercity ? 'Intercity Carpool' : 'Create Request'}</Text>
               <View style={{ width: 32 }} />
@@ -720,7 +723,7 @@ const BookCarpoolScreen = () => {
               <Animatable.View animation="fadeIn" duration={600} style={styles.mapContainer}>
                 {locationLoading ? (
                   <View style={styles.mapLoading}>
-                    <ActivityIndicator size="large" color="#F9C349" />
+                    <ActivityIndicator size="large" color={colors.accent} />
                     <Text style={styles.mapLoadingText}>Finding your location...</Text>
                   </View>
                 ) : (
@@ -770,7 +773,7 @@ const BookCarpoolScreen = () => {
                   </MapView>
                 )}
                 <TouchableOpacity style={styles.mapOverlayBtn} onPress={() => openMapPicker('pickup')}>
-                  <Icon name="edit-location" size={20} color="#F9C349" />
+                  <Icon name="edit-location" size={20} color={colors.accent} />
                 </TouchableOpacity>
               </Animatable.View>
 
@@ -787,7 +790,7 @@ const BookCarpoolScreen = () => {
                     style={styles.useCurrentButton}
                     onPress={getCurrentLocation}
                   >
-                    <Icon name="my-location" size={18} color="#F9C349" />
+                    <Icon name="my-location" size={18} color={colors.accent} />
                     <Text style={styles.useCurrentText}>Current</Text>
                   </TouchableOpacity>
                 </View>
@@ -822,7 +825,7 @@ const BookCarpoolScreen = () => {
                         row: styles.autocompleteRow,
                         description: styles.autocompleteDescription
                       }}
-                      placeholderTextColor="#999"
+                      placeholderTextColor={colors.textSecondary}
                       renderRightButton={() => (
                         <TouchableOpacity onPress={() => openMapPicker('pickup')} style={styles.mapIconBtn}>
                           <Icon name="map" size={22} color="#4ECDC4" />
@@ -863,7 +866,7 @@ const BookCarpoolScreen = () => {
                         row: styles.autocompleteRow,
                         description: styles.autocompleteDescription
                       }}
-                      placeholderTextColor="#999"
+                      placeholderTextColor={colors.textSecondary}
                       renderRightButton={() => (
                         <TouchableOpacity onPress={() => openMapPicker('dropoff')} style={styles.mapIconBtn}>
                           <Icon name="map" size={22} color="#FF6B6B" />
@@ -880,7 +883,7 @@ const BookCarpoolScreen = () => {
                   <View style={styles.scheduleHeader}>
                     <View style={styles.scheduleHeaderLeft}>
                       <View style={styles.scheduleIcon}>
-                        <Icon name="event" size={20} color="#F9C349" />
+                        <Icon name="event" size={20} color={colors.accent} />
                       </View>
                       <Text style={styles.scheduleTitle}>Schedule</Text>
                     </View>
@@ -896,7 +899,7 @@ const BookCarpoolScreen = () => {
                       activeOpacity={0.7}
                     >
                       <View style={styles.schedulePickerLeft}>
-                        <Icon name="calendar-today" size={22} color="#F9C349" />
+                        <Icon name="calendar-today" size={22} color={colors.accent} />
                         <Text style={styles.schedulePickerLabel}>Date</Text>
                       </View>
                       <View style={styles.schedulePickerValue}>
@@ -908,7 +911,7 @@ const BookCarpoolScreen = () => {
                             year: 'numeric' 
                           })}
                         </Text>
-                        <Icon name="chevron-right" size={20} color="#999" />
+                        <Icon name="chevron-right" size={20} color={colors.textSecondary} />
                       </View>
                     </TouchableOpacity>
 
@@ -920,7 +923,7 @@ const BookCarpoolScreen = () => {
                       activeOpacity={0.7}
                     >
                       <View style={styles.schedulePickerLeft}>
-                        <Icon name="access-time" size={22} color="#F9C349" />
+                        <Icon name="access-time" size={22} color={colors.accent} />
                         <Text style={styles.schedulePickerLabel}>Time</Text>
                       </View>
                       <View style={styles.schedulePickerValue}>
@@ -931,13 +934,13 @@ const BookCarpoolScreen = () => {
                             hour12: true 
                           })}
                         </Text>
-                        <Icon name="chevron-right" size={20} color="#999" />
+                        <Icon name="chevron-right" size={20} color={colors.textSecondary} />
                       </View>
                     </TouchableOpacity>
                   </View>
 
                   <View style={styles.scheduleNote}>
-                    <Icon name="info-outline" size={16} color="#999" />
+                    <Icon name="info-outline" size={16} color={colors.textSecondary} />
                     <Text style={styles.scheduleNoteText}>
                       Select a future date and time for your carpool
                     </Text>
@@ -996,7 +999,7 @@ const BookCarpoolScreen = () => {
                   
                   {searching ? (
                     <View style={styles.loadingContainer}>
-                      <ActivityIndicator size="large" color="#F9C349" />
+                      <ActivityIndicator size="large" color={colors.accent} />
                       <Text style={styles.loadingText}>Searching for carpools...</Text>
                     </View>
                   ) : availableCarpools.length > 0 ? (
@@ -1031,13 +1034,13 @@ const BookCarpoolScreen = () => {
                   activeOpacity={0.8}
                 >
                   <LinearGradient
-                    colors={(!pickup || !dropoff) ? ['#E0E0E0', '#D0D0D0'] : ['#F9C349', '#F5A623']}
+                    colors={(!pickup || !dropoff) ? ['#E0E0E0', '#D0D0D0'] : [colors.accent, '#F5A623']}
                     style={styles.requestButtonGradient}
                   >
                     <Icon name="add-circle" size={22} color={(!pickup || !dropoff) ? '#999' : '#000'} />
                     <Text style={[
                       styles.requestButtonText,
-                      (!pickup || !dropoff) && { color: '#999' }
+                      (!pickup || !dropoff) && { color: colors.textSecondary }
                     ]}>
                       Post Carpool Request
                     </Text>
@@ -1057,7 +1060,7 @@ const BookCarpoolScreen = () => {
               <View style={styles.mapPickerContainer}>
                 <View style={styles.mapPickerHeader}>
                   <TouchableOpacity onPress={() => setMapPickerVisible(false)} style={styles.mapPickerClose}>
-                    <Icon name="close" size={24} color="#000" />
+                    <Icon name="close" size={24} color={colors.text} />
                   </TouchableOpacity>
                   <Text style={styles.mapPickerTitle}>
                     Select {mapPickerType === 'pickup' ? 'Pickup' : 'Destination'}
@@ -1113,7 +1116,7 @@ const BookCarpoolScreen = () => {
                     <View style={styles.modalHeader}>
                       <View style={styles.modalHeaderLeft}>
                         <View style={styles.modalIcon}>
-                          <IconMC name="account-group" size={24} color="#000" />
+                          <IconMC name="account-group" size={24} color={colors.text} />
                         </View>
                         <View>
                           <Text style={styles.modalTitle}>Join Carpool</Text>
@@ -1126,7 +1129,7 @@ const BookCarpoolScreen = () => {
                         onPress={() => setShowJoinModal(false)}
                         style={styles.modalClose}
                       >
-                        <Icon name="close" size={24} color="#000" />
+                        <Icon name="close" size={24} color={colors.text} />
                       </TouchableOpacity>
                     </View>
 
@@ -1149,19 +1152,19 @@ const BookCarpoolScreen = () => {
 
                       <View style={styles.modalDetails}>
                         <View style={styles.modalDetailItem}>
-                          <Icon name="access-time" size={18} color="#999" />
+                          <Icon name="access-time" size={18} color={colors.textSecondary} />
                           <Text style={styles.modalDetailText}>
                             {selectedCarpool?.timeWindow?.start ? new Date(selectedCarpool.timeWindow.start).toLocaleString() : 'N/A'}
                           </Text>
                         </View>
                         <View style={styles.modalDetailItem}>
-                          <IconMC name="account-group" size={18} color="#999" />
+                          <IconMC name="account-group" size={18} color={colors.textSecondary} />
                           <Text style={styles.modalDetailText}>
                             {selectedCarpool?.carpool?.seatsAvailable} seats available
                           </Text>
                         </View>
                         <View style={styles.modalDetailItem}>
-                          <Icon name="attach-money" size={18} color="#999" />
+                          <Icon name="attach-money" size={18} color={colors.textSecondary} />
                           <Text style={styles.modalDetailText}>
                             ₨ {selectedCarpool?.carpool?.pricePerSeat || 'N/A'} per person
                           </Text>
@@ -1174,10 +1177,10 @@ const BookCarpoolScreen = () => {
                         activeOpacity={0.8}
                       >
                         <LinearGradient
-                          colors={['#F9C349', '#F5A623']}
+                          colors={[colors.accent, '#F5A623']}
                           style={styles.modalJoinGradient}
                         >
-                          <Icon name="check" size={20} color="#000" />
+                          <Icon name="check" size={20} color={colors.text} />
                           <Text style={styles.modalJoinText}>Confirm Join</Text>
                         </LinearGradient>
                       </TouchableOpacity>
@@ -1193,19 +1196,22 @@ const BookCarpoolScreen = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors, isDark) => {
+  const cardBg = isDark ? colors.card : '#FFFFFF';
+  const insetBg = isDark ? colors.cardElevated : '#F5F5F5';
+  return StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: cardBg,
   },
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: cardBg,
   },
   // List View Styles
   listContainer: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: cardBg,
   },
   listHeader: {
     flexDirection: 'row',
@@ -1214,12 +1220,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 50,
     paddingBottom: 15,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: cardBg,
   },
   listHeaderTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#000',
+    color: colors.text,
     letterSpacing: 0.5,
   },
   notificationButton: {
@@ -1233,15 +1239,15 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#F9C349',
+    backgroundColor: colors.accent,
   },
   tabContainer: { 
     flexDirection: 'row', 
-    backgroundColor: '#FFFFFF',
+    backgroundColor: cardBg,
     paddingHorizontal: 20,
     paddingVertical: 8,
     borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
+    borderBottomColor: colors.border,
   },
   tab: { 
     flex: 1, 
@@ -1254,20 +1260,20 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   activeTab: { 
-    backgroundColor: '#F9C34915',
+    backgroundColor: colors.accent + '15',
   },
   tabText: { 
-    color: '#999', 
+    color: colors.textSecondary, 
     fontSize: 15,
     fontWeight: '500',
   },
   activeTabText: { 
-    color: '#000',
+    color: colors.text,
     fontWeight: '600',
   },
   tabBadge: {
     marginLeft: 8,
-    backgroundColor: '#F9C349',
+    backgroundColor: colors.accent,
     borderRadius: 12,
     paddingHorizontal: 8,
     paddingVertical: 2,
@@ -1278,7 +1284,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#4ECDC4',
   },
   tabBadgeText: {
-    color: '#000',
+    color: colors.text,
     fontSize: 11,
     fontWeight: '600',
   },
@@ -1299,12 +1305,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 50,
     paddingBottom: 15,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: cardBg,
   },
   createHeaderTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#000',
+    color: colors.text,
     letterSpacing: 0.5,
   },
   backButton: {
@@ -1319,17 +1325,17 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     borderRadius: 16,
     overflow: 'hidden',
-    backgroundColor: '#F5F5F5',
+    backgroundColor: insetBg,
     position: 'relative',
   },
   mapLoading: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: insetBg,
     justifyContent: 'center',
     alignItems: 'center',
   },
   mapLoadingText: {
-    color: '#999',
+    color: colors.textSecondary,
     marginTop: 12,
     fontSize: 14,
   },
@@ -1343,7 +1349,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: cardBg,
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
@@ -1379,13 +1385,13 @@ const styles = StyleSheet.create({
     borderColor: '#FFF',
   },
   locationSection: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: cardBg,
     marginHorizontal: 20,
     marginBottom: 20,
     padding: 20,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#F0F0F0',
+    borderColor: colors.border,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04,
@@ -1401,7 +1407,7 @@ const styles = StyleSheet.create({
   locationTitle: {
     fontSize: 17,
     fontWeight: '600',
-    color: '#000',
+    color: colors.text,
   },
   useCurrentButton: {
     flexDirection: 'row',
@@ -1409,11 +1415,11 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingHorizontal: 12,
     paddingVertical: 6,
-    backgroundColor: '#F9C34915',
+    backgroundColor: colors.accent + '15',
     borderRadius: 20,
   },
   useCurrentText: {
-    color: '#F9C349',
+    color: colors.accent,
     fontSize: 13,
     fontWeight: '500',
   },
@@ -1444,13 +1450,13 @@ const styles = StyleSheet.create({
   pickupInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8F8F8',
+    backgroundColor: insetBg,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#F0F0F0',
+    borderColor: colors.border,
   },
   pickupTextInput: {
-    color: '#000',
+    color: colors.text,
     flex: 1,
     paddingHorizontal: 16,
     paddingVertical: 14,
@@ -1460,13 +1466,13 @@ const styles = StyleSheet.create({
   dropoffInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8F8F8',
+    backgroundColor: insetBg,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#F0F0F0',
+    borderColor: colors.border,
   },
   dropoffTextInput: {
-    color: '#000',
+    color: colors.text,
     flex: 1,
     paddingHorizontal: 16,
     paddingVertical: 14,
@@ -1478,13 +1484,13 @@ const styles = StyleSheet.create({
     zIndex: 999,
   },
   autocompleteList: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: cardBg,
     borderRadius: 12,
     marginTop: 4,
     maxHeight: 200,
     width: '100%',
     borderWidth: 1,
-    borderColor: '#F0F0F0',
+    borderColor: colors.border,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08,
@@ -1495,10 +1501,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#F5F5F5',
+    borderBottomColor: colors.border,
   },
   autocompleteDescription: {
-    color: '#000',
+    color: colors.text,
     fontSize: 14,
   },
   locationDivider: {
@@ -1525,31 +1531,31 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#F9C34915',
+    backgroundColor: colors.accent + '15',
     justifyContent: 'center',
     alignItems: 'center',
   },
   scheduleTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#000',
+    color: colors.text,
   },
   scheduleBadge: {
-    backgroundColor: '#F9C34915',
+    backgroundColor: colors.accent + '15',
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 12,
   },
   scheduleBadgeText: {
-    color: '#F9C349',
+    color: colors.accent,
     fontSize: 12,
     fontWeight: '500',
   },
   scheduleCard: {
-    backgroundColor: '#F8F8F8',
+    backgroundColor: insetBg,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#F0F0F0',
+    borderColor: colors.border,
     overflow: 'hidden',
   },
   schedulePicker: {
@@ -1557,7 +1563,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: 16,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: cardBg,
   },
   schedulePickerLeft: {
     flexDirection: 'row',
@@ -1565,7 +1571,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   schedulePickerLabel: {
-    color: '#000',
+    color: colors.text,
     fontSize: 15,
     fontWeight: '500',
   },
@@ -1575,12 +1581,12 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   schedulePickerText: {
-    color: '#000',
+    color: colors.text,
     fontSize: 14,
   },
   scheduleDivider: {
     height: 1,
-    backgroundColor: '#F0F0F0',
+    backgroundColor: insetBg,
   },
   scheduleNote: {
     flexDirection: 'row',
@@ -1590,18 +1596,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   scheduleNoteText: {
-    color: '#999',
+    color: colors.textSecondary,
     fontSize: 13,
     flex: 1,
   },
   section: {
     marginHorizontal: 20,
     marginBottom: 20,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: cardBg,
     padding: 16,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#F0F0F0',
+    borderColor: colors.border,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -1610,18 +1616,18 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   sectionTitle: {
-    color: '#000',
+    color: colors.text,
     fontSize: 17,
     fontWeight: '600',
   },
   carpoolCountBadge: {
-    backgroundColor: '#F9C34915',
+    backgroundColor: colors.accent + '15',
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 12,
   },
   carpoolCount: {
-    color: '#F9C349',
+    color: colors.accent,
     fontSize: 14,
     fontWeight: '600',
   },
@@ -1631,7 +1637,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   loadingText: {
-    color: '#999',
+    color: colors.textSecondary,
     fontSize: 14,
   },
   carpoolsList: {
@@ -1640,9 +1646,9 @@ const styles = StyleSheet.create({
   carpoolCard: {
     borderRadius: 16,
     overflow: 'hidden',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: cardBg,
     borderWidth: 1,
-    borderColor: '#F0F0F0',
+    borderColor: colors.border,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04,
@@ -1653,7 +1659,7 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
   carpoolCardFullContent: {
-    backgroundColor: '#F8F8F8',
+    backgroundColor: insetBg,
   },
   carpoolCardContent: {
     padding: 16,
@@ -1673,17 +1679,17 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#F9C34915',
+    backgroundColor: colors.accent + '15',
     justifyContent: 'center',
     alignItems: 'center',
   },
   userInitial: {
-    color: '#F9C349',
+    color: colors.accent,
     fontSize: 18,
     fontWeight: 'bold',
   },
   carpoolName: {
-    color: '#000',
+    color: colors.text,
     fontSize: 14,
     fontWeight: '600',
   },
@@ -1693,28 +1699,28 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   ratingText: {
-    color: '#999',
+    color: colors.textSecondary,
     fontSize: 12,
   },
   seatsBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F9C34915',
+    backgroundColor: colors.accent + '15',
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
     gap: 4,
   },
   seatsBadgeFull: {
-    backgroundColor: '#F0F0F0',
+    backgroundColor: insetBg,
   },
   seatsText: {
-    color: '#F9C349',
+    color: colors.accent,
     fontSize: 14,
     fontWeight: '600',
   },
   seatsTextFull: {
-    color: '#999',
+    color: colors.textSecondary,
   },
   carpoolRoute: {
     marginBottom: 12,
@@ -1744,7 +1750,7 @@ const styles = StyleSheet.create({
   routeTime: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8F8F8',
+    backgroundColor: insetBg,
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 8,
@@ -1752,11 +1758,11 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   routeTimeText: {
-    color: '#999',
+    color: colors.textSecondary,
     fontSize: 10,
   },
   routeText: {
-    color: '#666',
+    color: colors.textSecondary,
     fontSize: 13,
     flex: 1,
   },
@@ -1765,7 +1771,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     borderTopWidth: 1,
-    borderTopColor: '#F0F0F0',
+    borderTopColor: colors.border,
     paddingTop: 12,
   },
   carpoolMeta: {
@@ -1778,16 +1784,16 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   metaText: {
-    color: '#999',
+    color: colors.textSecondary,
     fontSize: 12,
   },
   carpoolPrice: {
-    color: '#F9C349',
+    color: colors.accent,
     fontSize: 18,
     fontWeight: '700',
   },
   carpoolPriceFull: {
-    color: '#999',
+    color: colors.textSecondary,
   },
   fullBadge: {
     position: 'absolute',
@@ -1823,12 +1829,12 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   noCarpoolsText: {
-    color: '#000',
+    color: colors.text,
     fontSize: 18,
     fontWeight: '600',
   },
   noCarpoolsSubtext: {
-    color: '#999',
+    color: colors.textSecondary,
     fontSize: 14,
     textAlign: 'center',
   },
@@ -1837,7 +1843,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     borderRadius: 16,
     overflow: 'hidden',
-    shadowColor: '#F9C349',
+    shadowColor: colors.accent,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 8,
@@ -1855,7 +1861,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   requestButtonText: {
-    color: '#000',
+    color: colors.text,
     fontSize: 16,
     fontWeight: '600',
   },
@@ -1864,11 +1870,11 @@ const styles = StyleSheet.create({
   },
   // Recent Ride Card Styles
   recentRideCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: cardBg,
     padding: 16,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#F0F0F0',
+    borderColor: colors.border,
     marginBottom: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -1887,7 +1893,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   recentRideTime: {
-    color: '#000',
+    color: colors.text,
     fontSize: 15,
     fontWeight: '600',
   },
@@ -1907,13 +1913,13 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     paddingBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
+    borderBottomColor: colors.border,
   },
   driverAvatar: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#F9C34915',
+    backgroundColor: colors.accent + '15',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1921,12 +1927,12 @@ const styles = StyleSheet.create({
     marginLeft: 10,
   },
   driverName: {
-    color: '#000',
+    color: colors.text,
     fontWeight: '600',
     fontSize: 14,
   },
   driverPhone: {
-    color: '#999',
+    color: colors.textSecondary,
     fontSize: 12,
   },
   routeInfo: {
@@ -1939,7 +1945,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   routeInfoText: {
-    color: '#666',
+    color: colors.textSecondary,
     fontSize: 13,
     flex: 1,
   },
@@ -1952,7 +1958,7 @@ const styles = StyleSheet.create({
   recentRideActions: {
     alignItems: 'flex-end',
     borderTopWidth: 1,
-    borderTopColor: '#F0F0F0',
+    borderTopColor: colors.border,
     paddingTop: 12,
   },
   cancelButton: {
@@ -1972,7 +1978,7 @@ const styles = StyleSheet.create({
   createNewBtn: {
     borderRadius: 16,
     overflow: 'hidden',
-    shadowColor: '#F9C349',
+    shadowColor: colors.accent,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 12,
@@ -1986,7 +1992,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   createNewText: {
-    color: '#000',
+    color: colors.text,
     fontSize: 16,
     fontWeight: '700',
   },
@@ -1996,12 +2002,12 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   emptyStateTitle: {
-    color: '#000',
+    color: colors.text,
     fontSize: 20,
     fontWeight: '600',
   },
   emptyStateSubtext: {
-    color: '#999',
+    color: colors.textSecondary,
     fontSize: 14,
     textAlign: 'center',
   },
@@ -2021,7 +2027,7 @@ const styles = StyleSheet.create({
     maxHeight: height * 0.8,
   },
   modalCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: cardBg,
     padding: 20,
   },
   modalHeader: {
@@ -2039,17 +2045,17 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#F9C34915',
+    backgroundColor: colors.accent + '15',
     justifyContent: 'center',
     alignItems: 'center',
   },
   modalTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#000',
+    color: colors.text,
   },
   modalSubtitle: {
-    color: '#999',
+    color: colors.textSecondary,
     fontSize: 14,
   },
   modalClose: {
@@ -2059,7 +2065,7 @@ const styles = StyleSheet.create({
     gap: 20,
   },
   modalRoute: {
-    backgroundColor: '#F8F8F8',
+    backgroundColor: insetBg,
     padding: 16,
     borderRadius: 12,
     gap: 8,
@@ -2081,7 +2087,7 @@ const styles = StyleSheet.create({
     marginLeft: 3,
   },
   modalRouteText: {
-    color: '#000',
+    color: colors.text,
     fontSize: 14,
     flex: 1,
   },
@@ -2092,12 +2098,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    backgroundColor: '#F8F8F8',
+    backgroundColor: insetBg,
     padding: 12,
     borderRadius: 10,
   },
   modalDetailText: {
-    color: '#000',
+    color: colors.text,
     fontSize: 14,
   },
   modalJoinButton: {
@@ -2113,24 +2119,24 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   modalJoinText: {
-    color: '#000',
+    color: colors.text,
     fontSize: 16,
     fontWeight: '700',
   },
   // Map Picker Styles
   mapPickerContainer: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: cardBg,
   },
   mapPickerHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: 16,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: cardBg,
     paddingTop: Platform.OS === 'ios' ? 50 : 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
+    borderBottomColor: colors.border,
   },
   mapPickerClose: {
     padding: 4,
@@ -2138,7 +2144,7 @@ const styles = StyleSheet.create({
   mapPickerTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#000',
+    color: colors.text,
   },
   mapWrapper: {
     flex: 1,
@@ -2153,7 +2159,7 @@ const styles = StyleSheet.create({
     marginLeft: -22,
     marginTop: -44,
     zIndex: 10,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: cardBg,
     borderRadius: 28,
     padding: 4,
     shadowColor: '#000',
@@ -2163,26 +2169,26 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   mapPickerFooter: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: cardBg,
     padding: 20,
     paddingBottom: Platform.OS === 'ios' ? 40 : 20,
     borderTopWidth: 1,
-    borderTopColor: '#F0F0F0',
+    borderTopColor: colors.border,
   },
   mapPickerAddressText: {
-    color: '#000',
+    color: colors.text,
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 20,
   },
   mapPickerConfirmBtn: {
-    backgroundColor: '#F9C349',
+    backgroundColor: colors.accent,
     padding: 16,
     borderRadius: 12,
     alignItems: 'center',
   },
   mapPickerConfirmText: {
-    color: '#000',
+    color: colors.text,
     fontSize: 16,
     fontWeight: '600',
   },
@@ -2192,6 +2198,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     height: 48,
   },
-});
+  });
+};
 
 export default BookCarpoolScreen;

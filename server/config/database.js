@@ -20,6 +20,7 @@ const connectDB = async () => {
       socketTimeoutMS: 45000,
       maxPoolSize: 10,
       minPoolSize: 2,
+      family: 4, // Force IPv4 to prevent Atlas SSL alert 80 issues on dual-stack networks
     });
 
     logger.info(`✅ MongoDB Connected: ${conn.connection.host}`);

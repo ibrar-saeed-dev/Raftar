@@ -14,11 +14,78 @@ export const COLORS = {
   border: '#333333'
 };
 
+// Canonical vehicle list — ids must match the server enum in models/Ride.js
+// and pricingService.js (bike, rickshaw, car, ac_car, luxury_car).
 export const VEHICLE_TYPES = [
-  { id: 'bike', label: 'Bike', icon: 'motorcycle', price: 100, capacity: 1 },
-  { id: 'rickshaw', label: 'Rickshaw', icon: 'three-wheeler', price: 150, capacity: 3 },
-  { id: 'car', label: 'Car', icon: 'directions-car', price: 200, capacity: 4 }
+  {
+    id: 'bike',
+    label: 'Bike',
+    icon: 'motorbike',
+    iconType: 'material-community',
+    price: 100,
+    pricePerKm: 8,
+    capacity: 1,
+    capacityLabel: '1 Person',
+    time: '5-10 min',
+    description: 'Fast & economical',
+    color: '#FF6B6B'
+  },
+  {
+    id: 'rickshaw',
+    label: 'Rickshaw',
+    icon: 'rickshaw',
+    iconType: 'material-community',
+    price: 150,
+    pricePerKm: 12,
+    capacity: 3,
+    capacityLabel: '3 Persons',
+    time: '10-15 min',
+    description: 'Budget friendly',
+    color: '#FF9F43'
+  },
+  {
+    id: 'car',
+    label: 'Car',
+    icon: 'car',
+    iconType: 'material-community',
+    price: 200,
+    pricePerKm: 15,
+    capacity: 4,
+    capacityLabel: '4 Persons',
+    time: '8-12 min',
+    description: 'Comfortable ride',
+    color: '#F9C349'
+  },
+  {
+    id: 'ac_car',
+    label: 'AC Car',
+    icon: 'snowflake',
+    iconType: 'material-community',
+    price: 250,
+    pricePerKm: 18,
+    capacity: 4,
+    capacityLabel: '4 Persons',
+    time: '10-15 min',
+    description: 'Cool & comfortable',
+    color: '#4ECDC4'
+  },
+  {
+    id: 'luxury_car',
+    label: 'Luxury',
+    icon: 'car-sports',
+    iconType: 'material-community',
+    price: 400,
+    pricePerKm: 25,
+    capacity: 4,
+    capacityLabel: '4 Persons',
+    time: '12-20 min',
+    description: 'Premium experience',
+    color: '#2C3E50'
+  }
 ];
+
+export const getVehicleType = (id) =>
+  VEHICLE_TYPES.find(v => v.id === id);
 
 export const RIDE_STATUS = {
   PENDING: 'pending',

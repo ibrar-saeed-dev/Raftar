@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
+import { useTheme } from '../../context/ThemeContext';
 import {
   View,
   Text,
@@ -22,20 +23,26 @@ import IconMC from 'react-native-vector-icons/MaterialCommunityIcons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import { registerDriver, getDriverProfile } from '../../redux/slices/driverSlice';
+import { VEHICLE_TYPES } from '../../utils/constants';
 
 const { width } = Dimensions.get('window');
 
 // Yellow Theme Colors
-const YELLOW_PRIMARY = '#F8B82A';
-const YELLOW_SECONDARY = '#F9C349';
-const WHITE = '#FFFFFF';
-const BLACK = '#000000';
-const GRAY_DARK = '#333333';
-const GRAY_MEDIUM = '#666666';
-const GRAY_LIGHT = '#F5F5F5';
-const GRAY_BG = '#F8F9FA';
+const getThemePalette = (colors, isDark) => ({
+  YELLOW_PRIMARY: colors.accent,
+  YELLOW_SECONDARY: colors.accent,
+  WHITE: isDark ? colors.card : '#FFFFFF',
+  BLACK: colors.text,
+  GRAY_DARK: colors.text,
+  GRAY_MEDIUM: colors.textSecondary,
+  GRAY_LIGHT: isDark ? colors.cardElevated : '#F5F5F5',
+  GRAY_BG: colors.background,
+});
 
 const DriverRegistrationScreen = () => {
+  const { colors, isDark } = useTheme();
+  const { YELLOW_PRIMARY, YELLOW_SECONDARY, WHITE, BLACK, GRAY_DARK, GRAY_MEDIUM, GRAY_LIGHT, GRAY_BG } = useMemo(() => getThemePalette(colors, isDark), [colors, isDark]);
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   const dispatch = useDispatch();
   const navigation = useNavigation();
   const { loading } = useSelector(state => state.driver);
@@ -138,18 +145,9 @@ const DriverRegistrationScreen = () => {
     return `${uploaded} / ${Object.keys(documents).length} uploaded`;
   };
 
-  const getVehicleTypeIcon = (type) => {
-    switch (type.toLowerCase()) {
-      case 'car': return 'car';
-      case 'bike': return 'motorbike';
-      case 'rickshaw': return 'auto-rickshaw';
-      default: return 'car';
-    }
-  };
-
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor={WHITE} />
+      <StatusBar barStyle={colors.statusBarStyle} backgroundColor={WHITE} />
       
       <View style={styles.container}>
         {/* Header */}
@@ -195,26 +193,26 @@ const DriverRegistrationScreen = () => {
             </View>
             
             <View style={styles.vehicleTypeRow}>
-              {['car', 'bike', 'rickshaw'].map((type) => (
+              {VEHICLE_TYPES.map(({ id, icon, label }) => (
                 <TouchableOpacity
-                  key={type}
+                  key={id}
                   style={[
                     styles.vehicleTypeButton,
-                    vehicle.type === type && styles.vehicleTypeActive
+                    vehicle.type === id && styles.vehicleTypeActive
                   ]}
-                  onPress={() => setVehicle({ ...vehicle, type })}
+                  onPress={() => setVehicle({ ...vehicle, type: id })}
                   activeOpacity={0.7}
                 >
-                  <IconMC 
-                    name={type === 'car' ? 'car' : type === 'bike' ? 'motorbike' : 'auto-rickshaw'} 
-                    size={22} 
-                    color={vehicle.type === type ? WHITE : GRAY_MEDIUM} 
+                  <IconMC
+                    name={icon}
+                    size={22}
+                    color={vehicle.type === id ? WHITE : GRAY_MEDIUM}
                   />
                   <Text style={[
                     styles.vehicleTypeText,
-                    vehicle.type === type && styles.vehicleTypeTextActive
+                    vehicle.type === id && styles.vehicleTypeTextActive
                   ]}>
-                    {type.charAt(0).toUpperCase() + type.slice(1)}
+                    {label}
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -327,7 +325,11 @@ const DriverRegistrationScreen = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors, isDark) => {
+  const { YELLOW_PRIMARY, YELLOW_SECONDARY, WHITE, BLACK, GRAY_DARK, GRAY_MEDIUM, GRAY_LIGHT, GRAY_BG } = getThemePalette(colors, isDark);
+  const cardBg = isDark ? colors.card : '#FFFFFF';
+  const insetBg = isDark ? colors.cardElevated : '#F5F5F5';
+  return StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: WHITE,
@@ -346,7 +348,7 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
     backgroundColor: WHITE,
     borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
+    borderBottomColor: colors.border,
   },
   backButton: {
     width: 40,
@@ -385,7 +387,7 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#F0F0F0',
+    borderColor: colors.border,
   },
   progressBar: {
     height: 6,
@@ -409,7 +411,7 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#F0F0F0',
+    borderColor: colors.border,
     shadowColor: BLACK,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04,
@@ -449,18 +451,19 @@ const styles = StyleSheet.create({
   },
   vehicleTypeRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 8,
     marginBottom: 16,
   },
   vehicleTypeButton: {
-    flex: 1,
+    width: '31%',
     alignItems: 'center',
     paddingVertical: 10,
     borderRadius: 10,
     backgroundColor: GRAY_LIGHT,
     borderWidth: 1,
-    borderColor: '#F0F0F0',
-    flexDirection: 'row',
+    borderColor: colors.border,
+    flexDirection: 'column',
     justifyContent: 'center',
     gap: 6,
   },
@@ -483,7 +486,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#F0F0F0',
+    borderColor: colors.border,
   },
   inputIcon: {
     paddingHorizontal: 12,
@@ -513,7 +516,7 @@ const styles = StyleSheet.create({
     backgroundColor: GRAY_LIGHT,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#F0F0F0',
+    borderColor: colors.border,
     borderStyle: 'dashed',
     overflow: 'hidden',
     position: 'relative',
@@ -574,6 +577,7 @@ const styles = StyleSheet.create({
   bottomSpacer: {
     height: 20,
   },
-});
+  });
+};
 
 export default DriverRegistrationScreen;

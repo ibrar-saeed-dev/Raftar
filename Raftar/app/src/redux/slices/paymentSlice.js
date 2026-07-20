@@ -37,10 +37,47 @@ export const addToWallet = createAsyncThunk(
   }
 );
 
+export const getPaymentMethods = createAsyncThunk(
+  'payment/getPaymentMethods',
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await api.get('/payments/methods');
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(error.error || 'Failed to get payment methods');
+    }
+  }
+);
+
+export const addPaymentMethod = createAsyncThunk(
+  'payment/addPaymentMethod',
+  async (methodData, { rejectWithValue }) => {
+    try {
+      const response = await api.post('/payments/methods', methodData);
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(error.error || 'Failed to add payment method');
+    }
+  }
+);
+
+export const removePaymentMethod = createAsyncThunk(
+  'payment/removePaymentMethod',
+  async (methodId, { rejectWithValue }) => {
+    try {
+      const response = await api.delete(`/payments/methods/${methodId}`);
+      return methodId; // return id to remove from state
+    } catch (error) {
+      return rejectWithValue(error.error || 'Failed to remove payment method');
+    }
+  }
+);
+
 const paymentSlice = createSlice({
   name: 'payment',
   initialState: {
     walletBalance: 0,
+    paymentMethods: [],
     transactions: [],
     currentPayment: null,
     loading: false,
@@ -71,6 +108,19 @@ const paymentSlice = createSlice({
       })
       .addCase(addToWallet.fulfilled, (state, action) => {
         state.walletBalance = action.payload.balance;
+      })
+      .addCase(getPaymentMethods.fulfilled, (state, action) => {
+        state.paymentMethods = action.payload.paymentMethods || action.payload || [];
+      })
+      .addCase(addPaymentMethod.fulfilled, (state, action) => {
+        if (action.payload.paymentMethod) {
+          state.paymentMethods.push(action.payload.paymentMethod);
+        } else {
+          state.paymentMethods.push(action.payload);
+        }
+      })
+      .addCase(removePaymentMethod.fulfilled, (state, action) => {
+        state.paymentMethods = state.paymentMethods.filter(method => method.id !== action.payload && method._id !== action.payload);
       });
   }
 });

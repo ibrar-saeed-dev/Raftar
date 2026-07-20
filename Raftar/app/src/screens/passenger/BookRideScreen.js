@@ -16,10 +16,12 @@ import {
   Animated,
   Modal,
   Linking,
-  Switch
+  Switch,
+  InteractionManager
 } from 'react-native';
+import { useTheme } from '../../context/ThemeContext';
 import { useDispatch, useSelector } from 'react-redux';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import IconIonic from 'react-native-vector-icons/Ionicons';
 import IconFA from 'react-native-vector-icons/FontAwesome5';
@@ -30,6 +32,7 @@ import * as Location from 'expo-location';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Animatable from 'react-native-animatable';
 import { createRide } from '../../redux/slices/rideSlice';
+import { VEHICLE_TYPES } from '../../utils/constants';
 import api from '../../services/api';
 import { GOOGLE_MAPS_API_KEY } from '../../config/constants';
 
@@ -37,20 +40,29 @@ const { width, height } = Dimensions.get('window');
 
 const BookRideScreen = () => {
   const navigation = useNavigation();
+  const route = useRoute();
   const dispatch = useDispatch();
   const { user } = useSelector(state => state.auth);
   const { currentRide } = useSelector(state => state.ride);
+  const { colors, isDark } = useTheme();
+  const styles = React.useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   
   const [loading, setLoading] = useState(false);
-  const [pickup, setPickup] = useState(null);
-  const [dropoff, setDropoff] = useState(null);
+  const [pickup, setPickup] = useState(route.params?.pickup || null);
+  const [dropoff, setDropoff] = useState(route.params?.destination || null);
+  const [stops, setStops] = useState([]);
   const [selectedVehicle, setSelectedVehicle] = useState('car');
-  const [fareMode, setFareMode] = useState('ai');
-  const [offerPrice, setOfferPrice] = useState('');
   const [estimatedFare, setEstimatedFare] = useState(null);
+  const [selectedPriceOption, setSelectedPriceOption] = useState(null);
+  const [vehicleFares, setVehicleFares] = useState({});
   const [showVehicleModal, setShowVehicleModal] = useState(false);
   const [showFareModal, setShowFareModal] = useState(false);
   const [searchingDriver, setSearchingDriver] = useState(false);
+  const [showStopModal, setShowStopModal] = useState(false);
+
+  const handleRemoveStop = (index) => {
+    setStops(stops.filter((_, i) => i !== index));
+  };
   
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
@@ -73,18 +85,21 @@ const BookRideScreen = () => {
   const pickerMapRef = useRef(null);
 
   useEffect(() => {
+    navigation.setOptions({ gestureEnabled: false });
     animateEntrance();
     getCurrentLocation();
-  }, []);
+  }, [navigation]);
 
   useEffect(() => {
     if (pickup && dropoff) {
-      calculateFare();
-      fetchRoute();
+      InteractionManager.runAfterInteractions(() => {
+        calculateFare();
+        fetchRoute();
+      });
     } else {
       setRouteCoords([]);
     }
-  }, [pickup, dropoff, selectedVehicle]);
+  }, [pickup, dropoff, stops]);
 
   const getCurrentLocation = async () => {
     setLocationLoading(true);
@@ -178,9 +193,12 @@ const BookRideScreen = () => {
     if (mapPickerType === 'pickup') {
       setPickup(data);
       pickupRef.current?.setAddressText(data.address);
-    } else {
+    } else if (mapPickerType === 'dropoff') {
       setDropoff(data);
       dropoffRef.current?.setAddressText(data.address);
+    } else if (mapPickerType === 'stop') {
+      setStops([...stops, data]);
+      setShowStopModal(false);
     }
     setMapPickerVisible(false);
   };
@@ -201,9 +219,14 @@ const BookRideScreen = () => {
     
     const [startLng, startLat] = pickup.location.coordinates;
     const [endLng, endLat] = dropoff.location.coordinates;
+    
+    let waypointsParam = '';
+    if (stops.length > 0) {
+      waypointsParam = `&waypoints=${stops.map(s => `${s.location.coordinates[1]},${s.location.coordinates[0]}`).join('|')}`;
+    }
 
     try {
-      const resp = await fetch(`https://maps.googleapis.com/maps/api/directions/json?origin=${startLat},${startLng}&destination=${endLat},${endLng}&key=${GOOGLE_MAPS_API_KEY}`);
+      const resp = await fetch(`https://maps.googleapis.com/maps/api/directions/json?origin=${startLat},${startLng}&destination=${endLat},${endLng}${waypointsParam}&key=${GOOGLE_MAPS_API_KEY}`);
       const respJson = await resp.json();
       if (respJson.routes.length) {
         const points = decodePolyline(respJson.routes[0].overview_polyline.points);
@@ -245,54 +268,96 @@ const BookRideScreen = () => {
     ]).start();
   };
 
-  const vehicleTypes = [
-    { 
-      id: 'bike', 
-      label: 'Bike', 
-      icon: 'motorbike',
-      iconType: 'material-community',
-      price: 100,
-      capacity: '1 Person',
-      time: '5-10 min',
-      color: '#FF6B6B'
-    },
-    { 
-      id: 'rickshaw', 
-      label: 'Rickshaw', 
-      icon: 'rickshaw',
-      iconType: 'material-community',
-      price: 150,
-      capacity: '3 Persons',
-      time: '10-15 min',
-      color: '#FF9F43'
-    },
-    { 
-      id: 'car', 
-      label: 'Car', 
-      icon: 'car',
-      iconType: 'material-community',
-      price: 200,
-      capacity: '4 Persons',
-      time: '8-12 min',
-      color: '#F9C349'
-    }
-  ];
+  const enhancedVehicleTypes = React.useMemo(() => {
+    const vehicleStyles = {
+      'bike': { bgLight: '#FFF7E0', bgDark: '#2A200B', iconColor: '#F5A623', icon: 'motorbike', iconType: 'material-community' },
+      'rickshaw': { bgLight: '#E1F5EE', bgDark: '#0D271F', iconColor: '#1D9E75', icon: 'rickshaw', iconType: 'material-community' },
+      'car': { bgLight: '#E6F1FB', bgDark: '#15212D', iconColor: '#378ADD', icon: 'car', iconType: 'material-community' },
+      'car-ac': { bgLight: '#EAF3DE', bgDark: '#1F2A14', iconColor: '#639922', icon: 'car-cool', iconType: 'material-community' },
+      'luxury': { bgLight: '#F3EAFB', bgDark: '#241634', iconColor: '#7F4FC9', icon: 'car-estate', iconType: 'material-community' },
+    };
+
+    return VEHICLE_TYPES.map(v => ({
+      ...v,
+      bgColor: isDark ? (vehicleStyles[v.id]?.bgDark || '#222') : (vehicleStyles[v.id]?.bgLight || '#F5F5F5'),
+      iconColor: vehicleStyles[v.id]?.iconColor || '#666',
+      icon: vehicleStyles[v.id]?.icon || 'car',
+      iconType: vehicleStyles[v.id]?.iconType || 'material-community',
+    }));
+  }, [isDark]);
+
+  const vehicleTypes = VEHICLE_TYPES;
 
   const calculateFare = async () => {
     if (!pickup || !dropoff) return;
     try {
-      const response = await api.post('/rides/calculate-fare', {
-        pickup: pickup.location,
-        dropoff: dropoff.location,
-        vehicleType: selectedVehicle
-      });
-      setEstimatedFare(response.data.fare);
+      const types = VEHICLE_TYPES.map(v => v.id);
+      const fares = {};
+      
+      await Promise.all(types.map(async (type) => {
+        const response = await api.post('/rides/calculate-fare', {
+          pickup: pickup,
+          dropoff: dropoff,
+          waypoints: stops,
+          vehicleType: type
+        });
+        fares[type] = response.data.fare?.total ?? response.data.fare ?? 0;
+      }));
+      
+      setVehicleFares(fares);
+      setEstimatedFare(fares[selectedVehicle] || 0);
     } catch (error) {
       console.error('Error calculating fare:', error);
     }
   };
 
-  const handleBookRide = async () => {
+  useEffect(() => {
+    if (vehicleFares[selectedVehicle]) {
+      const base = vehicleFares[selectedVehicle];
+      setEstimatedFare(base);
+      setSelectedPriceOption(Math.round(base));
+    } else {
+      const v = vehicleTypes.find(v => v.id === selectedVehicle);
+      if (v) {
+        setEstimatedFare(v.price);
+        setSelectedPriceOption(v.price);
+      }
+    }
+  }, [selectedVehicle, vehicleFares]);
+
+  const getPriceOptions = (base) => {
+    if (!base) return [];
+    const baseFare = Math.round(base);
+    const minFare = Math.round(baseFare * 0.8);
+    const maxFare = Math.round(baseFare * 1.2);
+    const step = (maxFare - minFare) / 4;
+    return [
+      Math.round(minFare),
+      Math.round(minFare + step),
+      Math.round(minFare + 2 * step),
+      Math.round(minFare + 3 * step),
+      Math.round(maxFare)
+    ];
+  };
+
+  const handlePriceStep = (direction) => {
+    const options = getPriceOptions(estimatedFare);
+    if (!options.length) return;
+    
+    let currentIndex = options.findIndex(p => p === selectedPriceOption);
+    if (currentIndex === -1) {
+       currentIndex = options.reduce((closestIdx, price, idx) => {
+         return Math.abs(price - selectedPriceOption) < Math.abs(options[closestIdx] - selectedPriceOption) ? idx : closestIdx;
+       }, 0);
+    }
+    
+    let newIndex = currentIndex + direction;
+    if (newIndex >= 0 && newIndex < options.length) {
+      setSelectedPriceOption(options[newIndex]);
+    }
+  };
+
+  const handleBookRide = async (confirmedPrice) => {
     if (!pickup || !dropoff) {
       Alert.alert('Error', 'Please select pickup and dropoff locations');
       return;
@@ -303,8 +368,8 @@ const BookRideScreen = () => {
       return;
     }
 
-    if (fareMode === 'offer' && (!offerPrice || parseFloat(offerPrice) <= 0)) {
-      Alert.alert('Error', 'Please enter a valid offer price');
+    if (!confirmedPrice || confirmedPrice <= 0) {
+      Alert.alert('Error', 'Please select a valid price');
       return;
     }
 
@@ -332,12 +397,19 @@ const BookRideScreen = () => {
           },
           placeId: dropoff.placeId
         },
+        waypoints: stops.map(s => ({
+          address: s.address,
+          location: {
+            type: 'Point',
+            coordinates: s.location.coordinates
+          }
+        })),
         vehicleType: selectedVehicle,
         type: 'solo',
         fare: {
-          type: fareMode,
-          amount: fareMode === 'ai' ? (estimatedFare?.total ?? estimatedFare ?? 0) : parseFloat(offerPrice),
-          offered: fareMode === 'offer' ? parseFloat(offerPrice) : null
+          type: 'offer',
+          amount: confirmedPrice,
+          offered: confirmedPrice
         },
         ...(isGuestBooking && {
           guest: {
@@ -352,14 +424,10 @@ const BookRideScreen = () => {
 
       const result = await dispatch(createRide(rideData)).unwrap();
       if (result.success) {
-        setSearchingDriver(true);
-        setTimeout(() => {
-          setSearchingDriver(false);
-          navigation.navigate('RideTracking', { 
-            rideId: result.ride._id,
-            rideData: result.ride
-          });
-        }, 3000);
+        navigation.navigate('RideTracking', { 
+          rideId: result.ride._id,
+          rideData: result.ride
+        });
       }
     } catch (error) {
       Alert.alert('Booking Failed', error.message || 'Unable to book ride. Please try again.');
@@ -393,27 +461,25 @@ const BookRideScreen = () => {
     >
       <View style={[
         styles.vehicleCardContent,
-        selectedVehicle === vehicle.id && { borderColor: vehicle.color }
+        selectedVehicle === vehicle.id && { borderColor: '#FFC107', backgroundColor: isDark ? '#2A200B' : '#FFFDF5' }
       ]}>
         <View style={[
           styles.vehicleIconContainer,
-          { backgroundColor: selectedVehicle === vehicle.id ? vehicle.color + '15' : '#F5F5F5' }
+          { backgroundColor: vehicle.bgColor }
         ]}>
-          {getIcon(vehicle.icon, vehicle.iconType, 28, 
-            selectedVehicle === vehicle.id ? vehicle.color : '#666'
-          )}
+          {getIcon(vehicle.icon, vehicle.iconType, 32, vehicle.iconColor)}
         </View>
         <Text style={[
           styles.vehicleLabel,
-          selectedVehicle === vehicle.id && { color: vehicle.color }
+          selectedVehicle === vehicle.id && { color: isDark ? '#FFF' : '#000' }
         ]}>
           {vehicle.label}
         </Text>
-        <Text style={styles.vehiclePrice}>₨ {vehicle.price}</Text>
+        <Text style={[styles.vehiclePrice, selectedVehicle === vehicle.id && { color: isDark ? '#FFF' : '#000', fontSize: 15 }]}>₨ {vehicleFares[vehicle.id] ? Math.round(vehicleFares[vehicle.id]) : vehicle.price}</Text>
         <View style={styles.vehicleMeta}>
           <View style={styles.vehicleMetaItem}>
             <Icon name="person" size={12} color="#999" />
-            <Text style={styles.vehicleMetaText}>{vehicle.capacity}</Text>
+            <Text style={styles.vehicleMetaText}>{vehicle.capacityLabel}</Text>
           </View>
           <View style={styles.vehicleMetaItem}>
             <Icon name="access-time" size={12} color="#999" />
@@ -421,8 +487,8 @@ const BookRideScreen = () => {
           </View>
         </View>
         {selectedVehicle === vehicle.id && (
-          <View style={[styles.selectedBadge, { backgroundColor: vehicle.color }]}>
-            <Icon name="check" size={12} color="#FFF" />
+          <View style={[styles.selectedBadge, { backgroundColor: '#FFC107' }]}>
+            <Icon name="check" size={12} color="#000" />
           </View>
         )}
       </View>
@@ -431,7 +497,7 @@ const BookRideScreen = () => {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+      <StatusBar barStyle={colors.statusBarStyle} backgroundColor={colors.background} />
       
       <KeyboardAvoidingView 
         style={styles.container}
@@ -451,30 +517,29 @@ const BookRideScreen = () => {
               style={styles.backButton}
               onPress={() => navigation.goBack()}
             >
-              <Icon name="arrow-back" size={24} color="#000" />
+              <Icon name="arrow-back" size={24} color={colors.text || '#000'} />
             </TouchableOpacity>
-            <Text style={styles.headerTitle}>Book a Ride</Text>
-            <TouchableOpacity style={styles.notificationButton}>
-              <Icon name="notifications-none" size={24} color="#000" />
-              <View style={styles.notificationBadge} />
-            </TouchableOpacity>
+            <Text style={[styles.headerTitle, { color: colors.text || '#000' }]}>Choose a ride</Text>
+            <View style={{ width: 32 }} />
           </View>
 
           {/* Active Ride Banner */}
           {currentRide && (currentRide.status === 'searching' || currentRide.status === 'accepted' || currentRide.status === 'started') && (
-            <Animatable.View animation="fadeIn" duration={500} style={styles.activeRideBanner}>
-              <View style={styles.activeRideBannerContent}>
-                <View style={styles.activeRideIcon}>
-                  <Icon name="directions-car" size={20} color="#F9C349" />
-                </View>
-                <View>
-                  <Text style={styles.activeRideBannerTitle}>Active Ride</Text>
-                  <Text style={styles.activeRideBannerStatus}>{currentRide.status}</Text>
-                </View>
-              </View>
+            <Animatable.View animation="fadeIn" duration={500}>
               <TouchableOpacity 
+                style={styles.activeRideBanner}
                 onPress={() => navigation.navigate('RideTracking', { rideId: currentRide._id })}
+                activeOpacity={0.8}
               >
+                <View style={styles.activeRideBannerContent}>
+                  <View style={styles.activeRideIcon}>
+                    <Icon name="directions-car" size={20} color="#F9C349" />
+                  </View>
+                  <View>
+                    <Text style={styles.activeRideBannerTitle}>Active Ride</Text>
+                    <Text style={styles.activeRideBannerStatus}>{currentRide.status}</Text>
+                  </View>
+                </View>
                 <Icon name="arrow-forward" size={24} color="#F9C349" />
               </TouchableOpacity>
             </Animatable.View>
@@ -486,7 +551,7 @@ const BookRideScreen = () => {
             keyboardShouldPersistTaps="handled"
           >
             {/* Map Section */}
-            <Animatable.View animation="fadeIn" duration={600} style={styles.mapContainer}>
+            <Animatable.View animation="fadeIn" duration={600} style={styles.mapContainer} useNativeDriver>
               {locationLoading ? (
                 <View style={styles.mapLoading}>
                   <ActivityIndicator size="large" color="#F9C349" />
@@ -532,129 +597,43 @@ const BookRideScreen = () => {
                   {routeCoords.length > 0 && (
                     <Polyline
                       coordinates={routeCoords}
-                      strokeWidth={4}
-                      strokeColor="#F9C349"
+                      strokeWidth={5}
+                      strokeColor="#FFC107"
                     />
                   )}
                 </MapView>
               )}
-              <TouchableOpacity style={styles.mapOverlayBtn} onPress={() => openMapPicker('pickup')}>
-                <Icon name="edit-location" size={20} color="#F9C349" />
-              </TouchableOpacity>
             </Animatable.View>
 
-            {/* Location Section */}
+            {/* Stops Section */}
             <Animatable.View 
               animation="fadeInUp" 
               duration={600} 
               delay={100}
-              style={styles.locationSection}
+              style={[styles.section, { paddingHorizontal: 20, paddingTop: 10 }]}
+              useNativeDriver
             >
-              <View style={styles.locationHeader}>
-                <Text style={styles.locationTitle}>Where to?</Text>
-                <TouchableOpacity style={styles.locationAction} onPress={getCurrentLocation}>
-                  <Icon name="my-location" size={20} color="#F9C349" />
-                  <Text style={styles.locationActionText}>Current</Text>
-                </TouchableOpacity>
-              </View>
-
-              <View style={styles.locationInputWrapper}>
-                <View style={styles.locationDot}>
-                  <View style={[styles.dot, { backgroundColor: '#4ECDC4' }]} />
-                  <View style={styles.dotLine} />
-                </View>
-                <View style={styles.locationInputContainer}>
-                  <CustomPlacesAutocomplete
-                    ref={pickupRef}
-                    placeholder="Pickup Location"
-                    onPress={(data, details = null) => {
-                      setPickup({
-                        address: data.description,
-                        location: {
-                          type: 'Point',
-                          coordinates: [
-                            details.geometry.location.lng,
-                            details.geometry.location.lat
-                          ]
-                        },
-                        placeId: data.place_id
-                      });
-                    }}
-                    styles={{
-                      textInputContainer: styles.pickupInputContainer,
-                      textInput: styles.pickupTextInput,
-                      container: styles.autocompleteContainer,
-                      listView: styles.autocompleteList,
-                      row: styles.autocompleteRow,
-                      description: styles.autocompleteDescription
-                    }}
-                    placeholderTextColor="#999"
-                    renderRightButton={() => (
-                      <TouchableOpacity onPress={() => openMapPicker('pickup')} style={styles.mapIconBtn}>
-                        <Icon name="map" size={22} color="#4ECDC4" />
-                      </TouchableOpacity>
-                    )}
-                  />
-                </View>
-              </View>
-
-              <View style={styles.locationDivider} />
-
-              <View style={styles.locationInputWrapper}>
-                <View style={styles.locationDot}>
-                  <View style={[styles.dot, { backgroundColor: '#FF6B6B' }]} />
-                </View>
-                <View style={styles.locationInputContainer}>
-                  <CustomPlacesAutocomplete
-                    ref={dropoffRef}
-                    placeholder="Where to?"
-                    onPress={(data, details = null) => {
-                      setDropoff({
-                        address: data.description,
-                        location: {
-                          type: 'Point',
-                          coordinates: [
-                            details.geometry.location.lng,
-                            details.geometry.location.lat
-                          ]
-                        },
-                        placeId: data.place_id
-                      });
-                    }}
-                    styles={{
-                      textInputContainer: styles.dropoffInputContainer,
-                      textInput: styles.dropoffTextInput,
-                      container: styles.autocompleteContainer,
-                      listView: styles.autocompleteList,
-                      row: styles.autocompleteRow,
-                      description: styles.autocompleteDescription
-                    }}
-                    placeholderTextColor="#999"
-                    renderRightButton={() => (
-                      <TouchableOpacity onPress={() => openMapPicker('dropoff')} style={styles.mapIconBtn}>
-                        <Icon name="map" size={22} color="#FF6B6B" />
-                      </TouchableOpacity>
-                    )}
-                  />
-                </View>
-              </View>
-
-              {pickup && dropoff && estimatedFare && (
-                <Animatable.View animation="fadeIn" duration={400} style={styles.farePreview}>
-                  <View style={styles.farePreviewLeft}>
-                    <View style={styles.farePreviewIcon}>
-                      <Icon name="info" size={14} color="#F9C349" />
-                    </View>
-                    <Text style={styles.farePreviewText}>
-                      Estimated Fare: ₨ {estimatedFare?.total ?? estimatedFare}
-                    </Text>
+              <View style={styles.stopsContainer}>
+                {stops.map((stop, index) => (
+                  <View key={index} style={styles.stopRow}>
+                    <Icon name="stop-circle" size={20} color="#FF9F43" />
+                    <Text style={styles.stopText} numberOfLines={1}>{stop.address}</Text>
+                    <TouchableOpacity onPress={() => handleRemoveStop(index)}>
+                      <Icon name="close" size={20} color="#999" />
+                    </TouchableOpacity>
                   </View>
-                  <View style={styles.farePreviewDistance}>
-                    <Icon name="near-me" size={14} color="#999" />
-                    <Text style={styles.distanceText}>2.5 km</Text>
-                  </View>
-                </Animatable.View>
-              )}
+                ))}
+                
+                {stops.length < 3 && (
+                  <TouchableOpacity 
+                    style={styles.addStopButton}
+                    onPress={() => setShowStopModal(true)}
+                  >
+                    <Icon name="add-circle-outline" size={20} color="#F5A623" />
+                    <Text style={styles.addStopText}>Add Stop</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
             </Animatable.View>
 
             {/* Vehicle Selection */}
@@ -663,6 +642,7 @@ const BookRideScreen = () => {
               duration={600} 
               delay={200}
               style={styles.section}
+              useNativeDriver
             >
               <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>Select Vehicle</Text>
@@ -676,7 +656,7 @@ const BookRideScreen = () => {
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={styles.vehicleScrollContent}
               >
-                {vehicleTypes.map(vehicle => renderVehicleCard(vehicle))}
+                {enhancedVehicleTypes.map(vehicle => renderVehicleCard(vehicle))}
               </ScrollView>
             </Animatable.View>
 
@@ -686,6 +666,7 @@ const BookRideScreen = () => {
               duration={600} 
               delay={250}
               style={styles.section}
+              useNativeDriver
             >
               <TouchableOpacity 
                 style={styles.guestToggleContainer}
@@ -694,21 +675,21 @@ const BookRideScreen = () => {
               >
                 <View style={styles.guestToggleLeft}>
                   <View style={styles.guestToggleIcon}>
-                    <Icon name="person-add" size={20} color="#F9C349" />
+                    <Icon name="person-add" size={20} color="#F5A623" />
                   </View>
                   <Text style={styles.guestToggleText}>Book for someone else</Text>
                 </View>
                 <Switch
                   value={isGuestBooking}
                   onValueChange={setIsGuestBooking}
-                  trackColor={{ false: '#E0E0E0', true: '#F9C349' }}
+                  trackColor={{ false: '#E0E0E0', true: '#FFC107' }}
                   thumbColor={isGuestBooking ? '#FFFFFF' : '#FFFFFF'}
                   ios_backgroundColor="#E0E0E0"
                 />
               </TouchableOpacity>
 
               {isGuestBooking && (
-                <Animatable.View animation="fadeIn" duration={300} style={styles.guestInputContainer}>
+                <Animatable.View animation="fadeIn" duration={300} style={styles.guestInputContainer} useNativeDriver>
                   <View style={styles.guestInputWrapper}>
                     <Icon name="phone" size={20} color="#F9C349" style={styles.guestInputIcon} />
                     <TextInput
@@ -756,124 +737,90 @@ const BookRideScreen = () => {
               )}
             </Animatable.View>
 
-            {/* Fare Mode */}
+            {/* Price Selection */}
             <Animatable.View 
               animation="fadeInUp" 
               duration={600} 
               delay={300}
-              style={styles.section}
+              style={[styles.section, { marginBottom: 40 }]}
+              useNativeDriver
             >
-              <Text style={styles.sectionTitle}>Choose Fare Mode</Text>
-              <View style={styles.fareModeContainer}>
-                <TouchableOpacity
-                  style={[
-                    styles.fareMode,
-                    fareMode === 'ai' && styles.fareModeSelected
-                  ]}
-                  onPress={() => setFareMode('ai')}
-                  activeOpacity={0.8}
+              <Text style={styles.sectionTitle}>Select Your Price</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <TouchableOpacity 
+                  style={styles.priceStepperBtn}
+                  onPress={() => handlePriceStep(-1)}
                 >
-                  <View style={[
-                    styles.fareModeContent,
-                    fareMode === 'ai' && { backgroundColor: '#F9C349' }
-                  ]}>
-                    <View style={styles.fareModeIcon}>
-                      <Icon 
-                        name="auto-awesome" 
-                        size={24} 
-                        color={fareMode === 'ai' ? '#000' : '#999'} 
-                      />
-                    </View>
-                    <Text style={[
-                      styles.fareModeText,
-                      fareMode === 'ai' && { color: '#000' }
-                    ]}>
-                      AI Price
-                    </Text>
-                    {estimatedFare && (
-                      <Text style={[
-                        styles.fareAmount,
-                        fareMode === 'ai' && { color: '#000' }
-                      ]}>
-                        ₨ {estimatedFare?.total ?? estimatedFare}
-                      </Text>
-                    )}
-                  </View>
+                  <Icon name="remove" size={24} color={colors.text || '#000'} />
                 </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[
-                    styles.fareMode,
-                    fareMode === 'offer' && styles.fareModeSelected
-                  ]}
-                  onPress={() => setFareMode('offer')}
-                  activeOpacity={0.8}
+                
+                <ScrollView 
+                  horizontal 
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.priceScrollContent}
+                  style={{ flex: 1, marginHorizontal: 8 }}
                 >
-                  <View style={[
-                    styles.fareModeContent,
-                    fareMode === 'offer' && { backgroundColor: '#F9C349' }
-                  ]}>
-                    <View style={styles.fareModeIcon}>
-                      <Icon 
-                        name="attach-money" 
-                        size={24} 
-                        color={fareMode === 'offer' ? '#000' : '#999'} 
-                      />
-                    </View>
-                    <Text style={[
-                      styles.fareModeText,
-                      fareMode === 'offer' && { color: '#000' }
-                    ]}>
-                      Offer Price
-                    </Text>
-                    {fareMode === 'offer' && (
-                      <TextInput
+                  {getPriceOptions(estimatedFare).map((price, index) => (
+                    <View key={index} style={styles.priceOptionWrapper}>
+                      <TouchableOpacity
                         style={[
-                          styles.offerInput,
-                          fareMode === 'offer' && { 
-                            backgroundColor: 'rgba(255,255,255,0.3)',
-                            color: '#000'
-                          }
+                          styles.priceOptionCard,
+                          selectedPriceOption === price && styles.priceOptionSelected
                         ]}
-                        placeholder="Enter amount"
-                        placeholderTextColor={fareMode === 'offer' ? 'rgba(0,0,0,0.4)' : '#999'}
-                        keyboardType="numeric"
-                        value={offerPrice}
-                        onChangeText={setOfferPrice}
-                      />
-                    )}
-                  </View>
+                        onPress={() => setSelectedPriceOption(price)}
+                      >
+                        <Text style={[
+                          styles.priceOptionText,
+                          selectedPriceOption === price && styles.priceOptionTextSelected
+                        ]}>
+                          ₨ {price}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </ScrollView>
+
+                <TouchableOpacity 
+                  style={styles.priceStepperBtn}
+                  onPress={() => handlePriceStep(1)}
+                >
+                  <Icon name="add" size={24} color={colors.text || '#000'} />
                 </TouchableOpacity>
               </View>
-            </Animatable.View>
 
-            {/* Book Button */}
-            <Animatable.View 
-              animation="fadeInUp" 
-              duration={600} 
-              delay={400}
-              style={styles.bookButtonContainer}
-            >
-              <TouchableOpacity
-                style={styles.bookButton}
-                onPress={handleBookRide}
-                disabled={loading || searchingDriver}
-                activeOpacity={0.8}
-              >
-                {loading || searchingDriver ? (
-                  <View style={styles.loadingContainer}>
-                    <ActivityIndicator color="#000" size="small" />
-                    <Text style={styles.loadingText}>
-                      {searchingDriver ? 'Finding Driver...' : 'Booking...'}
-                    </Text>
-                  </View>
-                ) : (
-                  <>
-                    <Text style={styles.bookButtonText}>Book Ride</Text>
-                    <Icon name="arrow-forward" size={24} color="#000" />
-                  </>
-                )}
-              </TouchableOpacity>
+              {selectedPriceOption > 0 && (
+                <TouchableOpacity 
+                  style={{
+                    marginTop: 24,
+                    borderRadius: 14,
+                    overflow: 'hidden',
+                  }}
+                  onPress={() => handleBookRide(selectedPriceOption)}
+                  disabled={loading || searchingDriver}
+                >
+                  <LinearGradient
+                    colors={['#FFC107', '#FFB300']}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      paddingVertical: 16,
+                      gap: 8,
+                    }}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                  >
+                    {loading || searchingDriver ? (
+                      <ActivityIndicator color="#000" />
+                    ) : (
+                      <>
+                        <Text style={{ fontSize: 18, color: '#000000', fontWeight: '700' }}>Find Driver</Text>
+                        <Icon name="arrow-forward" size={20} color="#000000" />
+                      </>
+                    )}
+                  </LinearGradient>
+                </TouchableOpacity>
+              )}
             </Animatable.View>
 
             <View style={styles.bottomSpacer} />
@@ -903,7 +850,7 @@ const BookRideScreen = () => {
                     onPress={() => setShowVehicleModal(false)}
                     style={styles.modalClose}
                   >
-                    <Icon name="close" size={24} color="#000" />
+                    <Icon name="close" size={24} color={colors.text} />
                   </TouchableOpacity>
                 </View>
                 <ScrollView showsVerticalScrollIndicator={false}>
@@ -928,7 +875,7 @@ const BookRideScreen = () => {
                       <View style={styles.modalVehicleInfo}>
                         <Text style={styles.modalVehicleLabel}>{vehicle.label}</Text>
                         <Text style={styles.modalVehicleCapacity}>
-                          {vehicle.capacity} • {vehicle.time}
+                          {vehicle.capacityLabel} • {vehicle.time}
                         </Text>
                       </View>
                       <Text style={styles.modalVehiclePrice}>₨ {vehicle.price}</Text>
@@ -947,9 +894,11 @@ const BookRideScreen = () => {
             <View style={styles.pickerModalContainer}>
               <View style={styles.pickerModalHeader}>
                 <TouchableOpacity onPress={() => setMapPickerVisible(false)} style={styles.pickerBackBtn}>
-                  <Icon name="arrow-back" size={24} color="#000" />
+                  <Icon name="arrow-back" size={24} color={colors.text} />
                 </TouchableOpacity>
-                <Text style={styles.pickerModalTitle}>Select {mapPickerType === 'pickup' ? 'Pickup' : 'Dropoff'}</Text>
+                <Text style={styles.pickerModalTitle}>
+                  Select {mapPickerType === 'pickup' ? 'Pickup' : mapPickerType === 'stop' ? 'Stop' : 'Dropoff'}
+                </Text>
                 <View style={{ width: 32 }} />
               </View>
               {mapPickerCoords && (
@@ -968,7 +917,7 @@ const BookRideScreen = () => {
                 />
               )}
               <View style={styles.pickerCenterPin}>
-                <Icon name="location-on" size={44} color={mapPickerType === 'pickup' ? "#4ECDC4" : "#FF6B6B"} />
+                <Icon name="location-on" size={44} color={mapPickerType === 'pickup' ? "#4ECDC4" : mapPickerType === 'stop' ? "#FF9F43" : "#FF6B6B"} />
               </View>
               <View style={styles.pickerBottomCard}>
                 <Text style={styles.pickerAddressLabel}>Selected Location</Text>
@@ -980,19 +929,59 @@ const BookRideScreen = () => {
             </View>
           </Modal>
         </Animated.View>
-      </KeyboardAvoidingView>
+        {/* Add Stop Modal */}
+      <Modal visible={showStopModal} animationType="slide">
+        <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
+          <View style={styles.pickerModalHeader}>
+            <TouchableOpacity onPress={() => setShowStopModal(false)} style={styles.pickerBackBtn}>
+              <Icon name="arrow-back" size={24} color={colors.text} />
+            </TouchableOpacity>
+            <Text style={styles.pickerModalTitle}>Add Stop</Text>
+            <View style={{ width: 32 }} />
+          </View>
+          <View style={{ flex: 1, padding: 20 }}>
+            <CustomPlacesAutocomplete
+              placeholder="Search for a stop..."
+              onPress={(data, details = null) => {
+                setStops([...stops, {
+                  address: data.description,
+                  location: {
+                    type: 'Point',
+                    coordinates: [details.geometry.location.lng, details.geometry.location.lat]
+                  },
+                  placeId: data.place_id
+                }]);
+                setShowStopModal(false);
+              }}
+              styles={{
+                textInputContainer: styles.pickupInputContainer,
+                textInput: styles.pickupTextInput,
+                container: styles.autocompleteContainer,
+                listView: styles.autocompleteList,
+              }}
+              renderRightButton={() => (
+                <TouchableOpacity onPress={() => openMapPicker('stop')} style={styles.mapIconBtn}>
+                  <Icon name="map" size={20} color="#FF9F43" />
+                </TouchableOpacity>
+              )}
+            />
+          </View>
+        </SafeAreaView>
+      </Modal>
+
+    </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors, isDark) => StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.background || colors.background,
   },
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.background || colors.background,
     
   },
   scrollContent: {
@@ -1005,7 +994,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     
     paddingBottom: 15,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.background,
     marginTop:34
   },
   backButton: {
@@ -1014,7 +1003,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#000',
+    color: colors.text,
     letterSpacing: 0.5,
   },
   notificationButton: {
@@ -1031,7 +1020,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F9C349',
   },
   activeRideBanner: {
-    backgroundColor: '#FFF8E1',
+    backgroundColor: colors.accent + '18',
     marginHorizontal: 20,
     marginTop: 8,
     marginBottom: 12,
@@ -1057,7 +1046,7 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   activeRideBannerTitle: {
-    color: '#000',
+    color: colors.text,
     fontWeight: '600',
     fontSize: 14,
   },
@@ -1067,22 +1056,22 @@ const styles = StyleSheet.create({
     textTransform: 'capitalize',
   },
   mapContainer: {
-    height: 200,
+    height: 350,
     marginHorizontal: 20,
     marginBottom: 16,
     borderRadius: 16,
     overflow: 'hidden',
-    backgroundColor: '#F5F5F5',
+    backgroundColor: colors.card,
     position: 'relative',
   },
   mapLoading: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: colors.card,
     justifyContent: 'center',
     alignItems: 'center',
   },
   mapLoadingText: {
-    color: '#999',
+    color: colors.textSecondary,
     marginTop: 12,
     fontSize: 14,
   },
@@ -1096,10 +1085,10 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.background,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
+    shadowColor: colors.text,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
@@ -1129,17 +1118,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: '#FFF',
+    borderColor: colors.background,
   },
   locationSection: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.background,
     marginHorizontal: 20,
     marginBottom: 20,
     padding: 20,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#F0F0F0',
-    shadowColor: '#000',
+    borderColor: colors.border,
+    shadowColor: colors.text,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04,
     shadowRadius: 8,
@@ -1154,7 +1143,7 @@ const styles = StyleSheet.create({
   locationTitle: {
     fontSize: 17,
     fontWeight: '600',
-    color: '#000',
+    color: colors.text,
   },
   locationAction: {
     flexDirection: 'row',
@@ -1188,7 +1177,7 @@ const styles = StyleSheet.create({
   dotLine: {
     width: 2,
     height: 20,
-    backgroundColor: '#E0E0E0',
+    backgroundColor: colors.border,
     marginTop: 4,
   },
   locationInputContainer: {
@@ -1197,13 +1186,13 @@ const styles = StyleSheet.create({
   pickupInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8F8F8',
+    backgroundColor: colors.cardElevated,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#F0F0F0',
+    borderColor: colors.border,
   },
   pickupTextInput: {
-    color: '#000',
+    color: colors.text,
     flex: 1,
     paddingHorizontal: 16,
     paddingVertical: 14,
@@ -1213,13 +1202,13 @@ const styles = StyleSheet.create({
   dropoffInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8F8F8',
+    backgroundColor: colors.cardElevated,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#F0F0F0',
+    borderColor: colors.border,
   },
   dropoffTextInput: {
-    color: '#000',
+    color: colors.text,
     flex: 1,
     paddingHorizontal: 16,
     paddingVertical: 14,
@@ -1231,14 +1220,14 @@ const styles = StyleSheet.create({
     zIndex: 999,
   },
   autocompleteList: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.background,
     borderRadius: 12,
     marginTop: 4,
     maxHeight: 200,
     width: '100%',
     borderWidth: 1,
-    borderColor: '#F0F0F0',
-    shadowColor: '#000',
+    borderColor: colors.border,
+    shadowColor: colors.text,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08,
     shadowRadius: 12,
@@ -1248,10 +1237,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#F5F5F5',
+    borderBottomColor: colors.card,
   },
   autocompleteDescription: {
-    color: '#000',
+    color: colors.text,
     fontSize: 14,
   },
   locationDivider: {
@@ -1265,7 +1254,7 @@ const styles = StyleSheet.create({
     marginTop: 16,
     paddingTop: 16,
     borderTopWidth: 1,
-    borderTopColor: '#F0F0F0',
+    borderTopColor: colors.border,
   },
   farePreviewLeft: {
     flexDirection: 'row',
@@ -1281,7 +1270,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   farePreviewText: {
-    color: '#000',
+    color: colors.text,
     fontSize: 14,
     fontWeight: '500',
   },
@@ -1289,13 +1278,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: colors.card,
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 12,
   },
   distanceText: {
-    color: '#999',
+    color: colors.textSecondary,
     fontSize: 12,
   },
   section: {
@@ -1311,7 +1300,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 17,
     fontWeight: '600',
-    color: '#000',
+    color: colors.text,
   },
   seeAll: {
     color: '#F9C349',
@@ -1330,13 +1319,13 @@ const styles = StyleSheet.create({
     transform: [{ scale: 1.02 }],
   },
   vehicleCardContent: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.background,
     padding: 16,
     borderRadius: 16,
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: '#F0F0F0',
-    shadowColor: '#000',
+    borderColor: colors.border,
+    shadowColor: colors.text,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04,
     shadowRadius: 4,
@@ -1350,14 +1339,50 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 8,
   },
+  stopsContainer: {
+    backgroundColor: colors.cardElevated,
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  stopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  stopText: {
+    flex: 1,
+    fontSize: 14,
+    color: colors.text,
+    marginLeft: 12,
+  },
+  addStopButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    backgroundColor: isDark ? '#2A200B' : '#FFFDF5',
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: isDark ? '#3A2E15' : '#FDECA6',
+    borderStyle: 'dashed',
+    justifyContent: 'center',
+  },
+  addStopText: {
+    fontSize: 14,
+    color: '#F5A623',
+    fontWeight: '600',
+    marginLeft: 8,
+  },
   vehicleLabel: {
-    color: '#000',
+    color: colors.text,
     fontSize: 14,
     fontWeight: '600',
     marginBottom: 2,
   },
   vehiclePrice: {
-    color: '#999',
+    color: colors.textSecondary,
     fontSize: 13,
     marginBottom: 6,
   },
@@ -1371,7 +1396,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   vehicleMetaText: {
-    color: '#999',
+    color: colors.textSecondary,
     fontSize: 10,
   },
   selectedBadge: {
@@ -1388,11 +1413,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#F8F8F8',
+    backgroundColor: colors.cardElevated,
     padding: 16,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#F0F0F0',
+    borderColor: colors.border,
   },
   guestToggleLeft: {
     flexDirection: 'row',
@@ -1402,31 +1427,31 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#F9C34915',
+    backgroundColor: isDark ? '#2A200B' : '#FFF7E0',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
   },
   guestToggleText: {
-    color: '#000',
+    color: colors.text,
     fontSize: 15,
     fontWeight: '500',
   },
   guestInputContainer: {
-    backgroundColor: '#F8F8F8',
+    backgroundColor: colors.cardElevated,
     padding: 16,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#F0F0F0',
+    borderColor: colors.border,
     marginTop: 10,
   },
   guestInputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.background,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#F0F0F0',
+    borderColor: colors.border,
     marginBottom: 10,
     paddingHorizontal: 12,
   },
@@ -1439,7 +1464,7 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   guestInput: {
-    color: '#000',
+    color: colors.text,
     flex: 1,
     paddingVertical: 12,
     fontSize: 14,
@@ -1448,81 +1473,50 @@ const styles = StyleSheet.create({
     paddingTop: 0,
     minHeight: 60,
   },
-  fareModeContainer: {
-    flexDirection: 'row',
+  priceScrollContent: {
+    paddingHorizontal: 2,
     gap: 12,
   },
-  fareMode: {
-    flex: 1,
-    borderRadius: 16,
-    overflow: 'hidden',
-    borderWidth: 2,
-    borderColor: '#F0F0F0',
-  },
-  fareModeSelected: {
-    borderColor: '#F9C349',
-  },
-  fareModeContent: {
-    padding: 16,
+  priceOptionWrapper: {
+    flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8F8F8',
   },
-  fareModeIcon: {
+  priceOptionCard: {
+    backgroundColor: isDark ? '#222' : colors.card,
+    borderRadius: 24,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  priceOptionSelected: {
+    backgroundColor: '#FFC107',
+  },
+  priceOptionText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.textSecondary,
+  },
+  priceOptionTextSelected: {
+    color: colors.text,
+    fontWeight: '700',
+  },
+  priceStepperBtn: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: isDark ? '#222' : colors.card,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 8,
   },
-  fareModeText: {
-    color: '#666',
-    fontSize: 14,
-    fontWeight: '500',
-    marginBottom: 4,
-  },
-  fareAmount: {
-    color: '#F9C349',
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  offerInput: {
-    backgroundColor: '#FFFFFF',
-    color: '#000',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    marginTop: 6,
-    width: '100%',
-    fontSize: 14,
-    textAlign: 'center',
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-  },
-  bookButtonContainer: {
-    paddingHorizontal: 20,
-    marginTop: 10,
-    marginBottom: 10,
-  },
-  bookButton: {
-    backgroundColor: '#F9C349',
-    borderRadius: 16,
-    paddingVertical: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
+  confirmPriceTick: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.text,
     justifyContent: 'center',
-    gap: 12,
-    shadowColor: '#F9C349',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 6,
-  },
-  bookButtonText: {
-    color: '#000',
-    fontSize: 18,
-    fontWeight: '700',
+    alignItems: 'center',
+    marginLeft: 8,
   },
   loadingContainer: {
     flexDirection: 'row',
@@ -1530,7 +1524,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   loadingText: {
-    color: '#000',
+    color: colors.text,
     fontSize: 16,
     fontWeight: '500',
   },
@@ -1546,7 +1540,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.4)',
   },
   modalContent: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.background,
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
     padding: 20,
@@ -1559,12 +1553,12 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     paddingBottom: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
+    borderBottomColor: colors.border,
   },
   modalTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#000',
+    color: colors.text,
   },
   modalClose: {
     padding: 4,
@@ -1572,7 +1566,7 @@ const styles = StyleSheet.create({
   modalVehicleItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8F8F8',
+    backgroundColor: colors.cardElevated,
     padding: 16,
     borderRadius: 12,
     marginBottom: 8,
@@ -1595,12 +1589,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   modalVehicleLabel: {
-    color: '#000',
+    color: colors.text,
     fontSize: 16,
     fontWeight: '600',
   },
   modalVehicleCapacity: {
-    color: '#999',
+    color: colors.textSecondary,
     fontSize: 12,
   },
   modalVehiclePrice: {
@@ -1617,17 +1611,17 @@ const styles = StyleSheet.create({
   },
   pickerModalContainer: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.background,
   },
   pickerModalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: 16,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.background,
     paddingTop: Platform.OS === 'ios' ? 50 : 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
+    borderBottomColor: colors.border,
   },
   pickerBackBtn: {
     padding: 4,
@@ -1635,7 +1629,7 @@ const styles = StyleSheet.create({
   pickerModalTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#000',
+    color: colors.text,
   },
   pickerMap: {
     flex: 1,
@@ -1647,37 +1641,37 @@ const styles = StyleSheet.create({
     marginLeft: -22,
     marginTop: -44,
     zIndex: 10,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.background,
     borderRadius: 28,
     padding: 4,
-    shadowColor: '#000',
+    shadowColor: colors.text,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 4,
   },
   pickerBottomCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.background,
     padding: 20,
     paddingBottom: Platform.OS === 'ios' ? 40 : 20,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    shadowColor: '#000',
+    shadowColor: colors.text,
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.05,
     shadowRadius: 10,
     elevation: 8,
     borderTopWidth: 1,
-    borderTopColor: '#F0F0F0',
+    borderTopColor: colors.border,
   },
   pickerAddressLabel: {
-    color: '#999',
+    color: colors.textSecondary,
     fontSize: 12,
     marginBottom: 8,
     fontWeight: '500',
   },
   pickerAddressText: {
-    color: '#000',
+    color: colors.text,
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 20,
@@ -1689,7 +1683,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   pickerConfirmText: {
-    color: '#000',
+    color: colors.text,
     fontSize: 16,
     fontWeight: '600',
   },
